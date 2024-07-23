@@ -20,3 +20,20 @@ def naive_sanity_check(array, thresh=0.0):
 
 def normalize_array(arr):
     return (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
+
+def view_sagittal_slices(volume):
+    for i in range(volume.shape[2]):
+        slice = volume[:][:][i]
+        plt.imshow(slice, cmap='gray')
+        plt.title(i)
+        plt.show()
+
+def create_volume(normalized_tensor):
+    mri_volume = np.zeros(normalized_tensor.shape)
+    for z_index in range(normalized_tensor.shape[2]):
+        sagittal_slice = normalized_tensor[:, :, z_index]
+        for row_index, row in enumerate(sagittal_slice):
+            for col_index, _ in enumerate(row):
+                density = sagittal_slice[row_index][col_index]
+                mri_volume[row_index][col_index][z_index] = density
+    return mri_volume
