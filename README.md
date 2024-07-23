@@ -14,7 +14,7 @@ A VDB representation of neurological MRI data.
 - [ ] Automated Blender opening and texturing
 - [ ] Animated FMRI usage
 - [ ] Slice-level rotoscope-based anatomy masking
-- [ ] Improve Blender VDB Texturing
+- [ ] Improve Blender VDB texturing
  
 # Contact
 jbbpfefferkorn@gmail.com
