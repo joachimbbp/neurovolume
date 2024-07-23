@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "neuro-volume"
+version = "0.1.0"
+description = ""
+authors = ["joachimbbp <104856283+joachimbbp@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+jupyter = "^1.0.0"
+nibabel = "^5.2.1"
+numpy = "^2.0.1"
+pytest = "^8.3.1"
+matplotlib = "^3.9.1"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
