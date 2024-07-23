@@ -1,6 +1,6 @@
 # Neuro Volume
 A VDB representation of neurological MRI data.
-![First Render](readme_media/first_neuro_render.png)
+![First Render](readme_media/brain_alpha.png)
 
 # Usage
 - Generate a NumPy array suitable for conversion to a VDB, run the cells in `src/neuro_volume/generate_neuro_volume.ipynb`
