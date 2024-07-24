@@ -1,5 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
+import os
 
 def show_3D_array(array):
     #More or less copypasta
@@ -37,3 +38,9 @@ def create_volume(normalized_tensor):
                 density = sagittal_slice[row_index][col_index]
                 mri_volume[row_index][col_index][z_index] = density
     return mri_volume
+
+def parent_directory() -> str:
+    #WARNING
+    #This only works for this repo's specific folder structure
+    dir = os.path.dirname(os.path.dirname(os.getcwd()))
+    return dir

@@ -9,13 +9,18 @@ A VDB representation of neurological MRI data.
 - The material must be selected by hand after loading the VDB
 ![Blender Instructions](readme_media/blender_setup.png)
 
+# Why VDB?
+VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Unlike typical meshed based pipelines using the marching cubes algorithm, this volume based approach preserves the scan’s normalized density data throughout the VFX pipeline. The animation support will also be particularly useful when animating FMRI data as outlined in the roadmap below.
+
+For more information on VDBs, see the [openVDB website](https://www.openvdb.org/)
+
 # Roadmap
 - [ ] Docker Container to integrate OpenVDB into `src/neuro_volume`
 - [ ] Automated Blender opening and texturing
 - [ ] Animated FMRI usage
 - [ ] Slice-level rotoscope-based anatomy masking
 - [ ] Improve Blender VDB texturing
- 
+
 # Contact
 jbbpfefferkorn@gmail.com
 
