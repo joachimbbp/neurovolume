@@ -11,8 +11,8 @@ import numpy as np
 import os
 
 #TODO Once integrated into docker, generate these with functions/parent_directory()
-filename = "/Users/joachimpfefferkorn/repos/neuro_volume/output/brain_volume.npy"
-output_path = "/Users/joachimpfefferkorn/repos/neuro_volume/output/brain_volume_vdb.vdb"
+filename = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_volume.npy"
+output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_vo0lume_vdb.vdb"
 
 Volume = np.load(filename)
 
@@ -37,4 +37,4 @@ grid.name='density'
 #writes vdb file
 openvdb.write(output_path,grid)
 #adds file to scene
-bpy.ops.object.volume_import(filepath=output_path, files=[])
+bpy.ops.object.volume_import(filepath=output_path, files=[])/Users/joachimpfefferkorn/repos/neurovolume/output/brain_volume.npy
