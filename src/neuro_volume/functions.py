@@ -19,8 +19,8 @@ def naive_sanity_check(array, thresh=0.0):
             print("Index: " + str(index) + " Density: " + str(density))
 
 
-def normalize_array(arr):
-    return (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
+def normalize_array(arr): #changed to return an np array directly
+    return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
 
 def view_sagittal_slices(volume):
     for i in range(volume.shape[2]):
@@ -28,6 +28,13 @@ def view_sagittal_slices(volume):
         plt.imshow(slice, cmap='gray')
         plt.title(i)
         plt.show()
+
+def view_middle_slice(volume):
+    slice = volume[:][:][5] #hard coded for now
+    plt.imshow(slice, cmap="gray")
+    plt.title("middle slice")
+    plt.show()
+    
 
 def create_volume(normalized_tensor):
     mri_volume = np.zeros(normalized_tensor.shape)
@@ -44,3 +51,6 @@ def parent_directory() -> str:
     #This only works for this repo's specific folder structure
     dir = os.path.dirname(os.path.dirname(os.getcwd()))
     return dir
+
+def sum_3D_array(array):
+    return np.sum(array[0]) + np.sum(array[1]) + np.sum(array[2])
