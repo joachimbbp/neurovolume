@@ -17,9 +17,9 @@ transform_matrix = [
 
 for tensor in os.listdir(npy_seq_folder):
     print(f"reading in {tensor}")
-    file_basename = os.path.basename(tensor)
     
     if pathlib.Path(f"{npy_seq_folder}/{tensor}").suffix == ".npy":
+        file_basename = os.path.basename(tensor).split('.')[0]
         Volume = np.load(f"{npy_seq_folder}/{tensor}")
         grid = openvdb.DoubleGrid()
         grid.copyFromArray(Volume.astype(float))
