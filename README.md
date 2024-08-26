@@ -25,7 +25,10 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 # Contact
 jbbpfefferkorn@gmail.com
 
-# Citations
+# Dataset information
 The MRI data used in this prototype is from openneuro.org
 
+You can download the dataset [here](https://openneuro.org/datasets/ds003900/versions/1.1.1). It is located at `sub-100/anat/sub-1001_T1w.nii.gz`
+
+## Citation
 Philippe Poulin and Guillaume Theaud and Pierre-Marc Jodoin and Maxime Descoteaux (2022). TractoInferno: A large-scale, open-source, multi-site database for machine learning dMRI tractography. OpenNeuro. [Dataset] doi: doi:10.18112/openneuro.ds003900.v1.1.1
