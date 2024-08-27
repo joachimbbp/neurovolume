@@ -12,7 +12,7 @@ import os
 
 #TODO Once integrated into docker, generate these with functions/parent_directory()
 filename = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_volume.npy"
-output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_vo0lume_vdb.vdb"
+output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_volume_vdb.vdb"
 
 Volume = np.load(filename)
 
