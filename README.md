@@ -17,8 +17,10 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 # Roadmap
 - [ ] Automated slice height spacing based on scan metadata
 - [ ] Docker Container to integrate OpenVDB into `src/neuro_volume`
-- [ ] Animated FMRI usage
-- [ ] Improve Blender VDB texturing and slicing
+    - [Click here for Docker Container Progress](https://github.com/joachimbbp/openvdb_docker)
+- [ ] Animated fMRI usage
+    - [Click here for fMRI Progress](https://github.com/joachimbbp/neurovolume/tree/fmri_070825)
+- [x] Improve Blender VDB texturing and slicing
 
 # Contact
 jbbpfefferkorn@gmail.com
