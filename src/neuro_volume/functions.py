@@ -2,6 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 
+
+
 def show_3D_array(array):
     #More or less copypasta
     plt.rcParams["figure.figsize"] = [7.00, 3.50]
