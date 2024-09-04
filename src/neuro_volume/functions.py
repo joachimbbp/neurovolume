@@ -22,7 +22,7 @@ def naive_sanity_check(array, thresh=0.0):
 
 
 def normalize_array(arr): #changed to return an np array directly
-    return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
+    return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)), dtype=float)
 
 def view_sagittal_slices(volume):
     for i in range(volume.shape[2]):
