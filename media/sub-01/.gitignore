@@ -1,0 +1,12 @@
+#media gitignore
+
+# Ignore everything in the folder
+*
+
+# But not this .gitignore file
+!.gitignore
+
+#And not these example files
+!anat/
+!anat/sub-01_T1w.nii.gz
+!anat/sub-01_T1w.json

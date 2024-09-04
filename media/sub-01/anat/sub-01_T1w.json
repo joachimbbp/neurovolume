@@ -1,0 +1,23 @@
+{
+    "Manufacturer": "GE",
+    "ManufacturersModelName": "DISCOVERY_MR750",
+    "ScanningSequence": "GR",
+    "SequenceVariant": "SS_SK",
+    "SeriesDescription": "3D_Ax_T1_BRAVO",
+    "BodyPartExamined": "HEAD",
+    "ProtocolName": "3D_Ax_T1_BRAVO",
+    "ImageType": [
+        "ORIGINAL",
+        "PRIMARY",
+        "OTHER"
+    ],
+    "AcquisitionDateTime": "2019-10-02T18:15:29.000000",
+    "MagneticFieldStrength": 3,
+    "FlipAngle": 12,
+    "EchoTime": 0.00302,
+    "RepetitionTime": 0.007788,
+    "InversionTime": 0.45,
+    "ConversionSoftware": "dcm2niix",
+    "ConversionSoftwareVersion": "v1.0.20170411 GCC4.8.4",
+    "Dcm2bidsVersion": "2.1.4"
+}

@@ -5,7 +5,11 @@ import os
 
 
 def show_3D_array(array):
+    print('updated')
+    plt.switch_backend('Agg')
     #More or less copypasta
+    #Currently is crashing the kernel when in the dev container
+
     plt.rcParams["figure.figsize"] = [7.00, 3.50]
     plt.rcParams["figure.autolayout"] = True
     fig = plt.figure()
@@ -22,12 +26,13 @@ def naive_sanity_check(array, thresh=0.0):
 
 
 def normalize_array(arr): #changed to return an np array directly
-    return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)), dtype=float)
+    print("no more float specificaiton")
+    return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
 
-def view_sagittal_slices(volume):
+def view_sagittal_slices(volume, color_map):
     for i in range(volume.shape[2]):
-        slice = volume[:][:][i]
-        plt.imshow(slice, cmap='gray')
+        slice = volume[:,:,i]
+        plt.imshow(slice, cmap=color_map)
         plt.title(i)
         plt.show()
 

@@ -22,9 +22,11 @@ Isaac David and Victor Olalde-Mathieu and Ana Y. Martínez and Lluviana Rodrígu
 - [ ] Reintegrate `pyopenvdb.DoubleGrid`
     - Despite existing in blender, we get this error in our dev container: `AttributeError: module 'pyopenvdb' has no attribute 'DoubleGrid'`
     - I suspect we are missing build support for something (like we were fur `Numpy`)
-- [ ] Move all blender scripting implementation into python source code (will fix `Issues` above)
+- [x] Move all blender scripting implementation into python source code (will fix `Issues` above)
 - [ ] Animate VDB emission and color to show activations (as apposed to layering the anatomy and activation VDBs in blender)
-    - [Nipy viz](https://nipy.org/nipy/labs/viz.html) might be a better library than nibabel
+    - [Nipy viz](https://nipy.org/nipy/labs/viz.html) might be a better library than `nibabel`
+    - Changing the `GridClass` to something other than`FOG_VOLUME` is probably necessary.
 - [ ] Fix your redundant, weird, sophomoric, `create_volume()` tensor creation function 
 - [x] Change fMRI dataset to [this](https://openneuro.org/datasets/ds003548/versions/1.0.1) open neuro project
-- [ ] Include example dataset in a non `.gitignored` media folder. Make sure to cite it as per openneuro's requirements
+- [x] Include example dataset in a non `.gitignored` media folder. Make sure to cite it as per openneuro's requirements
+- [ ] Space height based on scan meta-data (z-space currently squashed)
