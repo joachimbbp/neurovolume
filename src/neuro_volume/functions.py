@@ -1,7 +1,35 @@
 import numpy as np
+import matplotlib as mpl
 from matplotlib import pyplot as plt
+from matplotlib.colors import ListedColormap
 import os
 
+
+def iso_scale_trans(affine):
+    """
+    Isolates the scale and translation from an affine
+    """
+    return [
+    [float(affine[0][0]), 0.0, 0.0, 0.0],
+    [0.0, float(affine[1][1]), 0.0, 0.0],
+    [0.0, 0.0, float(affine[2][2]), 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+]
+
+def plot_examples(colormaps):
+#copypasta from matplotlib docs
+    """
+    Helper function to plot data with associated colormap.
+    """
+    np.random.seed(19680801)
+    data = np.random.randn(30, 30)
+    n = len(colormaps)
+    fig, axs = plt.subplots(1, n, figsize=(n * 2 + 2, 3),
+                            layout='constrained', squeeze=False)
+    for [ax, cmap] in zip(axs.flat, colormaps):
+        psm = ax.pcolormesh(data, cmap=cmap, rasterized=True, vmin=-4, vmax=4)
+        fig.colorbar(psm, ax=ax)
+    plt.show()
 
 
 def show_3D_array(array):
@@ -26,7 +54,6 @@ def naive_sanity_check(array, thresh=0.0):
 
 
 def normalize_array(arr): #changed to return an np array directly
-    print("no more float specificaiton")
     return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
 
 def view_sagittal_slices(volume, color_map):
@@ -44,6 +71,17 @@ def view_middle_slice(volume):
     
 
 def create_volume(normalized_tensor):
+    """
+    Redundant function that needs to be eliminated
+
+    `anat_norm = create_volume(normalize_array(nib.load(anat_filepath).get_fdata()))
+    anat_norm_no_cv = normalize_array(nib.load(anat_filepath).get_fdata())
+    print(np.array_equal(anat_norm, anat_norm_no_cv))`
+    Returns True
+
+    However, when a vdb is created with `anat_norm_no_cv` it comes out as a pure box of noise
+    I have no idea why!
+    """
     mri_volume = np.zeros(normalized_tensor.shape)
     for z_index in range(normalized_tensor.shape[2]):
         sagittal_slice = normalized_tensor[:, :, z_index]
