@@ -6,7 +6,7 @@ This branch is for the development of animated fMRI usage. It is a work in progr
 Anatomy successfully processes with `src/neuro_volume/anat_pipeline.ipynb`
 
 # Docker
-The dockerfile was created with myself and [Zach Lipp](https://github.com/zachlipp) (but mostly Zach). Integrating [OpenVDB](https://www.openvdb.org/) into a development environment is a challenge that effects many scientific visualization projects. Accordingly, we have a separate repo for this which can be found [here](https://github.com/joachimbbp/openvdb_docker). However, project specific tweaks, such as adding `Numpy` to the `openVDB` build, may not be reflected there.
+The dockerfile was created with myself and [Zach Lipp](https://github.com/zachlipp) (but mostly Zach). Integrating [OpenVDB](https://www.openvdb.org/) into a development environment is a challenge that affects many scientific visualization projects. Accordingly, we have a separate repo for this which can be found [here](https://github.com/joachimbbp/openvdb_docker). However, project specific tweaks, such as adding `Numpy` to the `openVDB` build, may not be reflected there.
 
 Note that when working within a docker container (such as your own fMRI dataset), any external files must be copied over using `docker cp ./some_file CONTAINER:/work`.
 
