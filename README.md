@@ -21,9 +21,8 @@ Isaac David and Victor Olalde-Mathieu and Ana Y. Martínez and Lluviana Rodrígu
 # Branch Goals:
 Once these are addressed we can push to main:
 - [x] Rebuild `pyopenvdb` with `NumPy` Support
-- [ ] Address missing `pyopenvdb.DoubleGrid`
-    - Despite existing in blender, we get this error in our dev container: `AttributeError: module 'pyopenvdb' has no attribute 'DoubleGrid'`
-    - I suspect we are missing build support for something (like we were for `Numpy`)
+- [x] Address missing `pyopenvdb.DoubleGrid`
+    - `PY_OPENVDB_WRAP_ALL_GRID_TYPES` Needs to be defined at compile time as per the [docs](https://www.openvdb.org/documentation/doxygen/python.html). Needs to be addressed in the [docker file](https://github.com/joachimbbp/openvdb_docker)
 - [x] Move all blender scripting implementation into python source code (will fix `Issues` above)
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
     - [Nipy viz](https://nipy.org/nipy/labs/viz.html) might be a better library than `nibabel`
@@ -32,3 +31,4 @@ Once these are addressed we can push to main:
 - [x] Change fMRI dataset to [this](https://openneuro.org/datasets/ds003548/versions/1.0.1) open neuro project
 - [x] Include example dataset in a non `.gitignored` media folder. Make sure to cite it as per openneuro's requirements
 - [x] Space height based on scan meta-data (z-space currently squashed)
+- [ ] Update to latest [openvdb_docker](https://github.com/joachimbbp/openvdb_docker) after next successful Build and Push

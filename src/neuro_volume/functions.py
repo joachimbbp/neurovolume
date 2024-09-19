@@ -56,17 +56,18 @@ def naive_sanity_check(array, thresh=0.0):
 def normalize_array(arr): #changed to return an np array directly
     return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
 
-def view_sagittal_slices(volume, color_map):
+def view_all_sagittal_slices(volume, color_map):
     for i in range(volume.shape[2]):
         slice = volume[:,:,i]
         plt.imshow(slice, cmap=color_map)
         plt.title(i)
         plt.show()
 
-def view_middle_slice(volume):
-    slice = volume[:][:][5] #hard coded for now
-    plt.imshow(slice, cmap="gray")
-    plt.title("middle slice")
+def view_sagittal_slice(volume, middle, color_map):
+    slice = volume[:,:,middle]
+    plt.imshow(slice, cmap=color_map)
+    plt.title(middle)
+    plt.colorbar()
     plt.show()
     
 
