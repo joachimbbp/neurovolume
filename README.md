@@ -5,10 +5,10 @@ This branch is for the development of animated fMRI usage. It is a work in progr
 # Status
 Anatomy successfully processes with `src/neuro_volume/anat_pipeline.ipynb`
 
-# Docker
-The dockerfile was created with myself and [Zach Lipp](https://github.com/zachlipp) (but mostly Zach). Integrating [OpenVDB](https://www.openvdb.org/) into a development environment is a challenge that affects many scientific visualization projects. Accordingly, we have a separate repo for this which can be found [here](https://github.com/joachimbbp/openvdb_docker). However, project specific tweaks, such as adding `Numpy` to the `openVDB` build, may not be reflected there.
+# Docker, Poetry, and Blender Scripts
+The [dockerfile](https://github.com/joachimbbp/openvdb_docker) created by myself and [Zach Lipp](https://github.com/zachlipp) is currently under construction. **This commit currently reverts to the Poetry package manager and is not using the docker file.** This is due to some  long build times that arise when `PY_OPENVDB_WRAP_ALL_GRID_TYPES=ON` is activated in OpenVDB. Until this problem is solved, I will perform all the data manipulation in Numpy arrays, and then convert these to separate grids with the Blender scripts found in `src/blender_scripts`.
 
-Note that when working within a docker container (such as your own fMRI dataset), any external files must be copied over using `docker cp ./some_file CONTAINER:/work`.
+The last commit before this change can be found [here](https://github.com/joachimbbp/neurovolume/tree/0525ba0786782e71f84ca09189ae85bd7adfeb5b).
 
 # Open Neuro
 ## Scan Data
@@ -20,9 +20,10 @@ Isaac David and Victor Olalde-Mathieu and Ana Y. Martínez and Lluviana Rodrígu
 
 # Branch Goals:
 Once these are addressed we can push to main:
-- [x] Rebuild `pyopenvdb` with `NumPy` Support
-- [x] Address missing `pyopenvdb.DoubleGrid`
-    - `PY_OPENVDB_WRAP_ALL_GRID_TYPES` Needs to be defined at compile time as per the [docs](https://www.openvdb.org/documentation/doxygen/python.html). Needs to be addressed in the [docker file](https://github.com/joachimbbp/openvdb_docker)
+- [ ] Rebuild `pyopenvdb` with `NumPy` Support
+    - Did work with previous docker file, put on hold due to issue below:
+- [ ] Address missing `pyopenvdb.DoubleGrid`
+    - `PY_OPENVDB_WRAP_ALL_GRID_TYPES` Needs to be defined at compile time as per the [docs](https://www.openvdb.org/documentation/doxygen/python.html). Needs to be addressed in the [docker file](https://github.com/joachimbbp/openvdb_docker). Image build takes approximately 47 minutes, but opening a dev container causes error messages and other unstableness.
     - [ ] Update to latest [openvdb_docker](https://github.com/joachimbbp/openvdb_docker) after next successful Build and Push
 - [x] Move all blender scripting implementation into python source code (will fix `Issues` above)
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
