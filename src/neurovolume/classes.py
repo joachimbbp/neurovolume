@@ -17,7 +17,7 @@ class MRI_Anat:
     def __str__(self):
         return self.brain_img.header
 
-    def view_slice(self,position=20, plane="transverse", color_map=mpl.colormaps['tab20c']):
+    def view_slice(self, position=20, plane="transverse", color_map=mpl.colormaps['tab20c']):
         #Could you do this with an enum in self?
         #TODO Make this 
         if plane=="sagittal":
