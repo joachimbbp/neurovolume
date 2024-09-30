@@ -19,7 +19,8 @@ class MRI_Anat:
 
     def view_slice(self, position=20, plane="transverse", color_map=mpl.colormaps['tab20c']):
         #Could you do this with an enum in self?
-        #TODO Make this 
+        #TODO I think there is also a nibabel equivalent to this...
+        #probably should move this back to functions tbh
         if plane=="sagittal":
             slice = self.brain_data[:,position,:]
         elif plane=="frontal":
