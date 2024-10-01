@@ -18,20 +18,17 @@ output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/anatomy_vdb.vd
 anatomy_volume = np.load(anat_path)
 
 affine = np.load(affine_path)
-
-
-print(affine)
+scale = (affine[0][0], affine[1][1], affine[2][2])
+print("scale", scale)
 
 grid = openvdb.FloatGrid() #FloatGrid supported without crazy build times
+#grid.transform = openvdb.createLinearTransform(affine)
 grid.copyFromArray(anatomy_volume.astype(float))
 grid.gridClass = openvdb.GridClass.UNKNOWN
 grid.name='anatomy'
-grid.transform = openvdb.createLinearTransform(affine)
 
 openvdb.write(output_path,grid)
-bpy.ops.object.volume_import(filepath=output_path, files=[])
-
-
+bpy.ops.object.volume_import(filepath=output_path, files=[], scale=(0.0,0.0,20.0), rotation=(0.0,0.0,3.0))
 
 #SO, our afine is nicely formatted as per openvdb's specifications, however the linear transform does not work. Ugh.
 #As a solve, we COULD dial this in as volume transformations in blender. NOT GREAT but it should work
