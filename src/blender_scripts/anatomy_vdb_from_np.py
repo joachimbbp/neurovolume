@@ -22,11 +22,11 @@ scale = (affine[0][0], affine[1][1], affine[2][2])
 print("scale", scale)
 print(affine)
 
-grid = openvdb.FloatGrid() #FloatGrid supported without crazy build times
+grid = openvdb.DoubleGrid() #FloatGrid supported without crazy build times
 #grid.transform = openvdb.createLinearTransform(affine)
-grid.copyFromArray(anatomy_volume.astype(float))
-grid.gridClass = openvdb.GridClass.UNKNOWN
-grid.name='anatomy'
+grid.copyFromArray(anatomy_volume.astype(float), tolerance=0.2) #Works for this specific dataset
+grid.gridClass = openvdb.GridClass.FOG_VOLUME
+grid.name='density'
 
 openvdb.write(output_path,grid)
 bpy.ops.object.volume_import(filepath=output_path, files=[])
