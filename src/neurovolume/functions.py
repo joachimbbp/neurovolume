@@ -56,19 +56,21 @@ def naive_sanity_check(array, thresh=0.0):
 def normalize_array(arr): #changed to return an np array directly
     return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
 
+def view_slice(slice, color_map="tab20c", title=""):
+    plt.imshow(slice, cmap=color_map)
+    plt.title(title)
+    plt.show()
+
+#TODO move the view saggital slices function over here, integrate into all these matplotlib functions
+
 def view_all_sagittal_slices(volume, color_map):
     for i in range(volume.shape[2]):
         slice = volume[:,:,i]
-        plt.imshow(slice, cmap=color_map)
-        plt.title(i)
-        plt.show()
+        view_slice(slice, color_map, title=str(i))
 
 def view_sagittal_slice(volume, middle, color_map):
     slice = volume[:,:,middle]
-    plt.imshow(slice, cmap=color_map)
-    plt.title(middle)
-    plt.colorbar()
-    plt.show()
+    view_slice(slice, color_map)
     
 
 def create_volume(normalized_tensor):
