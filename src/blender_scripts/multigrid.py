@@ -15,7 +15,7 @@ brain_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_grid.npy"
 exterior_anat_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/exterior_anat_grid.npy"
 
 affine_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/affine.npy"
-output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_volumes.vdb"
+output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_test10.vdb"
 
 affine = np.load(affine_path)
 brain_vol = np.load(brain_path)
@@ -25,16 +25,18 @@ brain_grid = openvdb.FloatGrid()
 extanat_grid = openvdb.FloatGrid()
 
 brain_grid.copyFromArray(brain_vol.astype(float), tolerance=0.2)
-extanat_grid.copyFromArray(brain_vol.astype(float), tolerance=0.2)
+extanat_grid.copyFromArray(ext_anat_vol.astype(float), tolerance=0.2)
 
 brain_grid.gridClass = openvdb.GridClass.FOG_VOLUME
 brain_grid.name = 'brain'
 extanat_grid.gridClass = openvdb.GridClass.FOG_VOLUME
 extanat_grid.name = 'external_anatomy'
 
+print(brain_grid)
+print(extanat_grid)
 
-openvdb.write(output_path,[brain_grid, extanat_grid])
-bpy.ops.object.volume_import(filepath=output_path)#, files=[])
+openvdb.write(output_path, [brain_grid, extanat_grid])
+bpy.ops.object.volume_import(filepath=output_path, files=[])
 
 
 #SO, our afine is nicely formatted as per openvdb's specifications, however the linear transform does not work. Ugh.
