@@ -4,6 +4,7 @@ This branch is for the development of animated fMRI usage. It is a work in progr
 
 # Status
 Anatomy successfully processes with `src/neuro_volume/anat_pipeline.ipynb`
+Much of the roto skull strip isn't going to work presently in the dev container.
 
 # Docker, Poetry, and Blender Scripts
 The [dockerfile](https://github.com/joachimbbp/openvdb_docker) created by myself and [Zach Lipp](https://github.com/zachlipp) is currently under construction. **This commit currently reverts to the Poetry package manager and is not using the docker file.** This is due to some  long build times that arise when `PY_OPENVDB_WRAP_ALL_GRID_TYPES=ON` is activated in OpenVDB. Until this problem is solved, I will perform all the data manipulation in Numpy arrays, and then convert these to separate grids with the Blender scripts found in `src/blender_scripts`.

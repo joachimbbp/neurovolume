@@ -3,6 +3,24 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 import os
+from PIL import Image
+from numpy import asarray
+
+def build_bool_mask(mask_sequence_path, original_mri_tensor):
+    masks = {} #dictionary with number being the key, the mask array as the value
+    for entry in os.listdir(mask_sequence_path):
+        if entry.endswith(".jpg"):
+            img_path = f"{mask_sequence_path}/{entry}"
+            with Image.open(img_path) as img:
+                masks[entry[-6:-4]] = (asarray(img.convert('L')) > 0)
+                #Creates a boolean mask for now #TODO come to think of it, you could do string or enum labels for anatomy here!
+                #TODO some scalar number to give soft transitions between the grids
+    
+    mask_3D = np.empty(original_mri_tensor.shape)
+    for index in sorted(masks):
+        mask_3D[:,:,int(index)] = masks[index]
+    print("bool masks built v1")
+    return mask_3D
 
 
 def iso_scale_trans(affine):
@@ -94,6 +112,9 @@ def create_volume(normalized_tensor):
                 mri_volume[row_index][col_index][z_index] = density
     return mri_volume
 
+def create_normalized_volume(vol):
+    return create_volume(normalize_array(vol))
+
 def parent_directory() -> str:
     #WARNING
     #This only works for this repo's specific folder structure
@@ -102,3 +123,7 @@ def parent_directory() -> str:
 
 def sum_3D_array(array):
     return np.sum(array[0]) + np.sum(array[1]) + np.sum(array[2])
+
+def create_masked_normalized_tensor(brain_tensor, mask_tensor, keep_when=True):
+    print("creating masked normal tensor")
+    return create_volume((np.where(mask_tensor==keep_when,np.array(normalize_array(brain_tensor)), 0.0)))
