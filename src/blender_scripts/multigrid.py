@@ -13,29 +13,32 @@ import os
 #TODO Once integrated into docker, generate these with functions/parent_directory()
 brain_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_grid.npy"
 exterior_anat_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/exterior_anat_grid.npy"
+full_anatomy_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/full_anat.npy"
 
 affine_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/affine.npy"
-output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_test10.vdb"
+output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_grid.vdb"
 
 affine = np.load(affine_path)
 brain_vol = np.load(brain_path)
 ext_anat_vol = np.load(exterior_anat_path)
+full_anat_vol = np.load(full_anatomy_path)
 
 brain_grid = openvdb.FloatGrid()
 extanat_grid = openvdb.FloatGrid()
+fullanat_grid = openvdb.FloatGrid()
 
 brain_grid.copyFromArray(brain_vol.astype(float), tolerance=0.2)
 extanat_grid.copyFromArray(ext_anat_vol.astype(float), tolerance=0.2)
+fullanat_grid.copyFromArray(full_anat_vol.astype(float),tolerance=0.2)
 
 brain_grid.gridClass = openvdb.GridClass.FOG_VOLUME
 brain_grid.name = 'brain'
 extanat_grid.gridClass = openvdb.GridClass.FOG_VOLUME
 extanat_grid.name = 'external_anatomy'
+fullanat_grid.gridClass = openvdb.GridClass.FOG_VOLUME
+fullanat_grid.name = 'full_anatomy'
 
-print(brain_grid)
-print(extanat_grid)
-
-openvdb.write(output_path, [brain_grid, extanat_grid])
+openvdb.write(output_path, [brain_grid, extanat_grid, fullanat_grid])
 bpy.ops.object.volume_import(filepath=output_path, files=[])
 
 
