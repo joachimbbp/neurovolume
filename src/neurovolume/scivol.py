@@ -11,8 +11,7 @@ class GridType(Enum):
     Vec3SGrid = "Vec3SGrid"
 
 class Grid:
-    def __init__(self, name: str, frames: list[np.matrix], grid_type: GridType, color: tuple,
-                tolerance_override=DEFAULT_TOLERANCE):
+    def __init__(self, name: str, frames: list[np.ndarray], grid_type: GridType, color: tuple):
         self.name = name
         self.frames = frames
         self.grid_type = grid_type.value
@@ -29,7 +28,7 @@ class Scivol:
     Note there is strictly no special characters in Scivol or it's child grids
     Presently we only use one affine and tolerance per scivol which affects every grid.
     '''
-    def __init__(self, name:str, affine: np.matrix, tolerance:float):
+    def __init__(self, name:str, affine: np.ndarray, tolerance:float):
         self.name = name
         self.affine = affine
         self.tolerance = tolerance

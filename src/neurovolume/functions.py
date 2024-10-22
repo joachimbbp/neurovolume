@@ -23,6 +23,7 @@ def build_bool_mask(mask_sequence_path, original_mri_tensor):
     return mask_3D
 
 
+
 def iso_scale_trans(affine):
     """
     Isolates the scale and translation from an affine

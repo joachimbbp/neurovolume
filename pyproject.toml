@@ -13,6 +13,8 @@ numpy = "^2.0.1"
 pytest = "^8.3.1"
 matplotlib = "^3.9.1"
 pillow = "^10.4.0"
+ipyvolume = "^0.6.3"
+neuropythy = "^0.12.15"
 
 
 
