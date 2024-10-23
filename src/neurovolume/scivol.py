@@ -1,6 +1,9 @@
 import numpy as np
 from enum import Enum
 
+np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+
+
 class GridType(Enum):
     '''
     These are the default grid types for OpenVDB.
@@ -11,7 +14,7 @@ class GridType(Enum):
     Vec3SGrid = "Vec3SGrid"
 
 class Grid:
-    def __init__(self, name: str, frames: list[np.ndarray], grid_type: GridType, color: tuple):
+    def __init__(self, name: str, frames: list[np.ndarray], color: tuple=(0,0,0), grid_type: GridType=GridType.FloatGrid):
         self.name = name
         self.frames = frames
         self.grid_type = grid_type.value
@@ -33,16 +36,19 @@ class Scivol:
         self.affine = affine
         self.tolerance = tolerance
         self.grids = []
-    def __str__(self):
-        return f"Scivol: {self.name}, Tolerance: {self.tolerance}, Grids: {self.grids}"
     def add_grid(self, grid:Grid):
-        self.grids += grid
+        self.grids.append(grid)
+    def add_grids(self, grids:[Grid]):
+        for grid in grids:
+            self.add_grid(grid)
     def write_scivol(self):
-        header = f"NAME:={self.name}|TOLERANCE:={self.tolerance}|AFFINE:={self.affine}|,"
+        header = f"NAME:={self.name}|\nTOLERANCE:={self.tolerance}|\nAFFINE:={self.affine}|\n"
         grids = ""
         for grid in self.grids:
-            grids += f"name:{grid.name}$grid_type:{grid.grid_class}$color:{grid.color}$modifiers:{grid.modifiers}$frames:{grid.frames}"
+            grids += f"name:{grid.name}\n$grid_type:{grid.grid_class}\n$color:{grid.color}\n$modifiers:{grid.modifiers}\n$frames:{grid.frames}"
         return header+grids
     def save_scivol(self, output_folder):
         with open(f"{output_folder}/{self.name}.scivol", 'w') as f:
-            f.write(self.write_scivol(self))
+            f.write(self.write_scivol())
+    def __str__(self):
+        return self.write_scivol()
