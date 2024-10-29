@@ -1,8 +1,8 @@
 import numpy as np
 from enum import Enum
+import json
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
-
 
 class GridType(Enum):
     '''
@@ -25,6 +25,17 @@ class Grid:
     #TODO initialize a grid just from a NiFTY File
     def __str__(self):
         return f"grid: {self.name}"
+
+    def to_dict(self):
+        print(f"writing {self.name} to grid")
+        content =  {
+            "frames": [frame.tolist() for frame in self.frames],  # Convert numpy arrays to lists
+            "grid_type": self.grid_type,
+            "color": self.color,
+            "grid_class": self.grid_class,
+            "modifiers": self.modifiers
+        }
+        return content
     
 class Scivol:
     '''
@@ -35,20 +46,25 @@ class Scivol:
         self.name = name
         self.affine = affine
         self.tolerance = tolerance
-        self.grids = []
-    def add_grid(self, grid:Grid):
-        self.grids.append(grid)
+        self.grids = {}
     def add_grids(self, grids:[Grid]):
         for grid in grids:
-            self.add_grid(grid)
+            self.grids[grid.name] = grid.to_dict()
     def write_scivol(self):
-        header = f"NAME:={self.name}|\nTOLERANCE:={self.tolerance}|\nAFFINE:={self.affine}|\n"
-        grids = ""
-        for grid in self.grids:
-            grids += f"name:{grid.name}\n$grid_type:{grid.grid_class}\n$color:{grid.color}\n$modifiers:{grid.modifiers}\n$frames:{grid.frames}"
-        return header+grids
+        print(f"writing {self.name}.scivol")
+        content = {
+        'name' : self.name,
+        'tolerance' : self.tolerance,
+        'affine' : self.affine.tolist(),
+        'grids' : self.grids #self.grids
+        }
+        #print(content)
+        return content
+
     def save_scivol(self, output_folder):
         with open(f"{output_folder}/{self.name}.scivol", 'w') as f:
-            f.write(self.write_scivol())
+            print(f"saving {self.name}.scivol")
+            json.dump(self.write_scivol(), f)
+
     def __str__(self):
         return self.write_scivol()
