@@ -1,50 +1,45 @@
-#This script is for use in the blender 4.1.1 Python environment and will not work in the current "neuro_volume" environment
-#This script can also be found in /blender/vdb_from_numpy.blend. This is where it is intended to be run
-#Integrating this functionality into /src will require a Docker container. This is planned on the roadmap
-
-#Running this script in blender will generate the VDB and import it into blender
-#The vdb_vol material will need to be added manually
-
 import bpy
-import pyopenvdb as openvdb
+import pyopenvdb as vdb
 import numpy as np
+import json
 import os
+#FUNCTIONS
+def build_grid(scivol_file, grid_name):
+    print(f"building {grid_name}")
+    vol = np.asarray(scivol_file['grids'][grid_name]['frames'][0]) #TODO 4D non-static grid when implementing fMRI
+    print(f"vol shape: {vol.shape}")
+    grid = vdb.FloatGrid()
+    grid.copyFromArray(vol.astype(float), tolerance = scivol_file['tolerance'])
+    grid.gridClass = scivol_file['grids'][grid_name]['grid_class']
+    grid.name = grid_name
+    print(f"{grid_name} type: {type(grid)}")
+    return grid
 
-#TODO Once integrated into docker, generate these with functions/parent_directory()
-brain_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/brain_grid.npy"
-exterior_anat_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/exterior_anat_grid.npy"
-full_anatomy_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/full_anat.npy"
+def write_grid_to_vdb(scivol_file, output_path):
+    grids = []
+    for grid_name in scivol_file['grids']:
+        grid = build_grid(scivol_file, grid_name)
+        grids.append(grid)
+    
+    print("writing vdb file")
+    vdb.write(output_path, grids) #Testing with just one grid for now
+    bpy.ops.object.volume_import(filepath=output_path, files=[])
 
-affine_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/affine.npy"
+
+#CONTROL FLOW
+#paths hard coded for now
+scivol_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/skullstrip.scivol"
 output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_grid.vdb"
 
-affine = np.load(affine_path)
-brain_vol = np.load(brain_path)
-ext_anat_vol = np.load(exterior_anat_path)
-full_anat_vol = np.load(full_anatomy_path)
+with open(scivol_path, 'r') as file:
+    scivol_file = json.load(file)
+print(f"{scivol_file['name']} loaded into blender")
 
-brain_grid = openvdb.FloatGrid()
-extanat_grid = openvdb.FloatGrid()
-fullanat_grid = openvdb.FloatGrid()
+write_grid_to_vdb(scivol_file, output_path)
 
-brain_grid.copyFromArray(brain_vol.astype(float), tolerance=0.2)
-extanat_grid.copyFromArray(ext_anat_vol.astype(float), tolerance=0.2)
-fullanat_grid.copyFromArray(full_anat_vol.astype(float),tolerance=0.2)
-
-brain_grid.gridClass = openvdb.GridClass.FOG_VOLUME
-brain_grid.name = 'brain'
-extanat_grid.gridClass = openvdb.GridClass.FOG_VOLUME
-extanat_grid.name = 'external_anatomy'
-fullanat_grid.gridClass = openvdb.GridClass.FOG_VOLUME
-fullanat_grid.name = 'full_anatomy'
-
-openvdb.write(output_path, [brain_grid, extanat_grid, fullanat_grid])
-bpy.ops.object.volume_import(filepath=output_path, files=[])
-
-
-#SO, our afine is nicely formatted as per openvdb's specifications, however the linear transform does not work. Ugh.
-#As a solve, we COULD dial this in as volume transformations in blender. NOT GREAT but it should work
-#TODO eliminate unessesary vars here
+print("applying affine")
+affine = scivol_file['affine']
+#Terrible affine hack
 bpy.ops.transform.resize(value=(affine[0][0], affine[1][1], affine[2][2]), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True), mirror=False, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=1, use_proportional_connected=False, use_proportional_projected=False, snap=False, snap_elements={'INCREMENT'}, use_snap_project=False, snap_target='CLOSEST', use_snap_self=True, use_snap_edit=True, use_snap_nonedit=True, use_snap_selectable=False, release_confirm=True)
-
 bpy.ops.transform.translate(value=(affine[3][0], affine[3][1], affine[3][2]), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, True, False), mirror=False, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=1, use_proportional_connected=False, use_proportional_projected=False, snap=False, snap_elements={'INCREMENT'}, use_snap_project=False, snap_target='CLOSEST', use_snap_self=True, use_snap_edit=True, use_snap_nonedit=True, use_snap_selectable=False, release_confirm=True)
+print("done")
