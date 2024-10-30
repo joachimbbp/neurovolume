@@ -6,10 +6,9 @@ import os
 
 def build_grid(scivol_file, grid_name):
     print(f"building {grid_name}")
-    #No affine applied in grid creation
     vol = np.asarray(scivol_file['grids'][grid_name]['frames'][0]) #TODO 4D non-static grid when implementing fMRI
     print(f"vol shape: {vol.shape}")
-    grid = vdb.FloatGrid() #Hard coded for now. Doubt many edge cases need anything else here
+    grid = vdb.FloatGrid()
     grid.copyFromArray(vol.astype(float), tolerance = scivol_file['tolerance'])
     grid.gridClass = scivol_file['grids'][grid_name]['grid_class']
     grid.name = grid_name
@@ -17,28 +16,20 @@ def build_grid(scivol_file, grid_name):
 
 #paths hard coded for now
 scivol_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/skullstrip.scivol"
-output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_grid.vdb"
+output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_grid01.vdb"
 
 with open(scivol_path, 'r') as file:
     scivol_file = json.load(file)
 print(f"{scivol_file['name']} loaded into blender")
 
-grids = {}
-for grid_name in scivol_file['grids']:
-    grids[grid_name] = build_grid(scivol_file, grid_name)
+#grids = []
+#for grid_name in scivol_file['grids']:
+#    grids.append(build_grid(scivol_file, grid_name))
 
-# THIS dictionary to list of variables thing isn't working!
-pre_globals = set(globals().keys())
-globals().update(grids)
-grid_vars = list(set(globals().keys()) - pre_globals)
-grid_values = [globals()[var_name] for var_name in grid_vars]
-print(f"grid vars: {grid_vars, type(grid_vars)}") # could/should probably do this with locals tbh
-print(f"grid values {grid_values}")
-
-print(f"grids: {grids.keys()}")
+test_grid = build_grid(scivol_file, 'full_anat')
 
 print("writing vdb file")
-vdb.write(output_path, grid_values)
+vdb.write(output_path, [test_grid]) #Testing with just one grid for now
 bpy.ops.object.volume_import(filepath=output_path, files=[])
 
 print("applying affine")
