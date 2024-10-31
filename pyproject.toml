@@ -14,7 +14,7 @@ pytest = "^8.3.1"
 matplotlib = "^3.9.1"
 pillow = "^10.4.0"
 ipyvolume = "^0.6.3"
-neuropythy = "^0.12.15"
+nilearn = "^0.10.4"
 
 
 
