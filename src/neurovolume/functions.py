@@ -126,5 +126,5 @@ def sum_3D_array(array):
     return np.sum(array[0]) + np.sum(array[1]) + np.sum(array[2])
 
 def create_masked_normalized_tensor(brain_tensor, mask_tensor, keep_when=True):
-    print("creating masked normal tensor")
+    print("creating masked normalized tensor")
     return create_volume((np.where(mask_tensor==keep_when,np.array(normalize_array(brain_tensor)), 0.0)))
