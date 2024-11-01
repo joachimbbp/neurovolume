@@ -19,6 +19,8 @@ Currently, only the scans being used for development are pushed to github. If yo
 ## Citation
 Isaac David and Victor Olalde-Mathieu and Ana Y. Martínez and Lluviana Rodríguez-Vidal and Fernando A. Barrios (2021). Emotion Category and Face Perception Task Optimized for Multivariate Pattern Analysis. OpenNeuro. [Dataset] doi: 10.18112/openneuro.ds003548.v1.0.1
 
+Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tree/main/assets/templates)
+
 # Branch Goals:
 Once these are addressed we can push to main:
 - [ ] Rebuild `pyopenvdb` with `NumPy` Support

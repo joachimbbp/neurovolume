@@ -5,6 +5,9 @@ from matplotlib.colors import ListedColormap
 import os
 from PIL import Image
 from numpy import asarray
+from ipywidgets import interact
+
+
 
 def build_bool_mask(mask_sequence_path, original_mri_tensor):
     masks = {} #dictionary with number being the key, the mask array as the value
