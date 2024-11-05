@@ -22,6 +22,12 @@ Isaac David and Victor Olalde-Mathieu and Ana Y. Martínez and Lluviana Rodrígu
 Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tree/main/assets/templates)
 
 # Branch Goals:
+Up next:
+- [ ]  scivol load works, but it loads EVERYTHING onto memory. This won't work for larger fMRI implementations (unless you work off the workstation). There needs to be a solve for this:
+	- More efficient JSON parser?
+	- Standalone VDB converter? (Don't shave a yak, only do so if necessary)
+- [ ] Full Anat is *very* blurry (although we can tune it back in the shader). We need to have **grid specific tolerance levels**
+
 Once these are addressed we can push to main:
 - [ ] Rebuild `pyopenvdb` with `NumPy` Support
     - Did work with previous docker file, put on hold due to issue below:

@@ -4,6 +4,7 @@ import json
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
+
 class GridType(Enum):
     '''
     These are the default grid types for OpenVDB.
@@ -41,8 +42,10 @@ class Scivol:
     '''
     Note there is strictly no special characters in Scivol or it's child grids
     Presently we only use one affine and tolerance per scivol which affects every grid.
+    Using ANTS, it seems like we don't need an affine, so we are setting this just as an identity matrix.
+    This is just incase we need an affine in the future for some reason.
     '''
-    def __init__(self, name:str, affine: np.ndarray, tolerance:float):
+    def __init__(self, name:str, tolerance = 0.0, affine = np.eye(4),):
         self.name = name
         self.affine = affine
         self.tolerance = tolerance
@@ -67,4 +70,7 @@ class Scivol:
             json.dump(self.write_scivol(), f)
 
     def __str__(self):
-        return self.write_scivol()
+        string = f"{self.name}\ntolerance: {self.tolerance}\naffine: {self.affine}\ngrids:\n"
+        for g in self.grids:
+            string += f"    - {g}\n"
+        return string
