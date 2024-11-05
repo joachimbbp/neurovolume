@@ -23,22 +23,22 @@ Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tre
 
 # Branch Goals:
 Up next:
-- [ ]  scivol load works, but it loads EVERYTHING onto memory. This won't work for larger fMRI implementations (unless you work off the workstation). There needs to be a solve for this:
-	- More efficient JSON parser?
-	- Standalone VDB converter? (Don't shave a yak, only do so if necessary)
+- [x]  scivol load works, but it loads EVERYTHING onto memory. This won't work for larger fMRI implementations (unless you work off the workstation). There needs to be a solve for this:
+    - Used `gz` files
 - [ ] Full Anat is *very* blurry (although we can tune it back in the shader). We need to have **grid specific tolerance levels**
 
 Once these are addressed we can push to main:
-- [ ] Rebuild `pyopenvdb` with `NumPy` Support
-    - Did work with previous docker file, put on hold due to issue below:
-- [ ] Address missing `pyopenvdb.DoubleGrid`
-    - `PY_OPENVDB_WRAP_ALL_GRID_TYPES` Needs to be defined at compile time as per the [docs](https://www.openvdb.org/documentation/doxygen/python.html). Needs to be addressed in the [docker file](https://github.com/joachimbbp/openvdb_docker). Image build takes approximately 47 minutes, but opening a dev container causes error messages and other unstableness.
-    - [ ] Update to latest [openvdb_docker](https://github.com/joachimbbp/openvdb_docker) after next successful Build and Push
 - [x] Move all blender scripting implementation into python source code (will fix `Issues` above)
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
-    - [Nipy viz](https://nipy.org/nipy/labs/viz.html) might be a better library than `nibabel`
     - [ ] Save stimulus data to correspond to animation
-- [ ] Eliminate `create_volume()` tensor creation function 
+- [ ] Rewrite helper functions as bespoke for this project
+    - [ ] Rename the compare function
+    - [ ] Implement a 4D viewer for temporal dimension
 - [x] Change fMRI dataset to [this](https://openneuro.org/datasets/ds003548/versions/1.0.1) open neuro project
 - [x] Include example dataset in a non `.gitignored` media folder. Make sure to cite it            as per openneuro's requirements
 - [x] Space height based on scan meta-data (z-space currently squashed)
+- [ ] Remove/squash/untrack old binaries (AE and Blender). *will this be solved by a squash and merge?* Verify.
+
+Bonuses:
+- [ ] Convert blender script to blender plugin
+- [ ] Eliminate `create_volume()` tensor creation function 

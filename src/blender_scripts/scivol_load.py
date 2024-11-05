@@ -3,6 +3,7 @@ import pyopenvdb as vdb
 import numpy as np
 import json
 import os
+import gzip
 
 def build_grid(scivol_file, grid_name):
     print(f"building {grid_name}")
@@ -15,17 +16,20 @@ def build_grid(scivol_file, grid_name):
     return grid
 
 #paths hard coded for now
-scivol_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/skullstrip.scivol"
-output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_grid01.vdb"
+scivol_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/compression_test.gz"
+output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output/combined_neuro_1.vdb"
 
-with open(scivol_path, 'r') as file:
-    scivol_file = json.load(file)
-print(f"{scivol_file['name']} loaded into blender")
+with gzip.open(scivol_path, 'r') as svin:
+    print('opening scivol path')
+    scivol_bytes = svin.read()
+print('decoding scivol to utf-8 string')
+scivol_str = scivol_bytes.decode('utf-8')
+print('converting string to JSON format')
+scivol_file = json.loads(scivol_str)
 
 grids = []
 for grid_name in scivol_file['grids']:
    grids.append(build_grid(scivol_file, grid_name))
-
 
 print("writing vdb file")
 vdb.write(output_path, grids)
