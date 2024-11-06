@@ -25,8 +25,6 @@ def build_bool_mask(mask_sequence_path, original_mri_tensor):
     print("bool masks built v1")
     return mask_3D
 
-
-
 def iso_scale_trans(affine):
     """
     Isolates the scale and translation from an affine
@@ -53,7 +51,6 @@ def plot_examples(colormaps):
         fig.colorbar(psm, ax=ax)
     plt.show()
 
-
 def show_3D_array(array):
     print('updated')
     plt.switch_backend('Agg')
@@ -73,7 +70,6 @@ def naive_sanity_check(array, thresh=0.0):
     for index, density in np.ndenumerate(array):
         if density > thresh:
             print("Index: " + str(index) + " Density: " + str(density))
-
 
 def normalize_array(arr): #changed to return an np array directly
     return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))

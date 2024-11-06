@@ -23,12 +23,10 @@ Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tre
 
 # Branch Goals:
 Up next:
-- [x]  scivol load works, but it loads EVERYTHING onto memory. This won't work for larger fMRI implementations (unless you work off the workstation). There needs to be a solve for this:
-    - Used `gz` files
-- [ ] Full Anat is *very* blurry (although we can tune it back in the shader). We need to have **grid specific tolerance levels**
+- [x]  Use `gz` compression for Scivol
 
 Once these are addressed we can push to main:
-- [x] Move all blender scripting implementation into python source code (will fix `Issues` above)
+- [x] Move all blender scripting implementation into python source code
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
     - [ ] Save stimulus data to correspond to animation
 - [ ] Rewrite helper functions as bespoke for this project
@@ -40,5 +38,12 @@ Once these are addressed we can push to main:
 - [ ] Remove/squash/untrack old binaries (AE and Blender). *will this be solved by a squash and merge?* Verify.
 
 Bonuses:
-- [ ] Convert blender script to blender plugin
 - [ ] Eliminate `create_volume()` tensor creation function 
+- [ ] Grid Specific Tolerance Levels
+
+Long Term:
+- [ ] Brain anatomy segmentation
+- [ ] Convert blender script to blender plugin
+- [ ] Standalone scivol reader/writer
+    - [ ] for VDBs
+    - [ ] for Pointclouds

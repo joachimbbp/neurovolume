@@ -20,7 +20,7 @@ class Grid:
         self.frames = frames
         self.grid_type = grid_type.value
         self.color = color
-        self.grid_class = "FOG_VOLUME" #TODO find out other, possibly better, grid_classes
+        self.grid_class = "FOG_VOLUME" #TODO Is this the best grid class? Are there different ones and do they behave differently?
         self.modifiers = [] #TODO modifier stack, start with blur or something
 
     #TODO initialize a grid just from a NiFTY File
