@@ -1,15 +1,15 @@
 import numpy as np
 from enum import Enum
 import json
+import gzip
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
-
 class GridType(Enum):
-    '''
-    These are the default grid types for OpenVDB.
-    More information can be found here: https://www.openvdb.org/documentation/doxygen/python.html
-    '''
+ 
+    # These are the default grid types for OpenVDB.
+    # More information can be found here: https://www.openvdb.org/documentation/doxygen/python.html
+
     FloatGrid = "FloatGrid"
     BoolGrid = "BoolGrid"
     Vec3SGrid = "Vec3SGrid"
@@ -39,12 +39,12 @@ class Grid:
         return content
     
 class Scivol:
-    '''
-    Note there is strictly no special characters in Scivol or it's child grids
-    Presently we only use one affine and tolerance per scivol which affects every grid.
-    Using ANTS, it seems like we don't need an affine, so we are setting this just as an identity matrix.
-    This is just incase we need an affine in the future for some reason.
-    '''
+
+    # Note there is strictly no special characters in Scivol or it's child grids
+    # Presently we only use one affine and tolerance per scivol which affects every grid.
+    # Using ANTS, it seems like we don't need an affine, so we are setting this just as an identity matrix.
+    # This is just incase we need an affine in the future for some reason.
+
     def __init__(self, name:str, tolerance = 0.0, affine = np.eye(4),):
         self.name = name
         self.affine = affine
@@ -54,7 +54,7 @@ class Scivol:
         for grid in grids:
             self.grids[grid.name] = grid.to_dict()
     def write_scivol(self):
-        print(f"writing {self.name}.scivol")
+        print(f"writing {self.name} scivol dictionary")
         content = {
         'name' : self.name,
         'tolerance' : self.tolerance,
@@ -64,10 +64,15 @@ class Scivol:
         #print(content)
         return content
 
-    def save_scivol(self, output_folder):
-        with open(f"{output_folder}/{self.name}.scivol", 'w') as f:
-            print(f"saving {self.name}.scivol")
-            json.dump(self.write_scivol(), f)
+    def save_scivol(self, output_folder, filename = ""):
+        if filename == "":
+            filename = self.name
+        json_str = json.dumps(self.write_scivol())
+        print("Encoding JSON file to utf-8")
+        json_bytes = json_str.encode('utf-8')
+        print(f"saving {filename}.scivol to {output_folder}")
+        with gzip.open(f"{output_folder}/{filename}.scivol", "wb") as svgz:
+            svgz.write(json_bytes)
 
     def __str__(self):
         string = f"{self.name}\ntolerance: {self.tolerance}\naffine: {self.affine}\ngrids:\n"
