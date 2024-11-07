@@ -26,15 +26,11 @@ Up next:
 - [x]  Use `gz` compression for Scivol
 
 Once these are addressed we can push to main:
-- [x] Move all blender scripting implementation into python source code
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
     - [ ] Save stimulus data to correspond to animation
 - [ ] Rewrite helper functions as bespoke for this project
-    - [ ] Rename the compare function
     - [ ] Implement a 4D viewer for temporal dimension
-- [x] Change fMRI dataset to [this](https://openneuro.org/datasets/ds003548/versions/1.0.1) open neuro project
-- [x] Include example dataset in a non `.gitignored` media folder. Make sure to cite it            as per openneuro's requirements
-- [x] Space height based on scan meta-data (z-space currently squashed)
+- [ ] Cleanup and remove redundant functions 
 - [ ] Remove/squash/untrack old binaries (AE and Blender). *will this be solved by a squash and merge?* Verify.
 
 Bonuses:
