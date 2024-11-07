@@ -36,6 +36,7 @@ Once these are addressed we can push to main:
 Bonuses:
 - [ ] Eliminate `create_volume()` tensor creation function 
 - [ ] Grid Specific Tolerance Levels
+- [ ] Include experimental stimulus and baseline media
 
 Long Term:
 - [ ] Brain anatomy segmentation
