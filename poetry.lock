@@ -1981,6 +1981,52 @@ style = ["black", "blacken-docs", "codespell", "flake8", "flake8-docstrings", "f
 test = ["coverage", "pytest (>=6.0.0)", "pytest-cov"]
 
 [[package]]
+name = "nitime"
+version = "0.11"
+description = "Nitime: timeseries analysis for neuroscience data"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "nitime-0.11-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:d53d976501149dcf958503bfecddfb04f27952f3cc4af3c55b1d1c5ea105ad3f"},
+    {file = "nitime-0.11-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:beeae9a990a909271c9ea97fe91007728386625390cc83e9d25c64ba9baa44c5"},
+    {file = "nitime-0.11-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:12b2d78a7be8a114becb6db8cb70fa664dd8c7317e727b6fab19f8dca583610e"},
+    {file = "nitime-0.11-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:96629557a66fa13e36f4a7124e4ffa7198ada842f18e4d8b25fd6ce1fe76628c"},
+    {file = "nitime-0.11-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:90ca890eec35d6906d1ccea336b27bf7fe65f23725626c7004d73f11931ad7d3"},
+    {file = "nitime-0.11-cp310-cp310-win_amd64.whl", hash = "sha256:415bd0dd7543a6c8f7db0b98ee75918db9fc611df2dbd600972fac24d95d0978"},
+    {file = "nitime-0.11-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b5b8073d005ee477c79ecf2495acc5c06245607c6c344019bd173ab3dd206f6e"},
+    {file = "nitime-0.11-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:fd3cf165862215e13236a04f02120847be13144818c1a153544975850a9f6fde"},
+    {file = "nitime-0.11-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6471872e351962cfccddf36227e1082095982bc9b4a7951ae6c68f5b092aa3c6"},
+    {file = "nitime-0.11-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:76d659092907fc21fdeb6603a0f7113b04ff5deacffa957af337fde94cc98268"},
+    {file = "nitime-0.11-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:a13bceec7347424dcafa61a4f99eef249892cca1a6908b7468fe650a809590d8"},
+    {file = "nitime-0.11-cp311-cp311-win_amd64.whl", hash = "sha256:71de1a75bff446a2663f13cb7738036a1573219234e0735e9ec623c85767e1b9"},
+    {file = "nitime-0.11-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:61f513ef1563eb309171416e76aef322fcd819ea6e5f0ecec41fbd74fd2c4181"},
+    {file = "nitime-0.11-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:6b2ffc1daa3e3f29ec13e8d206cae05dbad87875d7a7e488c095720aa76ee0c5"},
+    {file = "nitime-0.11-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:de0d66e149fe150342f17a8465f2b64ec8cc4936a13f3b1e03f7229c00345c21"},
+    {file = "nitime-0.11-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c3656c8b8a87d91253b2c641f359730f16a17f808256a0655c9ab06fa9469bdf"},
+    {file = "nitime-0.11-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:215fcd43d899f979f0386409c7cf93a755aecd4c0bf470f0138eefe358672514"},
+    {file = "nitime-0.11-cp312-cp312-win_amd64.whl", hash = "sha256:08513c60e7efd3e5abf7f12596e5196650b49abcbda8231f57cf1f8f484cbf3f"},
+    {file = "nitime-0.11-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:2fa635b45681145c574755b515ae7703143341f7111bbf174dcfe6b5bc260e6c"},
+    {file = "nitime-0.11-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:eece681760363f8c0c515a6452868c8ea7369abe9c112def555fffac901bafbf"},
+    {file = "nitime-0.11-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d5f78255ae0d0ca7829814c2c66855261da22e38d02d7ce026f4738822615d30"},
+    {file = "nitime-0.11-cp38-cp38-win_amd64.whl", hash = "sha256:6c409e6be4bc8b75f3c27d444408ad9154e857571bc7cbbaaa45acb396c842c9"},
+    {file = "nitime-0.11-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:341f9a96fb641578f0ee90d2f1026cafc20001cfefeeeae01686cb52165907d9"},
+    {file = "nitime-0.11-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:6a083ffcf33b1781cb319e34dd0fc38ba507d36bb9463795f8cfcecad8f03e41"},
+    {file = "nitime-0.11-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3475a563835b46775db0bdfcf701603a11ac71c35796c4fac7b1126a6628265c"},
+    {file = "nitime-0.11-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a31782078f1584e1a6a0cefc9bfb9cceea8cc3ebadb0a72ff7c20eaa65596b73"},
+    {file = "nitime-0.11-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:3a6b53d20846ca1fac5b0a5347f1527dd8c574976798f8d9465949b4c5bddfbf"},
+    {file = "nitime-0.11-cp39-cp39-win_amd64.whl", hash = "sha256:76434a2c89448028235c41abe634a548f132d9cf1042703d7e4cea2194bc3cfd"},
+    {file = "nitime-0.11.tar.gz", hash = "sha256:e087bc7ee93d08a767ffae13b027cdd8da36754d7a202a4145661eaeaa85d3fd"},
+]
+
+[package.dependencies]
+matplotlib = ">=3.5"
+numpy = ">=1.22"
+scipy = ">=1.8"
+
+[package.extras]
+full = ["networkx (>=2.7)", "nibabel (>=4.0)"]
+
+[[package]]
 name = "notebook"
 version = "7.0.7"
 description = "Jupyter Notebook - A web-based notebook environment for interactive computing"
@@ -3427,4 +3473,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "37909360fefbb3e46ba25c4ff7b17f91ad2f1628a5394b66c0bd5d02965e2d4e"
+content-hash = "f929f49bf396402c73ce466a865cee8e82c030e2658ced8d16250eddb4415c36"

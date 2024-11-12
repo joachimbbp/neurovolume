@@ -26,6 +26,7 @@ Up next:
 - [x]  Use `gz` compression for Scivol
 
 Once these are addressed we can push to main:
+- [ ] **I feel like the BOLD images in this set are really low res, although I may be wrong. Perhaps switch out datasets?**
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
     - [ ] Save stimulus data to correspond to animation
 - [ ] Rewrite helper functions as bespoke for this project
@@ -44,3 +45,4 @@ Long Term:
 - [ ] Standalone scivol reader/writer
     - [ ] for VDBs
     - [ ] for Pointclouds
+- [ ] Rewrite as much of the external file parsing libraries with bespoke functions

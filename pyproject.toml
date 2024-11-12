@@ -17,6 +17,7 @@ ipyvolume = "^0.6.3"
 nilearn = "^0.10.4"
 simpleitk = "^2.4.0"
 opencv-python = "^4.10.0.84"
+nitime = "^0.11"
 
 
 

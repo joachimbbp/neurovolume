@@ -6,7 +6,8 @@
 # But not this .gitignore file
 !.gitignore
 
-#And not these example files
-!anat/
-!anat/sub-01_T1w.nii.gz
-!anat/sub-01_T1w.json
+#Originally these were pushed to git, but that's not such a great idea
+
+# !anat/
+# !anat/sub-01_T1w.nii.gz
+# !anat/sub-01_T1w.json
