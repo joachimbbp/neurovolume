@@ -45,3 +45,4 @@ Long Term:
     - [ ] for VDBs
     - [ ] for Pointclouds
 - [ ] Rewrite as much of the external file parsing libraries with bespoke functions
+    - [ ] Priority: replace ANTs
