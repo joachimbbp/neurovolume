@@ -24,13 +24,16 @@ Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tre
 # Branch Goals:
 Up next:
 - [x]  Use `gz` compression for Scivol
+- [ ] Custom fMRI object that includes the stimulus and action data encoded along the temporal dimension. Possibly integrate into scivol.
 
 Once these are addressed we can push to main:
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
     - [x] Access stimulus data to correspond to animation
-- [ ] Rewrite helper functions as bespoke for this project
-    - [ ] Implement a 4D viewer for temporal dimension
-- [ ] Cleanup and remove redundant functions 
+- [x] Rewrite helper functions as bespoke for this project
+    - [x] Implement a 4D viewer for temporal dimension
+- [ ] Cleanup and remove redundant functions
+- [ ] Integrate notebook functions into functions file
+- [ ] Standardize naming convetions: `timeslice` and `frame`, are the same thing, for instance
 - [ ] Remove/squash/untrack old binaries (AE and Blender). *will this be solved by a squash and merge?* Verify.
 
 Bonuses:
@@ -46,3 +49,5 @@ Long Term:
     - [ ] for Pointclouds
 - [ ] Rewrite as much of the external file parsing libraries with bespoke functions
     - [ ] Priority: replace ANTs
+- [ ] Python Library
+- [ ] GUI for node-based analysis
