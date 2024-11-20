@@ -20,6 +20,7 @@ def explore_3D_vol(vol: np.ndarray, cmap=default_cmap, dim="x", mask=empty_mask)
         masking = True
 
     #TODO dry if possible
+    #TODO Hey you could use .set_title() to display the frame, maybe?
     def x_coord(slice):
         plt.figure(figsize=default_figsize)
         plt.imshow(vol[slice, :, :], cmap=default_cmap)
@@ -45,3 +46,4 @@ def explore_3D_vol(vol: np.ndarray, cmap=default_cmap, dim="x", mask=empty_mask)
             interact(y_coord, slice=(0, vol.shape[1]-1))
         case "z":
             interact(z_coord, slice=(0, vol.shape[2]-1))
+
