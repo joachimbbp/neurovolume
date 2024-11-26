@@ -24,6 +24,7 @@ Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tre
 # Branch Goals:
 Up next:
 - [x]  Use `gz` compression for Scivol
+- [ ] Try Napari for visualizations
 - [ ] Custom fMRI object that includes the stimulus and action data encoded along the temporal dimension. Possibly integrate into scivol.
 
 Once these are addressed we can push to main:
