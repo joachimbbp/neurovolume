@@ -37,6 +37,7 @@ Once these are addressed we can push to main:
 - [ ] Integrate notebook functions into functions file
 - [ ] Standardize naming convetions: `timeslice` and `frame`, are the same thing, for instance
 - [ ] Remove/squash/untrack old binaries (AE and Blender). *will this be solved by a squash and merge?* Verify.
+- [ ] Remove unused libraries from Poetry
 
 Bonuses:
 - [ ] Eliminate `create_volume()` tensor creation function 

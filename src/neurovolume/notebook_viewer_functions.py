@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 from ipywidgets import interact
 import numpy as np
 
+#LEGACY FUNCTIONS
+
 #Visualization options (feel free to tweak):
 default_cmap = 'nipy_spectral'
 default_figsize = (4,4)
