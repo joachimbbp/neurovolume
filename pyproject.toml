@@ -9,7 +9,7 @@ readme = "README.md"
 python = "^3.11"
 jupyter = "^1.0.0"
 nibabel = "^5.2.1"
-numpy = "^2.0.1"
+numpy = "2.0.0"
 pytest = "^8.3.1"
 matplotlib = "^3.9.1"
 pillow = "^10.4.0"
@@ -22,6 +22,8 @@ napari = "^0.5.4"
 scikit-image = "^0.24.0"
 pyqt5 = "^5.15.11"
 dask-image = "^2024.5.3"
+llvmlite = "^0.43.0"
+sparse = "^0.15.4"
 
 
 
