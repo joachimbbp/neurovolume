@@ -27,7 +27,7 @@ Up next:
 - [ ] Try Napari for visualizations
 - [ ] Try [SciPy Sparse](https://docs.scipy.org/doc/scipy/reference/sparse.html) for arrays 
 - [ ] Custom fMRI object that includes the stimulus and action data encoded along the temporal dimension. Possibly integrate into scivol.
-- [ ] Change `.scivol` to `.nervol`
+- [ ] Change `.scivol` to `.nerv`
 
 Once these are addressed we can push to main:
 - [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
