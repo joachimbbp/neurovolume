@@ -24,6 +24,8 @@ pyqt5 = "^5.15.11"
 dask-image = "^2024.5.3"
 llvmlite = "^0.43.0"
 sparse = "^0.15.4"
+torch = "^2.5.1"
+torchvision = "^0.20.1"
 
 
 

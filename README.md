@@ -24,8 +24,9 @@ Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tre
 # Branch Goals:
 Up next:
 - [x]  Use `gz` compression for Scivol
-- [ ] Try Napari for visualizations
-- [ ] Try [SciPy Sparse](https://docs.scipy.org/doc/scipy/reference/sparse.html) for arrays 
+- [x] Try Napari for visualizations
+    - There's some real potential here, but I am using my 2D slicer to dial in the rotation for now.
+- [ ] Try [Torch Sparse](https://pytorch.org/docs/stable/sparse.html) for arrays 
 - [ ] Custom fMRI object that includes the stimulus and action data encoded along the temporal dimension. Possibly integrate into scivol.
 - [ ] Change `.scivol` to `.nerv`
 
@@ -49,8 +50,7 @@ Long Term:
 - [ ] Brain anatomy segmentation
 - [ ] Convert blender script to blender plugin
 - [ ] Standalone scivol reader/writer
-    - [ ] for VDBs
-    - [ ] for Pointclouds
+    - Will require locking in the structure of `.nerv`
 - [ ] Rewrite as much of the external file parsing libraries with bespoke functions
     - [ ] Priority: replace ANTs
 - [ ] Python Library
