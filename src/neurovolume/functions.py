@@ -5,9 +5,78 @@ from matplotlib.colors import ListedColormap
 import os
 from PIL import Image
 from numpy import asarray
-from ipywidgets import interact
+import ants
 
 
+
+def skull_strip_bold(bold, mni_template, mni_mask, dilate=False):
+    """
+    Assuming a motion corrected or relatively BOLD image
+    """
+    
+    print("Skull strip for BOLD")
+    isolated_brain_vol_frames = []
+    for frame in range(bold.shape[3]):
+        print(f"Skull stripping bold frame {frame + 1}/{bold.shape[3]}")
+        bold_frame = ants.from_numpy(bold.numpy()[:,:,:,frame],
+                                    spacing=bold.spacing[:3])
+        brain_mask = generate_brain_mask(bold_frame, mni_template, mni_mask)
+        if dilate:
+            print("Dilating brain mask")
+            brain_mask = ants.morphology(brain_mask, radius=4, operation='dilate', mtype='binary')
+        isolated_brain_vol = ants.mask_image(bold_frame, brain_mask).numpy()
+        isolated_brain_vol_frames.append(isolated_brain_vol)
+    print("Creating new ANTsImage from isolated brain volumes")
+    data = np.stack([frame for frame in isolated_brain_vol_frames], axis=3)
+    isolated_brain_bold_img = ants.from_numpy(data, origin=bold.origin, spacing=bold.spacing)
+    print("Done")
+    return isolated_brain_bold_img
+    
+        
+
+def generate_brain_mask(subject, mni_template, mni_mask):
+    """
+    subject: the scan that we are going to generate a brain mask for
+    mni_template: your mni template
+    mni_mask: your mni mask 
+    """
+    template_warp_to_raw_anat = ants.registration(
+        fixed=subject,
+        moving=mni_template, 
+        type_of_transform='SyN',
+        verbose=False
+        )
+    print("Creating brain mask")
+    brain_mask = ants.apply_transforms(
+        fixed=template_warp_to_raw_anat['warpedmovout'],
+        moving=mni_mask,
+        transformlist=template_warp_to_raw_anat['fwdtransforms'],
+        interpolator='nearestNeighbor',
+        verbose=False
+    )
+    return brain_mask
+
+def skull_strip_anat(anat, mni_template, mni_mask, dilate=True, invert=False):
+    """
+    anat, mni_template, mni_mask must all be ANTS images.
+    inverting 
+    """
+    print("Skull Stripping Anatomy Volume")
+    print("Registering template to frame")
+
+    brain_mask = generate_brain_mask(anat, mni_template, mni_mask)
+    if dilate:
+        print("Dilating brain mask")
+        brain_mask = ants.morphology(brain_mask, radius=4, operation='dilate', mtype='binary')
+    if invert:
+        print("Inverting brain mask")
+        brain_mask = ants.from_numpy(np.invert(brain_mask))
+
+
+    print("Masking brain")
+    isolated_brain = ants.mask_image(anat, brain_mask)
+    print("Done")
+    return isolated_brain
 
 def build_bool_mask(mask_sequence_path, original_mri_tensor):
     masks = {} #dictionary with number being the key, the mask array as the value

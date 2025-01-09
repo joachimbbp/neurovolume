@@ -3,6 +3,8 @@ from enum import Enum
 import json
 import gzip
 
+# Possibly rename to nervol?
+
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
 class GridType(Enum):
