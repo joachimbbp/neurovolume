@@ -178,7 +178,7 @@ def view_sagittal_slice(volume, middle, color_map):
 
 def create_volume(normalized_tensor):
     """
-    Redundant function that needs to be eliminated
+    For some reason this incredibly redundant seeming function needs to be used!
 
     `anat_norm = create_volume(normalize_array(nib.load(anat_filepath).get_fdata()))
     anat_norm_no_cv = normalize_array(nib.load(anat_filepath).get_fdata())

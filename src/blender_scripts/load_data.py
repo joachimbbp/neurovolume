@@ -25,7 +25,6 @@ def vdb_seq_from_npy(npy):
     os.mkdir(seq_folder)
     vdb_seq = load_vdb(npy)
     for frame_idx in range(vdb_seq.shape[3]):
-        #frame_filename = f"{seq_folder}/{"bold_{:02d}".format(frame_idx)}"
         frame_filename = f"bold_{frame_idx}"
         generate_vdb_frame(frame_filename, vdb_seq[:,:,:,frame_idx], save_dir=seq_folder)
 
@@ -48,3 +47,6 @@ for npy in os.listdir(data_folder):
         case "bold.npy":
             print("bold")
             vdb_seq_from_npy(npy)
+        case "anat_brain.npy":
+            print("anat brain")
+            static_vdb_from_npy(npy)
