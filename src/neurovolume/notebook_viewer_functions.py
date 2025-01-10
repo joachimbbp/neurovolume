@@ -25,19 +25,19 @@ def explore_3D_vol(vol: np.ndarray, cmap=default_cmap, dim="x", mask=empty_mask)
     #TODO Hey you could use .set_title() to display the frame, maybe?
     def x_coord(slice):
         plt.figure(figsize=default_figsize)
-        plt.imshow(vol[slice, :, :], cmap=default_cmap)
+        plt.imshow(vol[slice, :, :], cmap=cmap)
         if masking:
             plt.contour(mask[slice,:,:], levels=mask_contor_levels, colors=mask_contor_color, linewidths=mask_contor_thickness)
 
     def y_coord(slice):
         plt.figure(figsize=default_figsize)
-        plt.imshow(vol[:, slice, :], cmap=default_cmap)
+        plt.imshow(vol[:, slice, :], cmap=cmap)
         if masking:
             plt.contour(mask[:,slice,:], levels=mask_contor_levels, colors=mask_contor_color, linewidths=mask_contor_thickness)
     
     def z_coord(slice):
         plt.figure(figsize=default_figsize)
-        plt.imshow(vol[:, :, slice], cmap=default_cmap)
+        plt.imshow(vol[:, :, slice], cmap=cmap)
         if masking:
             plt.contour(mask[:,:,slice], levels=mask_contor_levels, colors=mask_contor_color, linewidths=mask_contor_thickness)
 

@@ -7,6 +7,22 @@ from PIL import Image
 from numpy import asarray
 import ants
 
+def subtract_BOLD_movement(bold_img):
+    """
+    Each frame shows the difference between it and the previous frame. First frame is initialized at zero. 
+    """
+    origin =(bold_img.origin[0], bold_img.origin[1], bold_img.origin[2], bold_img.origin[3])
+    spacing = bold_img.spacing
+    direction = bold_img.direction
+    bold_np = np.empty_like(bold_img.numpy())
+
+    print(f"origin {origin}\nspacing {spacing}\ndirection {direction}")
+    print(bold_np.shape)
+    for frame in range(1, bold_np.shape[3]):
+        bold_np[:,:,:,frame] = np.absolute(bold_np[:,:,:,frame] - bold_np[:,:,:,frame - 1])
+    #output = ants.from_numpy(bold_np, origin=origin, spacing=spacing, direction=direction, has_components=True) #not sure about this bool
+    #return output
+    return bold_np #again with the crashing
 
 
 def skull_strip_bold(bold, mni_template, mni_mask, dilate=False):
