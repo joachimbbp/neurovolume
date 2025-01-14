@@ -4,6 +4,7 @@
 import os
 import ants
 import numpy as np
+import re
 
 # FUNCTIONS
 def parent_dir():
@@ -49,9 +50,10 @@ def get_name(var):
     """
     Returns the name of a variable
     """
-    for name, value in globals().items():
+    for filename, value in globals().items():
         if value is var:
-            return name
+            if "_path" in filename:
+                return filename.replace("_path", "")
 
 # CONTROL FLOW
 options = input("Manually Enter Paths: m\nOverride with hard coded test paths: o\n")
