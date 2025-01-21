@@ -1,23 +1,27 @@
-#tvsv stands for Tui Volume Slice Viewer
+#tvsv stands for TUI Volume Slice Viewer
 
 import sys
 import numpy as np
+from scipy.ndimage import zoom
+
 #Available color maps
 mac_hearts = "🖤💜🧡💛💚🩶🤎🩷🩵💙🤍"
 universal_chars = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,^."
 just_ints = "0123456789"
 
+
 #100x100 seems like a decent resolution
 
 #TODO implement the rest of these args
-usage = '''Usage:
+usage = '''Usage:`
     arg1, scan you wish to display
-    arg2, dimension to index (optional, if blank, default to half)
+    arg2, dimension to index (optional, if blank, default to z)
     arg3, 3D index (optional, if blank default to half)
-    arg4, time index (optional, ignore if 3D, set tohalf if blank)
+    arg4, time index (optional, ignore if 3D, set to half if blank)
     arg5, color map (optional)'''
 
-scan = np.load(sys.argv[1])
+#scan = np.load(sys.argv[1])
+scan = np.load("/Users/joachimpfefferkorn/repos/neurovolume/output/anat.npy") #for debug purposes only
 
 def select_frame(vol_seq):
     print("select frame not implemented yet")
@@ -39,7 +43,7 @@ def get_slice(vol, dim, slice_idx):
 def midpoint(vol, dim):
     return int(vol.shape[dim]/2)
 
-def select_slice(vol, dim=0, slice_idx=1):
+def select_slice(vol, dim=2, slice_idx=1):
     #(lambda s: s[-1])
     if slice_idx==None:
         slice_idx = midpoint(vol, dim)
@@ -50,25 +54,26 @@ def select_slice(vol, dim=0, slice_idx=1):
         slice = get_slice(vol, 0, midpoint(vol,dim))
     return slice
 
-def view_frame(frame):
+def view_frame(frame, scale_factor = 0.15):
     #WARNING: This normalizes to the specified frame, not the whole scan
 
-    def find_char(pixel_luma, min, max, charmap=just_ints):
+    def find_char(pixel_luma, min, max, charmap=mac_hearts):
         normalized_luma = (pixel_luma-min)/(max-min)
         charmap_idx = int(normalized_luma * (len(charmap)-1))
         #print(f"charmap idx {charmap_idx}, normalized luma {normalized_luma}, char: {charmap[charmap_idx]}")
         return charmap[charmap_idx]
     
     #TODO scale proportionally, don't force into 100x100
-    resized_frame = np.resize(frame, (25,25))
+    resized_frame = zoom(frame, scale_factor)
     canvas = ""
-    minmax = (np.min(resized_frame), np.max(resized_frame))
+    min = np.min(resized_frame)
+    max = np.max(resized_frame)
+    print(f"min {min} max {max}")
     for y in range(resized_frame.shape[0]):
         for x in range(resized_frame.shape[1]):
-            canvas+=find_char(resized_frame[y,x], minmax[0], minmax[1])
+            canvas+=find_char(resized_frame[y,x], min, max)
         canvas += "\n"
     print(canvas)
-    print(f"minmax: {minmax}, ")
 
 match len(scan.shape):
     case 2:
