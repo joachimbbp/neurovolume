@@ -56,6 +56,7 @@ def get_name(var):
                 return filename.replace("_path", "")
 
 # CONTROL FLOW
+#TODO clean up and use argparse
 options = input("Manually Enter Paths: m\nOverride with hard coded test paths: o\n")
 match options:
     case 'm':
