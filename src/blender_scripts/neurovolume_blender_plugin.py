@@ -1,4 +1,68 @@
 print("Neurovolume is running")
+import bpy
+import numpy as np
+import pyopenvdb as vdb
+import numpy as np
+import os
+import pathlib
+
+#------------------------------------------------------------------------------
+#                                   Backend Functions
+#------------------------------------------------------------------------------
+
+def load_vdb(npy, data_folder):
+    print(f"Loading in {npy}")
+    return np.load(f"{data_folder}/{npy}")
+
+def generate_vdb_frame(basename, volume, save_dir):
+    print(f"Generating vdb for {basename}")
+    grid = vdb.DoubleGrid()
+    grid.copyFromArray(volume.astype(float))
+    grid.gridClass = vdb.GridClass.FOG_VOLUME
+    grid.name='density'
+    output_path = f"{save_dir}/{basename}.vdb"
+    vdb.write(output_path,grid)
+    print(f"VDB written to {output_path}")
+
+def static_vdb_from_npy(npy, data_folder):
+    print("Static vdb from npy")
+    basename = os.path.basename(npy).split('.')[0]
+    generate_vdb_frame(basename, load_vdb(npy, data_folder), data_folder) #just saving to same folder for now
+    
+def vdb_seq_from_npy(npy, data_folder):
+    print("VDB seq fron npy")
+    basename = os.path.basename(npy).split('.')[0]
+    seq_folder = f"{data_folder}/{basename}_seq" #huge quick hack fix later
+    os.mkdir(seq_folder)
+    vdb_seq = load_vdb(npy, data_folder)
+    for frame_idx in range(vdb_seq.shape[3]):
+        frame_filename = f"bold_{frame_idx}"
+        generate_vdb_frame(frame_filename, vdb_seq[:,:,:,frame_idx], save_dir=seq_folder)
+
+def read_volumes(data_folder: str):
+    """""
+    folder_path: folder containing properly named .npy files
+    """""
+    print(f"searching in {data_folder}")
+    for npy in os.listdir(data_folder):
+        print(f"reading in {npy}")
+        name = pathlib.Path(f"{data_folder}/{npy}").name
+        if name == "anat.npy" or name == "mni_mask.npy" or name == "mni_template.npy":
+            static_vdb_from_npy(npy, data_folder)
+        if name == "bold_rest.npy" or name == "bold_stim.npy":
+            vdb_seq_from_npy(npy, data_folder)
+        else:
+            print(f"invalid name: {name}, not loading")
+# This is some of the worsrt code I have written
+# but I was in a huge hurry
+# TODO cleanup later            
+        
+    print("All volumes read in")
+
+
+#------------------------------------------------------------------------------
+#                                   GUI Functions
+#------------------------------------------------------------------------------
 
 #--------
 # Setup
@@ -6,9 +70,6 @@ print("Neurovolume is running")
 bl_info = {
     "name": "Neurovolume",
     }
-
-import bpy
-import numpy as np
 
 #--------
 # Classes
@@ -28,7 +89,7 @@ class Neurovolume(bpy.types.Panel):
         #generate things and we thus need them?
         
         layout.prop(scene, "path_input")
-        layout.operator("load.volume", text="Load .npy File as Volume")
+        layout.operator("load.volume", text="Load.npy Files as VDBs")
 
 
 
@@ -39,8 +100,9 @@ class LoadVolume(bpy.types.Operator):
     
     def execute(self, context):
         #For now we are just going to print what is input
-        text = context.scene.path_input
-        print(f"Entered Path: {text}")
+        folder_path = context.scene.path_input
+        print(f"Entered Path: {folder_path}")
+        read_volumes(folder_path)
         
         self.report({'INFO'}, "path printed to terminal")
         return {"FINISHED"}
@@ -50,8 +112,8 @@ class LoadVolume(bpy.types.Operator):
 #----------------------
 def register_properties():
     bpy.types.Scene.path_input = bpy.props.StringProperty(
-        name="Path Input",
-        description="Enter path to .npy file",
+        name="NPY Folder",
+        description="Enter path to folder containing .npy files",
         default=""
         )
         
@@ -74,3 +136,8 @@ def unregister():
 
 if __name__ == "__main__":
     register()
+
+#------------------------------------------------------------------------------
+#                                   Control Flow
+#------------------------------------------------------------------------------
+
