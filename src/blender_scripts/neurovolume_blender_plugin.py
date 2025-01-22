@@ -28,7 +28,9 @@ class Neurovolume(bpy.types.Panel):
         #generate things and we thus need them?
         
         layout.prop(scene, "path_input")
-        layout.operator("load.npy", text="Load .npy File")
+        layout.operator("load.volume", text="Load .npy File as Volume")
+
+
 
 class LoadVolume(bpy.types.Operator):
     """Load in NPY file and convert it to VDB"""
