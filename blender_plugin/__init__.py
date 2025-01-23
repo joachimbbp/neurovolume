@@ -22,9 +22,12 @@ import pathlib
 #                                   Backend Functions
 #------------------------------------------------------------------------------
 
-def load_vdb(npy, data_folder):
+def load_npy(npy, data_folder):
     print(f"Loading in {npy}")
-    return np.load(f"{data_folder}/{npy}")
+    try:
+        return np.load(f"{data_folder}/{npy}")
+    except:
+        return "LOAD_ERROR"
 
 def generate_vdb_frame(basename, volume, save_dir):
     print(f"Generating vdb for {basename}")
@@ -36,20 +39,18 @@ def generate_vdb_frame(basename, volume, save_dir):
     vdb.write(output_path,grid)
     print(f"VDB written to {output_path}")
 
-def static_vdb_from_npy(npy, data_folder):
+def static_vdb_from_npy(np_vol, basename, data_folder):
     print("Static vdb from npy")
-    basename = os.path.basename(npy).split('.')[0]
-    generate_vdb_frame(basename, load_vdb(npy, data_folder), data_folder) #just saving to same folder for now
+    generate_vdb_frame(basename, np_vol, data_folder) #just saving to same folder for now
     
-def vdb_seq_from_npy(npy, data_folder):
+def vdb_seq_from_npy(np_vol, basename, data_folder):
     print("VDB seq fron npy")
-    basename = os.path.basename(npy).split('.')[0]
     seq_folder = f"{data_folder}/{basename}_seq" #huge quick hack fix later
     os.mkdir(seq_folder)
-    vdb_seq = load_vdb(npy, data_folder)
-    for frame_idx in range(vdb_seq.shape[3]):
+    sequence = np_vol
+    for frame_idx in range(sequence.shape[3]):
         frame_filename = f"bold_{frame_idx}"
-        generate_vdb_frame(frame_filename, vdb_seq[:,:,:,frame_idx], save_dir=seq_folder)
+        generate_vdb_frame(frame_filename, sequence[:,:,:,frame_idx], save_dir=seq_folder)
 
 def read_volumes(data_folder: str):
     """""
@@ -57,18 +58,24 @@ def read_volumes(data_folder: str):
     """""
     print(f"searching in {data_folder}")
     for npy in os.listdir(data_folder):
-        print(f"reading in {npy}")
-        name = pathlib.Path(f"{data_folder}/{npy}").name
-        if name == "anat.npy" or name == "mni_mask.npy" or name == "mni_template.npy":
-            static_vdb_from_npy(npy, data_folder)
-        if name == "bold_rest.npy" or name == "bold_stim.npy":
-            vdb_seq_from_npy(npy, data_folder)
-        else:
-            print(f"invalid name: {name}, not loading")
-# This is some of the worsrt code I have written
-# but I was in a huge hurry
-# TODO cleanup later            
-        
+        name = pathlib.Path(f"{data_folder}/{npy}").name #TEMP
+        print(f"name {name}")
+        basename, extension = name.split('.')
+        print(f"basename {basename}, ext {extension}") #TEMP DEBUG
+        if extension == "npy":
+            np_vol = load_npy(npy, data_folder)
+            if type(np_vol) != np.ndarray:
+                print(f"{name} not loaded, error loading .npy file. volume is of type {np_vol.type()}")
+                continue
+            elif len(np_vol.shape) == 3:
+                print(f"reading in 3D vol {npy}")
+                static_vdb_from_npy(np_vol, basename, data_folder)
+            elif len(np_vol.shape) == 4:
+                print(f"reading in 4D vol {npy}")
+                vdb_seq_from_npy(np_vol, basename, data_folder)
+            else:
+                print(f"invalid size: {name} is {len(np_vol.shape)} dimensions")
+                continue
     print("All volumes read in")
 
 
@@ -101,7 +108,7 @@ class Neurovolume(bpy.types.Panel):
         #generate things and we thus need them?
         
         layout.prop(scene, "path_input")
-        layout.operator("load.volume", text="Load.npy Files as VDBs")
+        layout.operator("load.volume", text="Load .npy Files as VDBs")
 
 
 
