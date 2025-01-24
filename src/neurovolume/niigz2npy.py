@@ -54,6 +54,20 @@ def get_name(var):
         if value is var:
             if "_path" in filename:
                 return filename.replace("_path", "")
+def parse_metadata(ants_img_string):
+    info = str(ants_img_string).split('\n')
+    metadata = {}
+    for idx, entry in enumerate(info):
+        strips = entry.strip().split(":")
+        if len(strips) == 1 and idx==0:
+            metadata["Header"] = strips[0].strip()
+        elif len(strips) == 2:
+            name, value = strips
+            metadata[name.strip()] = value
+        else:
+            continue
+    return metadata
+
 
 # CONTROL FLOW
 #TODO clean up and use argparse
