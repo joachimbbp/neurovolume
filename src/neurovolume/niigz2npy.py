@@ -4,7 +4,8 @@
 import os
 import ants
 import numpy as np
-import re
+
+import json
 
 # FUNCTIONS
 def parent_dir():
@@ -31,47 +32,30 @@ def vol_from_path(path):
     """
     print(f"    Creating Volume for {os.path.basename(path)}")
     return create_volume(ants.image_read(path).numpy())
-    #TODO replace ants.image_read().numpy() with custom function
 
-def get_name(var):
-    """
-    Returns the name of a variable
-    """
-    for name, value in globals().items():
-        if value is var:
-            return name
-        
-def save_npy(vol: np.ndarray, name: str, output_dir: str):
-    print(f"    Saving {name}")
-    with open(f'{output_dir}/{name}.npy', 'wb') as f:
-        np.save(f, np.array(vol))
+def extract_metadata(ants_img_path, output_folder):
+    print(f"    Extracting Metadata from {os.path.basename(ants_img_path)}")
+    ants_img = ants.image_read(ants_img_path)
+    filename = os.path.basename(ants_img_path.split('.')[0])
+    info = str(ants_img).split('\n')
 
-def get_name(var):
-    """
-    Returns the name of a variable
-    """
-    for filename, value in globals().items():
-        if value is var:
-            if "_path" in filename:
-                return filename.replace("_path", "")
-def parse_metadata(ants_img_string):
-    info = str(ants_img_string).split('\n')
     metadata = {}
     for idx, entry in enumerate(info):
         strips = entry.strip().split(":")
         if len(strips) == 1 and idx==0:
             metadata["Header"] = strips[0].strip()
         elif len(strips) == 2:
-            name, value = strips
-            metadata[name.strip()] = value
+            key, value = strips
+            metadata[key.strip()] = value
         else:
             continue
-    return metadata
-
+    metadata_json = json.dumps(metadata, indent=4)
+    with open(f'{output_folder}/{filename}.json', 'w') as outfile:
+        outfile.write(metadata_json)
 
 # CONTROL FLOW
-#TODO clean up and use argparse
-options = input("Enter template paths: t, Manually Enter Paths: m\nOverride with hard coded test paths: o\n")
+#TODO Manually enter an arbitrary amount of paths as you want, including a folder. Implement in argparse
+options = input("Enter template paths: t\nOverride with hard coded test paths: o\n")
 match options:
     case 't':
         anat_path = input('Enter path for Anatomy Scan:\n')
@@ -90,16 +74,8 @@ match options:
         print("Invalid option, exiting program")
         exit()
 
-print("Gathering Paths...")
 paths = [anat_path, bold_stim_path, bold_rest_path, mni_template_path, mni_mask_path]
-print("Establishing Names...")
-names = [get_name(path) for path in paths]
-print("Building Volumes...")
-vols = [vol_from_path(path) for path in paths]
-
-#maybe this could be a dictionary but I sort of like this?
-print(f"Saving .npy files to {output_dir}...")
-for idx, vol in enumerate(vols):
-    save_npy(vol, names[idx], output_dir)
-print("Done")
-exit()
+for path in paths:
+    extract_metadata(path, output_dir)
+    with open(f'{output_dir}/{os.path.basename(path).split(".")[0]}.npy', 'wb') as f:
+        np.save(f, np.array(vol_from_path(path)))
