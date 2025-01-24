@@ -4,8 +4,8 @@
 import os
 import ants
 import numpy as np
-
 import json
+import sys
 
 # FUNCTIONS
 def parent_dir():
@@ -34,7 +34,6 @@ def vol_from_path(path):
     return create_volume(ants.image_read(path).numpy())
 
 def extract_metadata(ants_img_path, output_folder):
-    print(f"    Extracting Metadata from {os.path.basename(ants_img_path)}")
     ants_img = ants.image_read(ants_img_path)
     filename = os.path.basename(ants_img_path.split('.')[0])
     info = str(ants_img).split('\n')
@@ -55,27 +54,41 @@ def extract_metadata(ants_img_path, output_folder):
 
 # CONTROL FLOW
 #TODO Manually enter an arbitrary amount of paths as you want, including a folder. Implement in argparse
-options = input("Enter template paths: t\nOverride with hard coded test paths: o\n")
-match options:
-    case 't':
-        anat_path = input('Enter path for Anatomy Scan:\n')
-        bold_path = input('Enter path for BOLD Scan:\n')
-        mni_template_path = input('Enter path for MNI Template:\n')
-        mni_mask = input('Enter path for MNI Mask:\n')
-        output_dir = input('Enter save path for .npy files:\n')
-    case 'o':
-        anat_path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01/anat/sub-01_T1w.nii.gz"
-        bold_stim_path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz"
-        bold_rest_path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01/func/sub-01_task-rest_bold.nii.gz"
-        mni_template_path =  "/Users/joachimpfefferkorn/repos/neurovolume/media/templates/mni_icbm152_t1_tal_nlin_sym_09a.nii"
-        mni_mask_path = "/Users/joachimpfefferkorn/repos/neurovolume/media/templates/mni_icbm152_t1_tal_nlin_sym_09a_mask.nii"
-        output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
-    case '_':
-        print("Invalid option, exiting program")
-        exit()
 
-paths = [anat_path, bold_stim_path, bold_rest_path, mni_template_path, mni_mask_path]
-for path in paths:
-    extract_metadata(path, output_dir)
-    with open(f'{output_dir}/{os.path.basename(path).split(".")[0]}.npy', 'wb') as f:
-        np.save(f, np.array(vol_from_path(path)))
+def read_args(scan_dirs, output_dir):
+    for item in scan_dirs:
+        if os.path.isdir(item):
+            print(f'Directory Found {item}')
+            sub_items = [f'{item}/{sub_item}' for sub_item in os.listdir(item)]
+            read_args(sub_items, output_dir)
+        else:
+            file_split = item.split(".")
+            if len(file_split) >= 2:
+                if file_split[1] == "nii":
+                    try:
+                        extract_metadata(item, output_dir)
+                        print(f"    Saved Metadata .json file from {item}")
+                    except Exception as e:
+                        print(f'    Error extracting Metadata .json file from {item}\n     Exception\n     {e}')
+                        continue
+
+                    try:
+                        save_name = f'{output_dir}/{os.path.basename(item).split(".")[0]}.npy'
+                        with open(save_name, 'wb') as f:
+                            np.save(f, np.array(vol_from_path(item)))
+                            print(f'        Saved .npy volume to {save_name}')
+                    except Exception as e:
+                        print(f'    Error saving volume {item}\n     Exception\n     {e}')
+                        continue
+
+                else:
+                    print(f'    {item} first extension is not ".nii" Moving on to next item')
+                    continue
+            else:
+                print(f'    {item} does not contain the proper amount of extensions or names (more than two total). Moving to next item')
+
+print("argv0", sys.argv[1])
+print("argv1:", sys.argv[2:])
+read_args(sys.argv[2:], sys.argv[1])
+#read_args(["/Users/joachimpfefferkorn/repos/neurovolume/media"], "/Users/joachimpfefferkorn/repos/neurovolume/output")
+print("done")
