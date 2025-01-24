@@ -57,9 +57,9 @@ def get_name(var):
 
 # CONTROL FLOW
 #TODO clean up and use argparse
-options = input("Manually Enter Paths: m\nOverride with hard coded test paths: o\n")
+options = input("Enter template paths: t, Manually Enter Paths: m\nOverride with hard coded test paths: o\n")
 match options:
-    case 'm':
+    case 't':
         anat_path = input('Enter path for Anatomy Scan:\n')
         bold_path = input('Enter path for BOLD Scan:\n')
         mni_template_path = input('Enter path for MNI Template:\n')
