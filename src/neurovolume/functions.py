@@ -8,6 +8,11 @@ from numpy import asarray
 import ants
 from ipywidgets import interact
 
+#TODO
+# [ ] Eliminate ants dependency (skull stripping will be done in blender)
+# [ ] Move all notebook viewer functions to their own file
+# Reduce all dependencies to stuff thats included in blender (at the very least)
+#   Ideally kill everything but standard library stuff and numpy
 
 # SUBTRACTION STUFF
 def subtract_previous_frame(bold_vol: np.ndarray):
@@ -245,7 +250,7 @@ def naive_sanity_check(array, thresh=0.0):
         if density > thresh:
             print("Index: " + str(index) + " Density: " + str(density))
 
-def normalize_array(arr): #changed to return an np array directly
+def normalize_array(arr):
     return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
 
 def view_slice(slice, color_map="tab20c", title=""):

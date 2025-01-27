@@ -1,5 +1,5 @@
 # standalone executable (eventually) for converting compressed `npy.gz`  files into .npy files
-# Eventually replace ANTs with your own functions and let this all live within Blender
+# Eventually replace ANTs with your own functions and let this all live within the Blender Plugin
 
 import os
 import ants
@@ -11,27 +11,27 @@ import sys
 def parent_dir():
     return os.path.dirname(os.path.dirname(os.getcwd()))
 
-def create_volume(tensor):
+def create_normalized_volume(tensor):
     """
-    For some reason, this loop is needed to create
-    a volume that isn't just pure noise once converted
-    to a VDB.
+    Creates a normalized tensor
     """
     mri_volume = np.zeros(tensor.shape)
-    for z_index in range(tensor.shape[2]):
-        sagittal_slice = tensor[:, :, z_index]
+    normed_tensor = np.array((tensor - np.min(tensor)) / (np.max(tensor) - np.min(tensor)))
+    for z_index in range(normed_tensor.shape[2]):
+        sagittal_slice = normed_tensor[:, :, z_index]
         for row_index, row in enumerate(sagittal_slice):
             for col_index, _ in enumerate(row):
                 density = sagittal_slice[row_index][col_index]
                 mri_volume[row_index][col_index][z_index] = density
     return mri_volume
 
+
 def vol_from_path(path):
     """
     Returns a VDB tensor from the NiFTY
     """
     print(f"    Creating Volume for {os.path.basename(path)}")
-    return create_volume(ants.image_read(path).numpy())
+    return create_normalized_volume(ants.image_read(path).numpy())
 
 def extract_metadata(ants_img_path, output_folder):
     ants_img = ants.image_read(ants_img_path)
@@ -87,8 +87,8 @@ def read_args(scan_dirs, output_dir):
             else:
                 print(f'    {item} does not contain the proper amount of extensions or names (more than two total). Moving to next item')
 
-print("argv0", sys.argv[1])
-print("argv1:", sys.argv[2:])
+print("Output:", sys.argv[1])
+print("Media:", sys.argv[2:])
 read_args(sys.argv[2:], sys.argv[1])
 #read_args(["/Users/joachimpfefferkorn/repos/neurovolume/media"], "/Users/joachimpfefferkorn/repos/neurovolume/output")
 print("done")

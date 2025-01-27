@@ -1,57 +1,36 @@
-# fMRI Testing
-**Please see the main branch for a working version of this project.**
-This branch is for the development of animated fMRI usage. It is a work in progress. Many commits will contain local paths, messy code, broken functions, etc.
+# Neurovolume (WIP)
+Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This project is currently a work in progress.
 
-# Status
-Anatomy successfully processes with `src/neuro_volume/anat_pipeline.ipynb`
-Much of the roto skull strip isn't going to work presently in the dev container.
 
-# Docker, Poetry, and Blender Scripts
-The [dockerfile](https://github.com/joachimbbp/openvdb_docker) created by myself and [Zach Lipp](https://github.com/zachlipp) is currently under construction. **This commit currently reverts to the Poetry package manager and is not using the docker file.** This is due to some  long build times that arise when `PY_OPENVDB_WRAP_ALL_GRID_TYPES=ON` is activated in OpenVDB. Until this problem is solved, I will perform all the data manipulation in Numpy arrays, and then convert these to separate grids with the Blender scripts found in `src/blender_scripts`.
+# Usage
+The usage for Neurovolume is presently spread across a few different scripts. Once we remove dependencies and write our own, custom functions, we will be able to package this entire project within a single Blender plugin. We will also provide a library which can be adapted into other plugins and standalone tools.
 
-The last commit before this change can be found [here](https://github.com/joachimbbp/neurovolume/tree/0525ba0786782e71f84ca09189ae85bd7adfeb5b).
+It is possible to the `functions.py` library to pull some VDBs out of fMRI data. This, however, has not yet been implemented in the blender plugin.
 
-# Open Neuro
-## Scan Data
-Currently, only the scans being used for development are pushed to github. If you wish to view the entire dataset it can be found [here](https://openneuro.org/datasets/ds003548/versions/1.0.1) or downloaded with the following:
+This project uses poetry for dependency management.
 
- `openneuro download --snapshot 1.0.1 ds003548 ds003548-download/`
-## Citation
+## Basic Pipeline for Static MRIs
+- Run the `niigz2npy` script. This converts all compressed `nii.gz` `NIFTI` files to `.npy` files containing normalized numpy arrays. (Make sure your output folder is empty).
+
+```shell
+cd src/neurovolume
+Python niigz2npy.py <path/to/output/folder/> <input/folder/one/> <input/folder/two> </etc.../>
+```
+- Open blender and import the plugin found at `blender_plugin/__init__.py`
+You can do this by copy and pasting the code into the blenders text editor and running it there.
+- Once this is running, a GUI should appear on the right side of the 3D view. Paste the path to the folder containing your `.npy` files and click `Load .npy Files into Blender`
+- This should load the VDB files into blender for shading, animation, rendering, etc.
+![Blender Instructions](readme_media/blender_instructions.png)
+
+# Why VDB?
+VDBs are a highly performant, art-directable, volumetric data structure that supports animations.  Unlike typical meshed based pipelines using the marching cubes algorithm, this volume based approach preserves the scan’s normalized density data throughout the VFX pipeline. The animation support will also be particularly useful when animating FMRI data as outlined in the roadmap below.
+
+For more information on VDBs, see the [openVDB website](https://www.openvdb.org/)
+
+
+# Dataset Citation
+This software was tested using the following datasets.
+
 Isaac David and Victor Olalde-Mathieu and Ana Y. Martínez and Lluviana Rodríguez-Vidal and Fernando A. Barrios (2021). Emotion Category and Face Perception Task Optimized for Multivariate Pattern Analysis. OpenNeuro. [Dataset] doi: 10.18112/openneuro.ds003548.v1.0.1
 
-Template [source](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tree/main/assets/templates)
-
-# Branch Goals:
-Up next:
-- [x]  Use `gz` compression for Scivol
-- [x] Try Napari for visualizations
-    - There's some real potential here, but I am using my 2D slicer to dial in the rotation for now.
-- [ ] Try [Torch Sparse](https://pytorch.org/docs/stable/sparse.html) for arrays 
-- [ ] Custom fMRI object that includes the stimulus and action data encoded along the temporal dimension. Possibly integrate into scivol.
-- [ ] Change `.scivol` to `.nerv`
-
-Once these are addressed we can push to main:
-- [ ] Animate fMRI activations as VDB emission in a separate `VDB` `Grid`
-    - [x] Access stimulus data to correspond to animation
-- [x] Rewrite helper functions as bespoke for this project
-    - [x] Implement a 4D viewer for temporal dimension
-- [ ] Cleanup and remove redundant functions
-- [ ] Integrate notebook functions into functions file
-- [ ] Standardize naming convetions: `timeslice` and `frame`, are the same thing, for instance
-- [ ] Remove/squash/untrack old binaries (AE and Blender). *will this be solved by a squash and merge?* Verify.
-- [ ] Remove unused libraries from Poetry
-
-Bonuses:
-- [ ] Eliminate `create_volume()` tensor creation function 
-- [ ] Grid Specific Tolerance Levels
-- [ ] Include experimental stimulus and baseline media
-
-Long Term:
-- [ ] Brain anatomy segmentation
-- [ ] Convert blender script to blender plugin
-- [ ] Standalone scivol reader/writer
-    - Will require locking in the structure of `.nerv`
-- [ ] Rewrite as much of the external file parsing libraries with bespoke functions
-    - [ ] Priority: replace ANTs
-- [ ] Python Library
-- [ ] GUI for node-based analysis
+The MNI Template can be found [Here](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tree/main/assets/templates)
