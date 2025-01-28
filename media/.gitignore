@@ -2,12 +2,7 @@
 
 # Ignore everything in the folder
 *
-
+/*
 # But not this .gitignore file
 !.gitignore
 
-#Originally these were pushed to git, but that's not such a great idea
-
-# !anat/
-# !anat/sub-01_T1w.nii.gz
-# !anat/sub-01_T1w.json
