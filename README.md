@@ -1,4 +1,5 @@
 # Neurovolume (WIP)
+![Render of a non-skull stripped MNI Template](readme_media/mni_template_render.png)
 Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This project is currently a work in progress.
 
 
