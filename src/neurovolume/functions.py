@@ -8,11 +8,6 @@ from numpy import asarray
 import ants
 from ipywidgets import interact
 
-#TODO
-# [ ] Eliminate ants dependency (skull stripping will be done in blender)
-# [ ] Move all notebook viewer functions to their own file
-# Reduce all dependencies to stuff thats included in blender (at the very least)
-#   Ideally kill everything but standard library stuff and numpy
 
 # SUBTRACTION STUFF
 def subtract_previous_frame(bold_vol: np.ndarray):
@@ -271,17 +266,17 @@ def view_sagittal_slice(volume, middle, color_map):
     
 
 def create_volume(normalized_tensor):
-    """
-    For some reason this incredibly redundant seeming function needs to be used!
 
-    `anat_norm = create_volume(normalize_array(nib.load(anat_filepath).get_fdata()))
-    anat_norm_no_cv = normalize_array(nib.load(anat_filepath).get_fdata())
-    print(np.array_equal(anat_norm, anat_norm_no_cv))`
-    Returns True
+    # For some reason this incredibly redundant seeming function needs to be used!
 
-    However, when a vdb is created with `anat_norm_no_cv` it comes out as a pure box of noise
-    I have no idea why!
-    """
+    # `anat_norm = create_volume(normalize_array(nib.load(anat_filepath).get_fdata()))
+    # anat_norm_no_cv = normalize_array(nib.load(anat_filepath).get_fdata())
+    # print(np.array_equal(anat_norm, anat_norm_no_cv))`
+    # Returns True
+
+    # However, when a vdb is created with `anat_norm_no_cv` it comes out as a pure box of noise
+    # I have no idea why!
+
     mri_volume = np.zeros(normalized_tensor.shape)
     for z_index in range(normalized_tensor.shape[2]):
         sagittal_slice = normalized_tensor[:, :, z_index]

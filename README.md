@@ -16,16 +16,39 @@ This project uses poetry for dependency management.
 cd src/neurovolume
 Python niigz2npy.py <path/to/output/folder/> <input/folder/one/> <input/folder/two> </etc.../>
 ```
-- Open blender and import the plugin found at `blender_plugin/__init__.py`
+- Open Blender and import the plugin found at `blender_plugin/__init__.py`
 You can do this by copy and pasting the code into the blenders text editor and running it there.
 - Once this is running, a GUI should appear on the right side of the 3D view. Paste the path to the folder containing your `.npy` files and click `Load .npy Files into Blender`
-- This should load the VDB files into blender for shading, animation, rendering, etc.
+- This should load the VDB files into Blender for shading, animation, rendering, etc.
 ![Blender Instructions](readme_media/blender_instructions.png)
 
 # Why VDB?
 VDBs are a highly performant, art-directable, volumetric data structure that supports animations.  Unlike typical meshed based pipelines using the marching cubes algorithm, this volume based approach preserves the scan’s normalized density data throughout the VFX pipeline. The animation support will also be particularly useful when animating FMRI data as outlined in the roadmap below.
 
 For more information on VDBs, see the [openVDB website](https://www.openvdb.org/)
+
+# Blender, VDB, and Neuroscience Programming Environments
+This project uses Poetry to manage dependencies and create a virtual environment. However, our Blender environment includes two dependencies -`pyopenvdb` and `bpy`- which are very hard to integrate into our current code base. Furthermore, our `ants`, our fMRI processing library, is very hard to use within blender.
+
+Throughout the development, we have used a few different techniques to resolve these issues, including a [docker file](https://github.com/joachimbbp/openvdb_docker) specifically for OpenVDB.
+
+Currently, we are using VSCode with [Jacques Lucke's Blender Extension](https://github.com/JacquesLucke/blender_vscode) to write our Blender plugin. This plugin holds all of the `bpy` and `pyopenvdb` code, while our `functions.py` and `niigz2npy.py` are written within the poetry environment. As we replace `ants` (and perhaps even `pyopenvdb`) with our own, dependency-minimal code, we will be able to write all of this within the same environment. This will hopefully create maximally portable code which can be easily adapted for many 3D softwares.
+
+# Roadmap
+Global Goal: write everything with dependencies available only within Blender's Python environment. Once this is achieved, we can easily package everything within a single Blender plugin and our separate library will be robust and portable.
+
+Once achieved, the repo will contain the following:
+- Stand-alone Blender Plugin containing all the functionality to convert `NIFTI` files into `VDB`.
+- A minimal-dependency library containing fMRI processing tools for other projects (such as command-line tools or other VFX software plugins)
+- A library for visualization (and possibly alignment) within Jupyter Notebooks (can include matplotlib dependencies, etc) 
+
+## To Do
+- [ ] Bespoke `NIFTI` file reader
+- [ ] VDB Grid Alignment and Combination in Blender
+- [ ] Clean up `poetry` dependencies
+- [ ] Standardize Dimension Naming Conventions
+    - `x y z t` vs `0 1 2 3` vs `Horizontal Coronal Sagittal Time`
+- [ ] Add fMRI Import functionality in Blender Plugin
 
 
 # Dataset Citation
