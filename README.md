@@ -1,34 +1,59 @@
-# Neuro Volume
-A VDB representation of neurological MRI data.
-![First Render](readme_media/brain.png)
+# Neurovolume (WIP)
+![Render of a non-skull stripped MNI Template](readme_media/mni_template_render.png)
+Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This project is currently a work in progress.
+
 
 # Usage
-- Generate a NumPy array suitable for conversion to a VDB, run the cells in `src/neuro_volume/generate_neuro_volume.ipynb`
-- Convert the VDB and load it into blender as a volume by running the `vdb_from_numpy.py` script in the Blender file found here: `blender/vdb_from_numpy.blend`
-    - Note this script can also be found in the `src` folder, but will only run in the Blender environment
-- The material must be selected by hand after loading the VDB
+The usage for Neurovolume is presently spread across a few different scripts. Once we remove dependencies and write our own, custom functions, we will be able to package this entire project within a single Blender plugin. We will also provide a library which can be adapted into other plugins and standalone tools.
+
+It is possible to the `functions.py` library to pull some VDBs out of fMRI data. This, however, has not yet been implemented in the blender plugin.
+
+## Basic Pipeline for Static MRIs
+- This project uses poetry for dependency management. With poetry installed, you can build and enter the virtual environment with `poetry install`
+- Run the `niigz2npy` script. This converts all compressed `nii.gz` `NIFTI` files to `.npy` files containing normalized numpy arrays. (Make sure your output folder is empty).
+
+```shell
+cd src/neurovolume
+Python niigz2npy.py <path/to/output/folder/> <input/folder/one/> <input/folder/two> </etc.../>
+```
+- Open Blender and import the plugin found at `blender_plugin/__init__.py`
+You can do this by copy and pasting the code into the blenders text editor and running it there.
+- Once this is running, a GUI should appear on the right side of the 3D view. Paste the path to the folder containing your `.npy` files and click `Load .npy Files into Blender`
+- This should load the VDB files into Blender for shading, animation, rendering, etc.
 ![Blender Instructions](readme_media/blender_instructions.png)
 
 # Why VDB?
-VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Unlike typical meshed based pipelines using the marching cubes algorithm, this volume based approach preserves the scan’s normalized density data throughout the VFX pipeline. The animation support will also be particularly useful when animating FMRI data as outlined in the roadmap below.
+VDBs are a highly performant, art-directable, volumetric data structure that supports animations.  Unlike typical meshed based pipelines using the marching cubes algorithm, this volume based approach preserves the scan’s normalized density data throughout the VFX pipeline. The animation support will also be particularly useful when animating FMRI data as outlined in the roadmap below.
 
 For more information on VDBs, see the [openVDB website](https://www.openvdb.org/)
 
+# Blender, VDB, and Neuroscience Programming Environments
+This project uses Poetry to manage dependencies and create a virtual environment. However, our Blender environment includes two dependencies -`pyopenvdb` and `bpy`- which are very hard to integrate into our current code base. Furthermore, our `ants`, our fMRI processing library, is very hard to use within blender.
+
+Throughout the development, we have used a few different techniques to resolve these issues, including a [docker file](https://github.com/joachimbbp/openvdb_docker) specifically for OpenVDB.
+
+Currently, we are using VSCode with [Jacques Lucke's Blender Extension](https://github.com/JacquesLucke/blender_vscode) to write our Blender plugin. This plugin holds all of the `bpy` and `pyopenvdb` code, while our `functions.py` and `niigz2npy.py` are written within the poetry environment. As we replace `ants` (and perhaps even `pyopenvdb`) with our own, dependency-minimal code, we will be able to write all of this within the same environment. This will hopefully create maximally portable code which can be easily adapted for many 3D softwares.
+
 # Roadmap
-- [ ] Automated slice height spacing based on scan metadata
-- [ ] Docker Container to integrate OpenVDB into `src/neuro_volume`
-    - [Click here for Docker Container Progress](https://github.com/joachimbbp/openvdb_docker)
-- [ ] Animated fMRI usage
-    - [Click here for fMRI Progress](https://github.com/joachimbbp/neurovolume/tree/fmri_070825)
-- [x] Improve Blender VDB texturing and slicing
+Global Goal: write everything with dependencies available only within Blender's Python environment. Once this is achieved, we can easily package everything within a single Blender plugin and our separate library will be robust and portable.
 
-# Contact
-jbbpfefferkorn@gmail.com
+Once achieved, the repo will contain the following:
+- Stand-alone Blender Plugin containing all the functionality to convert `NIFTI` files into `VDB`.
+- A minimal-dependency library containing fMRI processing tools for other projects (such as command-line tools or other VFX software plugins)
+- A library for visualization (and possibly alignment) within Jupyter Notebooks (can include matplotlib dependencies, etc) 
 
-# Dataset information
-The MRI data used in this prototype is from openneuro.org
+## To Do
+- [ ] Bespoke `NIFTI` file reader
+- [ ] VDB Grid Alignment and Combination in Blender
+- [ ] Clean up `poetry` dependencies
+- [ ] Standardize Dimension Naming Conventions
+    - `x y z t` vs `0 1 2 3` vs `Horizontal Coronal Sagittal Time`
+- [ ] Add fMRI Import functionality in Blender Plugin
 
-You can download the dataset [here](https://openneuro.org/datasets/ds003900/versions/1.1.1). It is located at `sub-100/anat/sub-1001_T1w.nii.gz`
 
-## Citation
-Philippe Poulin and Guillaume Theaud and Pierre-Marc Jodoin and Maxime Descoteaux (2022). TractoInferno: A large-scale, open-source, multi-site database for machine learning dMRI tractography. OpenNeuro. [Dataset] doi: doi:10.18112/openneuro.ds003900.v1.1.1
+# Dataset Citation
+This software was tested using the following datasets.
+
+Isaac David and Victor Olalde-Mathieu and Ana Y. Martínez and Lluviana Rodríguez-Vidal and Fernando A. Barrios (2021). Emotion Category and Face Perception Task Optimized for Multivariate Pattern Analysis. OpenNeuro. [Dataset] doi: 10.18112/openneuro.ds003548.v1.0.1
+
+The MNI Template can be found [Here](https://github.com/Angeluz-07/MRI-preprocessing-techniques/tree/main/assets/templates)

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "neuro-volume"
+name = "neurovolume"
 version = "0.1.0"
 description = ""
 authors = ["joachimbbp <104856283+joachimbbp@users.noreply.github.com>"]
@@ -9,9 +9,26 @@ readme = "README.md"
 python = "^3.11"
 jupyter = "^1.0.0"
 nibabel = "^5.2.1"
-numpy = "^2.0.1"
+numpy = "2.0.0"
 pytest = "^8.3.1"
 matplotlib = "^3.9.1"
+pillow = "^10.4.0"
+ipyvolume = "^0.6.3"
+nilearn = "^0.10.4"
+simpleitk = "^2.4.0"
+opencv-python = "^4.10.0.84"
+nitime = "^0.11"
+napari = "^0.5.4"
+scikit-image = "^0.24.0"
+pyqt5 = "^5.15.11"
+dask-image = "^2024.5.3"
+llvmlite = "^0.43.0"
+sparse = "^0.15.4"
+torch = "^2.5.1"
+torchvision = "^0.20.1"
+antspyx = "^0.5.4"
+
+
 
 
 [tool.poetry.group.dev.dependencies]
