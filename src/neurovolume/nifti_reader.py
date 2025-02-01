@@ -112,25 +112,23 @@ def read_nifti(nifti_file_path):
             return voxels.reshape(dimensions[1], dimensions[2], dimensions[3], dimensions[4])
         
 
-        volume = read_img()
+        voxels = read_img()
 #GPT-------
         # Apply scaling if needed
         if scl_slope != 0:
-            volume = volume.astype(np.float32) * scl_slope + scl_inter
+            voxels = voxels.astype(np.float32) * scl_slope + scl_inter
             print("Applied intensity scaling")
         else:
             print("No scaling applied (scl_slope = 0)")
 #-----------
-        print("volume shape: ", volume.shape)
-        print("Volume dtype", volume.dtype)
+        print("volume shape: ", voxels.shape)
+        print("Volume dtype", voxels.dtype)
 
 #        hard coding method 3 for now
-
-        def method_3(input, srow_x, srow_y, srow_z):
+        def method_3(input, srow_x=srow_x, srow_y=srow_y, srow_z=srow_z):
             print("input shape", input.shape)
-            print("using method 3 to transform volume")
-
-            #got gptto write this matrix
+            print("using method 3 to transform volume")            
+            #got gpt to write this matrix because I am lazy
             transformation_matrix = np.array([
             [srow_x[0], srow_x[1], srow_x[2], srow_x[3]],
             [srow_y[0], srow_y[1], srow_y[2], srow_y[3]],
@@ -138,12 +136,8 @@ def read_nifti(nifti_file_path):
             [0, 0, 0, 1]
                                 ])
             print("transformation matrix", transformation_matrix)
-            return np.dot(input, transformation_matrix)
+            return input * transformation_matrix
 
-        #for 
+        voxels = method_3(voxels)
 
-
-        volume[:] = volume.dot(transformation_matrix.T)
-        return volume
-
-read_nifti(nifti_file_path)
+        return voxels, affine
