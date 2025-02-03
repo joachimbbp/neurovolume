@@ -40,7 +40,6 @@ def read_nifti(nifti_file_path):
             file.seek(offset)
             data = file.read(size)
             return struct.unpack(f_string, data)
-        
 
         endianness = '<' #default to little
         dimensions = read_hdr_field(40, 16, f'{endianness}8h')
@@ -64,9 +63,7 @@ def read_nifti(nifti_file_path):
         print('pixdim: ', pixdim)
         print('xyzt units', type(xyzt_units), xyzt_units)
 
-        slice_code = ord(read_hdr_field(122, 1, f'{endianness}1s')[0])
-        print(' slice code', slice_code)
-        #got 0 which means unknown
+
 
         qform_code = read_hdr_field(252, 2, f'{endianness}1h')
         sform_code = read_hdr_field(254, 2, f'{endianness}1h')
@@ -88,6 +85,17 @@ def read_nifti(nifti_file_path):
         print(f"scl_slope: {scl_slope}, scl_inter: {scl_inter}")
 
 
+        # Slice Acquisition Information -------------------
+        slice_code = ord(read_hdr_field(122, 1, f'{endianness}1c')[0])  # Convert to integer
+        slice_start = read_hdr_field(74, 2, f'{endianness}1h')[0]  # Use 'h' for short
+        slice_end = read_hdr_field(120, 2, f'{endianness}1h')[0]  # Same here
+        slice_duration = read_hdr_field(132, 4, f'{endianness}1f')[0]  # 'f' for float
+
+        print('🍕 slice code', slice_code)
+        #got 0 which means unknown
+        print('  slice start', slice_start, 'slice end ', slice_end)
+        print('  slice duration ', slice_duration)
+        # -------------
 
 
         def read_img(offset=int(vox_offset), bitpix=bitpix, dimensions=dimensions, datatype=datatype, file=nf):
@@ -126,6 +134,7 @@ def read_nifti(nifti_file_path):
 
 #        hard coding method 3 for now
         def method_3(input, srow_x=srow_x, srow_y=srow_y, srow_z=srow_z):
+            return input
             print("input shape", input.shape)
             print("using method 3 to transform volume")            
             #got gpt to write this matrix because I am lazy
@@ -140,4 +149,5 @@ def read_nifti(nifti_file_path):
 
         voxels = method_3(voxels)
 
-        return voxels, affine
+        return voxels
+read_nifti(nifti_file_path)
