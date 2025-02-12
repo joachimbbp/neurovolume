@@ -43,7 +43,8 @@ Once achieved, the repo will contain the following:
 - A library for visualization (and possibly alignment) within Jupyter Notebooks (can include matplotlib dependencies, etc) 
 
 ## To Do
-- [ ] Bespoke `NIFTI` file reader
+- [ ] Blender Plugin can directly import `NIFTI` files
+    - Fully integrates `niigz2npy` and replaces `nibabel` functions with native `numpy`-only functions
 - [ ] VDB Grid Alignment and Combination in Blender
 - [ ] Clean up `poetry` dependencies
 - [ ] Standardize Dimension Naming Conventions

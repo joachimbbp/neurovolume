@@ -1,8 +1,7 @@
 # standalone executable (eventually) for converting compressed `npy.gz`  files into .npy files
-# Eventually replace ANTs with your own functions and let this all live within the Blender Plugin
 
 import os
-import ants
+import nibabel as nib
 import numpy as np
 import json
 import sys
@@ -31,12 +30,14 @@ def vol_from_path(path):
     Returns a VDB tensor from the NiFTY
     """
     print(f"    Creating Volume for {os.path.basename(path)}")
-    return create_normalized_volume(ants.image_read(path).numpy())
+    nib_img = nib.load(path)
+    nib_array = nib_img.get_fdata()
+    return create_normalized_volume(nib_array)
 
-def extract_metadata(ants_img_path, output_folder):
-    ants_img = ants.image_read(ants_img_path)
-    filename = os.path.basename(ants_img_path.split('.')[0])
-    info = str(ants_img).split('\n')
+def extract_metadata(img_path, output_folder):
+    nib_img = nib.load(img_path)
+    filename = os.path.basename(img_path.split('.')[0])
+    info = str(nib_img).split('\n')
 
     metadata = {}
     for idx, entry in enumerate(info):
@@ -52,10 +53,9 @@ def extract_metadata(ants_img_path, output_folder):
     with open(f'{output_folder}/{filename}.json', 'w') as outfile:
         outfile.write(metadata_json)
 
-# CONTROL FLOW
-#TODO Manually enter an arbitrary amount of paths as you want, including a folder. Implement in argparse
 
-def read_args(scan_dirs, output_dir):
+def read_args(scan_dirs: list, output_dir: str):
+
     for item in scan_dirs:
         if os.path.isdir(item):
             print(f'Directory Found {item}')
@@ -86,9 +86,10 @@ def read_args(scan_dirs, output_dir):
                     continue
             else:
                 print(f'    {item} does not contain the proper amount of extensions or names (more than two total). Moving to next item')
+# example read args
+# read_args(["/Users/joachimpfefferkorn/repos/neurovolume/media"], "/Users/joachimpfefferkorn/repos/neurovolume/output")
 
+read_args(sys.argv[2:], sys.argv[1])
 print("Output:", sys.argv[1])
 print("Media:", sys.argv[2:])
-read_args(sys.argv[2:], sys.argv[1])
-#read_args(["/Users/joachimpfefferkorn/repos/neurovolume/media"], "/Users/joachimpfefferkorn/repos/neurovolume/output")
 print("done")

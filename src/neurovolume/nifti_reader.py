@@ -7,6 +7,10 @@ import numpy as np
 # https://docs.python.org/3/library/struct.html
 # https://brainder.org/2012/09/23/the-nifti-file-format/
 
+
+#TODO
+# [ ] When cleaning up, make sure you're using lexical scoping
+
 nifti_file_path = "/Users/joachimpfefferkorn/repos/neurovolume/media/openneuro/sub-01_T1w.nii"
 
 datatypes = {
@@ -33,12 +37,12 @@ datatypes = {
 
 def read_nifti(nifti_file_path):
     with open (nifti_file_path, 'rb') as nf:
-        def read_hdr_field(offset, size, f_string, file=nf):
+        def read_hdr_field(offset, size, f_string):
             '''
             offset and size are in bytes
             '''
-            file.seek(offset)
-            data = file.read(size)
+            nf.seek(offset)
+            data = nf.read(size)
             return struct.unpack(f_string, data)
 
         endianness = '<' #default to little
@@ -95,36 +99,40 @@ def read_nifti(nifti_file_path):
         #got 0 which means unknown
         print('  slice start', slice_start, 'slice end ', slice_end)
         print('  slice duration ', slice_duration)
-        # -------------
+        # ---------------------------------------------------
 
 
-        def read_img(offset=int(vox_offset), bitpix=bitpix, dimensions=dimensions, datatype=datatype, file=nf):
-            num_bits = (dimensions[1] * dimensions[2] * dimensions[3] * dimensions[4])
-            num_bytes = num_bits * (bitpix // 8)
-            print("number of bits: ", num_bits, "\nnumber of bytes: ", num_bytes)
+        def read_img_3D(offset=int(vox_offset)):
+
+            num_voxels = (dimensions[1] * dimensions[2] * dimensions[3])
+            num_bytes = num_voxels * bitpix // 8
+            dtype_override = np.dtype(f'{endianness}i2')
+            print("number of voxels: ", num_voxels, "\nnumber of byres: ", num_bytes, "vox offset int", offset, "dtype override: ", dtype_override)
+
             # From the original header file https://nifti.nimh.nih.gov/pub/dist/src/niftilib/nifti1.h
             # #define DT_SIGNED_SHORT            4     /* signed short (16 bits/voxel) */
-            dtype_override = np.dtype(f'{endianness}i2')
-            print("dtype override: ", dtype_override)
 
-            file.seek(offset)
+            nf.seek(offset)
+            print(f"Current file position: {nf.tell()} (Expected: {offset})")
+            # data_sample = file.read(16)  # Read first 16 bytes at offset
+            # print(f"First 16 bytes after seeking: {data_sample.hex()}")
             print(f"Using dtype: {dtype_override}, Endianness: {dtype_override.byteorder}")
-            voxels = np.frombuffer(file.read(num_bytes), dtype=dtype_override) #TODO remove numpy if possible, or make everything numpy? How performant is it?
-            print("voxels", len(voxels), type(voxels), voxels.shape)
-            # only 3D volumes for now
 
-            #TODO maybe a hard-coded midslice for testing?
+            voxels = np.frombuffer(nf.read(num_bytes), dtype=dtype_override, count=num_voxels)
 
-            print("Expected voxel count:", dimensions[1] * dimensions[2] * dimensions[3])
-            print("Actual voxel count:", len(voxels))
-            return voxels.reshape(dimensions[1], dimensions[2], dimensions[3], dimensions[4])
+            print("💠voxels", len(voxels), type(voxels), voxels.shape)
+            print("Expected voxel count:", dimensions[1] * dimensions[2] * dimensions[3], "Actual voxel count:", len(voxels))
+
+            return voxels.reshape(dimensions[1], dimensions[2], dimensions[3]) #were just doing 3D for now...
         
+        voxels = read_img_3D()
 
-        voxels = read_img()
 #GPT-------
         # Apply scaling if needed
         if scl_slope != 0:
-            voxels = voxels.astype(np.float32) * scl_slope + scl_inter
+            voxels = voxels.astype(np.int16) * scl_slope + scl_inter
+            #Very weird, but this does give us an output of an array with float64 as the dtype
+            #this matches the nibabel implementation
             print("Applied intensity scaling")
         else:
             print("No scaling applied (scl_slope = 0)")
@@ -133,21 +141,31 @@ def read_nifti(nifti_file_path):
         print("Volume dtype", voxels.dtype)
 
 #        hard coding method 3 for now
-        def method_3(input, srow_x=srow_x, srow_y=srow_y, srow_z=srow_z):
-            return input
-            print("input shape", input.shape)
-            print("using method 3 to transform volume")            
-            #got gpt to write this matrix because I am lazy
-            transformation_matrix = np.array([
-            [srow_x[0], srow_x[1], srow_x[2], srow_x[3]],
-            [srow_y[0], srow_y[1], srow_y[2], srow_y[3]],
-            [srow_z[0], srow_z[1], srow_z[2], srow_z[3]],
-            [0, 0, 0, 1]
-                                ])
-            print("transformation matrix", transformation_matrix)
-            return input * transformation_matrix
+        def method_3(voxel_array):
+            print(np.ndindex(voxel_array.shape))
+            # print("input shape", voxel_array.shape)
+            # print("using method 3 to transform volume")            
+            # #got gpt to write this matrix because I am lazy
+            # transformation_matrix = np.array([
+            # [srow_x[0], srow_x[1], srow_x[2], srow_x[3]],
+            # [srow_y[0], srow_y[1], srow_y[2], srow_y[3]],
+            # [srow_z[0], srow_z[1], srow_z[2], srow_z[3]],
+            # [0, 0, 0, 1]
+            #                     ])
+            
+            # cloud = []
+            # debug_iter = 0
+            # for index in np.ndindex(voxel_array.shape):
+            #     x, y, z = index
+            #     ijk1 = np.array([x, y, z, 1])
+            #     point = (transformation_matrix @ ijk1)
+            #     debug_iter += 1
+            #     if debug_iter % 100 == 0:
+            #         print(f'iteration {debug_iter}, point: {point}')
 
-        voxels = method_3(voxels)
-
+        _ = method_3(voxels)
         return voxels
-read_nifti(nifti_file_path)
+    
+#read_nifti(nifti_file_path)
+
+
