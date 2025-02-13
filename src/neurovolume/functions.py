@@ -8,48 +8,6 @@ from numpy import asarray
 import ants
 from ipywidgets import interact
 
-
-# SUBTRACTION STUFF
-def subtract_previous_frame(bold_vol: np.ndarray):
-    result = np.empty_like(bold_vol)
-    for frame in range(bold_vol.shape[3]):
-        if frame == range(og_bold_vol.shape[3])[0]:
-            result[:,:,:,frame] = np.zeros_like(bold_vol[:,:,:,frame])
-        else:
-            result[:,:,:,frame] = bold_vol[:,:,:,frame] - bold_vol[:,:,:,frame-1]
-    return np.abs(result)
-
-def subtract_control_frame(bold_vol: np.ndarray, control_frame_idx: int):
-    result = np.empty_like(bold_vol)
-    for frame in range(bold_vol.shape[3]):
-        result[:,:,:,frame] = bold_vol[:,:,:,frame] - bold_vol[:,:,:,control_frame_idx]
-    return np.abs(result)
-
-def subtract_average_from_frame(bold_vol: np.ndarray, alignment_frame = False):
-    """
-    An alignment frame is the average bold frame tacked on the last frame
-    You can use this for manually aligning to anatomy scans
-    """
-    average = np.mean(bold_vol, axis=3)
-    if alignment_frame:
-        seq_len = bold_vol.shape[3]+1
-    else:
-        #result = np.empty_like(bold_vol)
-        seq_len = bold_vol.shape[3]
-
-    result = np.empty([bold_vol.shape[0], bold_vol.shape[1], bold_vol.shape[2], seq_len])
-
-    for frame in range(bold_vol.shape[3]):
-        result[:,:,:,frame] = bold_vol[:,:,:,frame] - average
-    
-    if alignment_frame:
-        result[:,:,:,seq_len-1] = average
-
-    return np.abs(result)
-
-
-
-
 #Visualization options (feel free to tweak):
 default_cmap = 'nipy_spectral'
 default_figsize = (4,4)
@@ -57,6 +15,7 @@ mask_contor_color = 'white'
 mask_contor_thickness = 1
 mask_contor_levels = [0.5]
 empty_mask = np.empty((1,1,1))
+
 def explore_3D_vol(vol: np.ndarray, cmap=default_cmap, dim="x", mask=empty_mask):
 
     #control flow dependent stuff (don't change these):
@@ -95,23 +54,6 @@ def explore_3D_vol(vol: np.ndarray, cmap=default_cmap, dim="x", mask=empty_mask)
             interact(y_coord, slice=(0, vol.shape[1]-1))
         case "z":
             interact(z_coord, slice=(0, vol.shape[2]-1))
-
-def subtract_BOLD_movement(bold_img):
-    """
-    Each frame shows the difference between it and the previous frame. First frame is initialized at zero. 
-    """
-    origin =(bold_img.origin[0], bold_img.origin[1], bold_img.origin[2], bold_img.origin[3])
-    spacing = bold_img.spacing
-    direction = bold_img.direction
-    bold_np = np.empty_like(bold_img.numpy())
-
-    print(f"origin {origin}\nspacing {spacing}\ndirection {direction}")
-    print(bold_np.shape)
-    for frame in range(1, bold_np.shape[3]):
-        bold_np[:,:,:,frame] = np.absolute(bold_np[:,:,:,frame] - bold_np[:,:,:,frame - 1])
-    #output = ants.from_numpy(bold_np, origin=origin, spacing=spacing, direction=direction, has_components=True) #not sure about this bool
-    #return output
-    return bold_np #again with the crashing
 
 
 def skull_strip_bold(bold, mni_template, mni_mask, dilate=False):
