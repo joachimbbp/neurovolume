@@ -45,7 +45,7 @@ def static_vdb_from_npy(np_vol, basename, data_folder):
     
 def vdb_seq_from_npy(np_vol, basename, data_folder):
     print("VDB seq fron npy")
-    seq_folder = f"{data_folder}/{basename}_seq" #huge quick hack fix later
+    seq_folder = f"{data_folder}/{basename}_seq" #huge quick hack TODO fix later
     #TODO better handling if the folder already exists
     os.mkdir(seq_folder)
     sequence = np_vol
@@ -87,21 +87,28 @@ def read_volumes(data_folder: str):
 
 def import_VDBs(vdb_paths):
     for vdb_filepath in vdb_paths:
-        #bpy.ops.object.volume_import(filepath="/Users/joachimpfefferkorn/repos/neurovolume/output/anat.vdb", directory="/Users/joachimpfefferkorn/repos/neurovolume/output/", files=[{"name":"anat.vdb", "name":"anat.vdb"}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-        # fullname = os.path.basename(vdb_filepath)
-        # print("fullname ", fullname, "vdb filepath: ", vdb_filepath)
-        # filename, basename = fullname.split(".")
-        
+
         if os.path.isdir(vdb_filepath):
-            print(f"VDB sequence detected at {vdb_filepath}. This function is not implemented yet")
+            try:
+                print(f"VDB sequence detected at {vdb_filepath}. Importing sequence")
+                frames = []
+                for item in os.listdir(vdb_filepath):
+                    dict = {"name":item, "name":item} #not sure why this is redundant like this, but it's how Blender reads it in
+                    frames.append(dict)
+                bpy.ops.object.volume_import(filepath=vdb_filepath,
+                                                directory=vdb_filepath,
+                                                files=frames,
+                                                relative_path=True, align='WORLD', location=(0,0,0), scale=(1,1,1))
+            except Exception as e:
+                print(f"Directory does not contain valid VDB sequence.\n    Exception: {e}")
 
         elif os.path.basename(vdb_filepath).split('.')[1] == "vdb":
-            print("Static VDB file detected")
-            name = os.path.basename(vdb_filepath)#.split('.')[0] #this feels a little clunky and error prone?
+            print(f"Static VDB file detected at {vdb_filepath}")
+            name = os.path.basename(vdb_filepath)
             try:
                 bpy.ops.object.volume_import(filepath=vdb_filepath, directory=os.path.dirname(vdb_filepath), files=[{"name":name}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-            except:
-                print(f"{vdb_filepath} could not be loaded")
+            except Exception as e:
+                print(f"{vdb_filepath} could not be loaded\n    Exception:{e}")
         else:
             print(f"invalid filepath {vdb_filepath}")
             continue

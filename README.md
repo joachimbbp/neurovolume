@@ -49,7 +49,14 @@ Once achieved, the repo will contain the following:
 - [ ] Clean up `poetry` dependencies
 - [ ] Standardize Dimension Naming Conventions
     - `x y z t` vs `0 1 2 3` vs `Horizontal Coronal Sagittal Time`
-- [ ] Add fMRI Import functionality in Blender Plugin
+
+**fMRI**
+- [x] Add fMRI Sequence import functionality in Blender Plugin
+- [ ] Method of Subtraction from Neutral Stimulus
+- [ ] Frame Interpolation Options for Realtime Playback
+    - [ ] Cross dissolve
+    - [ ] Morph
+
 
 
 # Dataset Citation
