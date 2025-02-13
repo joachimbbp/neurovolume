@@ -29,15 +29,19 @@ def load_npy(npy, data_folder):
         return "LOAD_ERROR"
 
 def generate_vdb_frame(basename, volume, save_dir):
-    print(f"Generating vdb for {basename}")
-    grid = vdb.DoubleGrid()
-    grid.copyFromArray(volume.astype(float))
-    grid.gridClass = vdb.GridClass.FOG_VOLUME
-    grid.name='density'
     output_path = f"{save_dir}/{basename}.vdb"
-    vdb.write(output_path,grid)
-    print(f"VDB written to {output_path}")
-    return output_path
+    if os.path.exists(output_path):
+        print(f"{basename} already exist")
+        return output_path
+    else:
+        print(f"Generating vdb for {basename}")
+        grid = vdb.DoubleGrid()
+        grid.copyFromArray(volume.astype(float))
+        grid.gridClass = vdb.GridClass.FOG_VOLUME
+        grid.name='density'
+        vdb.write(output_path,grid)
+        print(f"VDB written to {output_path}")
+        return output_path
 
 def static_vdb_from_npy(np_vol, basename, data_folder):
     print("Static vdb from npy")
@@ -45,14 +49,17 @@ def static_vdb_from_npy(np_vol, basename, data_folder):
     
 def vdb_seq_from_npy(np_vol, basename, data_folder):
     print("VDB seq fron npy")
-    seq_folder = f"{data_folder}/{basename}_seq" #huge quick hack TODO fix later
-    #TODO better handling if the folder already exists
-    os.mkdir(seq_folder)
-    sequence = np_vol
-    for frame_idx in range(sequence.shape[3]):
-        frame_filename = f"bold_{frame_idx}"
-        generate_vdb_frame(frame_filename, sequence[:,:,:,frame_idx], save_dir=seq_folder)
-    return seq_folder
+    seq_folder = f"{data_folder}/{basename}_seq"
+    if os.path.exists(seq_folder):
+        print(f"{seq_folder} folder already exists")
+        return seq_folder
+    else:
+        os.mkdir(seq_folder)
+        sequence = np_vol
+        for frame_idx in range(sequence.shape[3]):
+            frame_filename = f"bold_{frame_idx}"
+            generate_vdb_frame(frame_filename, sequence[:,:,:,frame_idx], save_dir=seq_folder)
+        return seq_folder
 
 def read_volumes(data_folder: str):
     #TODO method of subtraction for fMRI sequences
@@ -66,7 +73,11 @@ def read_volumes(data_folder: str):
     for npy in os.listdir(data_folder):
         name = pathlib.Path(f"{data_folder}/{npy}").name #TEMP
         print(f"name {name}")
-        basename, extension = name.split('.')
+        try:
+            basename, extension = name.split('.')
+        except Exception as e:
+            print(f'{name} is not a valid .npy file')
+            continue
         print(f"basename: {basename}, extension: {extension}") #TEMP DEBUG
         if extension == "npy":
             np_vol = load_npy(npy, data_folder)
@@ -155,7 +166,7 @@ def register_properties():
     bpy.types.Scene.path_input = bpy.props.StringProperty(
         name="NPY Folder",
         description="Enter path to folder containing .npy files",
-        default=""
+        default="/Users/joachimpfefferkorn/repos/neurovolume/output"
         )
         
 def unregister_properties():
