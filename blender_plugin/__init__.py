@@ -1,3 +1,7 @@
+#------------------------------------------------------------------------------
+#                                   Setup
+#------------------------------------------------------------------------------
+
 bl_info = {
     "name": "Neurovolume",
     "author": "Joachim Pfefferkorn",
@@ -17,9 +21,25 @@ import numpy as np
 import os
 import pathlib
 
+low_clip: float = 0.0
+
 #------------------------------------------------------------------------------
 #                                   Backend Functions
 #------------------------------------------------------------------------------
+def create_normalized_volume(normalized_tensor):
+    print("Creating normalized Volume")
+    def normalize_array(arr):
+        return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
+    mri_volume = np.zeros(normalized_tensor.shape)
+    for z_index in range(normalized_tensor.shape[2]):
+        print(f"     sagittal slice {z_index}/{normalized_tensor.shape[2]}")
+        sagittal_slice = normalized_tensor[:, :, z_index]
+        for row_index, row in enumerate(sagittal_slice):
+            for col_index, _ in enumerate(row):
+                density = sagittal_slice[row_index][col_index]
+                mri_volume[row_index][col_index][z_index] = density
+    return normalize_array(mri_volume)
+
 
 def load_npy(npy, data_folder):
     print(f"Loading in {npy}")
@@ -30,18 +50,25 @@ def load_npy(npy, data_folder):
 
 def generate_vdb_frame(basename, volume, save_dir):
     output_path = f"{save_dir}/{basename}.vdb"
+
     if os.path.exists(output_path):
-        print(f"{basename} already exist")
-        return output_path
-    else:
-        print(f"Generating vdb for {basename}")
-        grid = vdb.DoubleGrid()
-        grid.copyFromArray(volume.astype(float))
-        grid.gridClass = vdb.GridClass.FOG_VOLUME
-        grid.name='density'
-        vdb.write(output_path,grid)
-        print(f"VDB written to {output_path}")
-        return output_path
+        print(f"{basename} already exist, overwriting!")
+        os.remove(output_path)
+    if low_clip > 0.0:
+        print(f'Clipping {basename} low density at {low_clip}')
+        volume = create_normalized_volume(np.clip(volume, low_clip, None))
+
+    print(f'vol range {volume.min()}-{volume.max()}')
+    print(f'vol type: {type(volume)}')
+
+    print(f"Generating vdb for {basename}")
+    grid = vdb.DoubleGrid()
+    grid.copyFromArray(volume.astype(float))
+    grid.gridClass = vdb.GridClass.FOG_VOLUME
+    grid.name='density'
+    vdb.write(output_path,grid)
+    print(f"VDB written to {output_path}")
+    return output_path
 
 def static_vdb_from_npy(np_vol, basename, data_folder):
     print("Static vdb from npy")
@@ -62,7 +89,6 @@ def vdb_seq_from_npy(np_vol, basename, data_folder):
         return seq_folder
 
 def read_volumes(data_folder: str):
-    #TODO method of subtraction for fMRI sequences
     """""
     folder_path: folder containing properly named .npy files
     """""
@@ -133,6 +159,7 @@ def import_VDBs(vdb_paths):
 # Classes
 #--------
 class Neurovolume(bpy.types.Panel):
+    #Eventually this will probably just be "Load Volumes." Other functionality can go in other panels
     """Main Neurovolume Panel"""
     bl_label = "Neurovolume"
     bl_idname = "VIEW3D_PT_nv"
@@ -142,17 +169,21 @@ class Neurovolume(bpy.types.Panel):
     
     def draw (self, context):        
         self.layout.prop(context.scene, "path_input")
+        self.layout.prop(context.scene, "low_clip")
         self.layout.operator("load.volume", text="Load .npy Files as VDBs")
 
 class LoadVolume(bpy.types.Operator):
     """Load in NPY file and convert it to VDB"""
-    bl_idname = "load.volume" #ugh why are these conventions different?
+    bl_idname = "load.volume"
     bl_label = "Load Volume"
     
     def execute(self, context):
+        global low_clip
         #For now we are just going to print what is input
         folder_path = context.scene.path_input
         print(f"Entered Path: {folder_path}")
+        low_clip = context.scene.low_clip
+        print("executing with low clip,", low_clip)
         paths = read_volumes(folder_path)
         import_VDBs(paths)
 
@@ -162,18 +193,26 @@ class LoadVolume(bpy.types.Operator):
 #----------------------
 # Property Registration
 #----------------------
+#THIS IS ALL A MESS
+
 def register_properties():
     bpy.types.Scene.path_input = bpy.props.StringProperty(
         name="NPY Folder",
         description="Enter path to folder containing .npy files",
         default="/Users/joachimpfefferkorn/repos/neurovolume/output"
         )
+    bpy.types.Scene.low_clip = bpy.props.FloatProperty(
+        name="Low Clip",
+        description="Set low threshold for volume",
+        default=0.0,
+        min=0.0,
+        max=1.0,
+    )
         
 def unregister_properties():
     del bpy.types.Scene.path_input
-#-------------
-# Registration
-#-------------
+    del bpy.types.Scene.low_clip
+
 classes = [Neurovolume, LoadVolume]
 
 def register():
