@@ -16,36 +16,52 @@ mask_contor_thickness = 1
 mask_contor_levels = [0.5]
 empty_mask = np.empty((1,1,1))
 
-def explore_3D_vol(vol: np.ndarray, cmap=default_cmap, dim="x", mask=empty_mask):
+def explore_4D_vol(vol: np.ndarray, cmap=default_cmap, dim="x"):
+    #TODO:
+    #   DRY
+    #   Interaction for dimensions
+    #   Integrate 3D interaction
+    """
+    vol is 3 or 4 dimensional
+    """
 
-    #control flow dependent stuff (don't change these):
-    empty_mask = np.empty((1,1,1))
+    def x_coord(slice, frame):
+        plt.figure(figsize=default_figsize)
+        plt.imshow(vol[slice, :, :, frame], cmap=cmap)
 
-    #TODO rename dims to saggital, etc, or at least print that on the plot
-    #TODO shot all 3D at the same time with https://matplotlib.org/stable/users/explain/axes/axes_intro.html
-    masking = False
-    if mask.all() != empty_mask.all():
-        masking = True
+    def y_coord(slice, frame):
+        plt.figure(figsize=default_figsize)
+        plt.imshow(vol[:, slice, :, frame], cmap=cmap)
+       
+    def z_coord(slice, frame):
+        plt.figure(figsize=default_figsize)
+        plt.imshow(vol[:, :, slice, frame], cmap=cmap)
 
+    frame_range=(0, vol.shape[3]-1)
+
+
+    match dim:
+        case "x":
+            interact(x_coord, slice=(0, vol.shape[0]-1), frame=frame_range)
+        case "y":
+            interact(y_coord, slice=(0, vol.shape[1]-1), frame=frame_range)
+        case "z":
+            interact(z_coord, slice=(0, vol.shape[2]-1), frame=frame_range)
+
+def explore_3D_vol(vol: np.ndarray, cmap=default_cmap, dim="x"):
     #TODO dry if possible
-    #TODO Hey you could use .set_title() to display the frame, maybe?
+
     def x_coord(slice):
         plt.figure(figsize=default_figsize)
         plt.imshow(vol[slice, :, :], cmap=cmap)
-        if masking:
-            plt.contour(mask[slice,:,:], levels=mask_contor_levels, colors=mask_contor_color, linewidths=mask_contor_thickness)
 
     def y_coord(slice):
         plt.figure(figsize=default_figsize)
         plt.imshow(vol[:, slice, :], cmap=cmap)
-        if masking:
-            plt.contour(mask[:,slice,:], levels=mask_contor_levels, colors=mask_contor_color, linewidths=mask_contor_thickness)
-    
+       
     def z_coord(slice):
         plt.figure(figsize=default_figsize)
         plt.imshow(vol[:, :, slice], cmap=cmap)
-        if masking:
-            plt.contour(mask[:,:,slice], levels=mask_contor_levels, colors=mask_contor_color, linewidths=mask_contor_thickness)
 
     match dim:
         case "x":
@@ -189,23 +205,6 @@ def naive_sanity_check(array, thresh=0.0):
 
 def normalize_array(arr):
     return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
-
-def view_slice(slice, color_map="tab20c", title=""):
-    plt.imshow(slice, cmap=color_map)
-    plt.title(title)
-    plt.show()
-
-#TODO move the view saggital slices function over here, integrate into all these matplotlib functions
-
-def view_all_sagittal_slices(volume, color_map):
-    for i in range(volume.shape[2]):
-        slice = volume[:,:,i]
-        view_slice(slice, color_map, title=str(i))
-
-def view_sagittal_slice(volume, middle, color_map):
-    slice = volume[:,:,middle]
-    view_slice(slice, color_map)
-    
 
 def create_volume(normalized_tensor):
 
