@@ -43,23 +43,26 @@ Once achieved, the repo will contain the following:
 - A library for visualization (and possibly alignment) within Jupyter Notebooks (can include matplotlib dependencies, etc) 
 
 ## To Do
-- [ ] Blender Plugin can directly import `NIFTI` files
+**Blender**
+- [ ] Blender Plugin can directly import and process `NIFTI` files
     - Fully integrates `niigz2npy` and replaces `nibabel` functions with native `numpy`-only functions
     - Blender Plugin can implement method of subtraction for fMRI sequences
 - [ ] VDB Grid Alignment and Combination in Blender
-- [ ] Clean up `poetry` dependencies
-- [ ] Standardize Dimension Naming Conventions
-    - `x y z t` vs `0 1 2 3` vs `Horizontal Coronal Sagittal Time`
+
+
 
 **fMRI**
 - [x] Add fMRI Sequence import functionality in Blender Plugin
 - [x] Method of Subtraction from Neutral Stimulus
     - Exists in the `bold_diffing` notebook. Currently this gives the user the most control, although we should integrate this into the Blender plugin when we implement the native `NIFTI` file parsing.
 - [ ] Frame Interpolation Options for Realtime Playback
-    - [ ] Cross dissolve
+    - [x] Cross dissolve
     - [ ] Morph
 
-
+**Dev**
+- [ ] Clean up `poetry` dependencies
+- [ ] Standardize Dimension Naming Conventions
+    - `x y z t` vs `0 1 2 3` vs `Horizontal Coronal Sagittal Time`
 
 # Dataset Citation
 This software was tested using the following datasets.
