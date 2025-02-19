@@ -206,26 +206,24 @@ def naive_sanity_check(array, thresh=0.0):
 def normalize_array(arr):
     return np.array((arr - np.min(arr)) / (np.max(arr) - np.min(arr)))
 
-def create_volume(normalized_tensor):
+def create_volume(tensor):
 
     # For some reason this incredibly redundant seeming function needs to be used!
 
-    # `anat_norm = create_volume(normalize_array(nib.load(anat_filepath).get_fdata()))
-    # anat_norm_no_cv = normalize_array(nib.load(anat_filepath).get_fdata())
-    # print(np.array_equal(anat_norm, anat_norm_no_cv))`
-    # Returns True
-
-    # However, when a vdb is created with `anat_norm_no_cv` it comes out as a pure box of noise
+    # comparing the mri_volume with tensor they are -as to be expected- the same
+    # However, when a vdb is created just with the tensor it comes out as a pure box of noise
     # I have no idea why!
 
-    mri_volume = np.zeros(normalized_tensor.shape)
-    for z_index in range(normalized_tensor.shape[2]):
-        sagittal_slice = normalized_tensor[:, :, z_index]
+    mri_volume = np.zeros(tensor.shape)
+    for z_index in range(tensor.shape[2]):
+        sagittal_slice = tensor[:, :, z_index]
         for row_index, row in enumerate(sagittal_slice):
             for col_index, _ in enumerate(row):
                 density = sagittal_slice[row_index][col_index]
                 mri_volume[row_index][col_index][z_index] = density
     return mri_volume
+
+
 
 def create_normalized_volume(vol):
     return create_volume(normalize_array(vol))
