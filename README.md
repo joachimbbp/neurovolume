@@ -4,9 +4,9 @@ Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This projec
 
 
 # Usage
-The usage for Neurovolume is presently spread across a few different scripts. Once we remove dependencies and write our own, custom functions, we will be able to package this entire project within a single Blender plugin. We will also provide a library which can be adapted into other plugins and standalone tools.
+The usage for Neurovolume is presently spread across a few different scripts. Once we remove dependencies and write our own custom functions, we will be able to package this entire project within a single Blender plugin. We will also provide a library which can be adapted into other plugins and standalone tools.
 
-It is possible to the `functions.py` library to pull some VDBs out of fMRI data. This, however, has not yet been implemented in the blender plugin.
+It is possible to use the `functions.py` library to pull some time-series VDBs out of 4D fMRI data. This work, including frame-interpolation and method of subtraction, can be found in the `bold_processing.ipynb`
 
 ## Basic Pipeline for Static MRIs
 - This project uses poetry for dependency management. With poetry installed, you can build and enter the virtual environment with `poetry install`
@@ -23,12 +23,12 @@ You can do this by copy and pasting the code into the blenders text editor and r
 ![Blender Instructions](readme_media/blender_instructions.png)
 
 # Why VDB?
-VDBs are a highly performant, art-directable, volumetric data structure that supports animations.  Unlike typical meshed based pipelines using the marching cubes algorithm, this volume based approach preserves the scan’s normalized density data throughout the VFX pipeline. The animation support will also be particularly useful when animating FMRI data as outlined in the roadmap below.
+VDBs are a highly performant, art-directable, volumetric data structure that supports animations.  Unlike typical meshed-based pipelines using the marching cubes algorithm, this volume-based approach preserves the scan’s normalized density data throughout the visualization pipeline. The animation support will also be particularly useful when animating fMRI data as outlined in the roadmap below.
 
 For more information on VDBs, see the [openVDB website](https://www.openvdb.org/)
 
 # Blender, VDB, and Neuroscience Programming Environments
-This project uses Poetry to manage dependencies and create a virtual environment. However, our Blender environment includes two dependencies -`pyopenvdb` and `bpy`- which are very hard to integrate into our current code base. Furthermore, our `ants`, our fMRI processing library, is very hard to use within blender.
+This project uses Poetry to manage dependencies and create a virtual environment. However, our Blender environment includes two dependencies -`pyopenvdb` and `bpy`- which are very hard to integrate into our current code base. Furthermore, `ants` and `nibabel`, our fMRI processing libraries, are very hard to use within blender.
 
 Throughout the development, we have used a few different techniques to resolve these issues, including a [docker file](https://github.com/joachimbbp/openvdb_docker) specifically for OpenVDB.
 
