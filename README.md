@@ -1,5 +1,5 @@
 # Neurovolume
-![Render of a BOLD image using the method of subtraction and motion extraction](readme_media/method_of_subtraction_bold.gif)
+![Looped of a BOLD image using the method of subtraction, motion extraction, and frame cross-dissolve frame interpolation](readme_media/bold_mos_me_loop.gif)
 Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This project is currently a work in progress.
 
 
