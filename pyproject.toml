@@ -27,6 +27,7 @@ sparse = "^0.15.4"
 torch = "^2.5.1"
 torchvision = "^0.20.1"
 antspyx = "^0.5.4"
+ipython = "^9.0.0"
 
 
 
