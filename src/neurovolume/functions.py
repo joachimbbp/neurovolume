@@ -16,6 +16,17 @@ mask_contor_thickness = 1
 mask_contor_levels = [0.5]
 empty_mask = np.empty((1,1,1))
 
+def plot_average(arr, clip_range=None):
+    means = []
+    for i in range(arr.shape[3]):
+        means.append(np.mean(arr[:,:,:,i]))
+    if isinstance(clip_range, range):
+        print(clip_range)       
+        plt.plot(means[clip_range.start:clip_range.stop], linestyle='-', color='b')
+    else:
+        plt.plot(means, linestyle='-', color='b')
+
+
 def explore_4D_vol(vol: np.ndarray, cmap=default_cmap, dim="x"):
     #TODO:
     #   DRY
