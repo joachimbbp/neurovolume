@@ -1,5 +1,5 @@
-# Neurovolume (WIP)
-![Render of a non-skull stripped MNI Template](readme_media/mni_template_render.png)
+# Neurovolume
+![Render of a BOLD image using the method of subtraction and motion extraction](readme_media/method_of_subtraction_bold.gif)
 Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This project is currently a work in progress.
 
 
@@ -9,6 +9,7 @@ The usage for Neurovolume is presently spread across a few different scripts. On
 It is possible to use the `functions.py` library to pull some time-series VDBs out of 4D fMRI data. This work, including frame-interpolation and method of subtraction, can be found in the `bold_processing.ipynb`
 
 ## Basic Pipeline for Static MRIs
+![Render of a non-skull stripped MNI Template](readme_media/mni_template_render.png)
 - This project uses poetry for dependency management. With poetry installed, you can build and enter the virtual environment with `poetry install`
 - Run the `niigz2npy` script. This converts all compressed `nii.gz` `NIFTI` files to `.npy` files containing normalized numpy arrays. (Make sure your output folder is empty).
 
