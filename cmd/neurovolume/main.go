@@ -1,17 +1,12 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/KyungWonPark/nifti"
+	"github.com/joachimbbp/neurovolume/pkg/audio"
+	"github.com/joachimbbp/neurovolume/pkg/read_nifti"
 )
 
 func main() {
 	println("Main function executing. ")
-	t1_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/openneuro/sub-01_T1w.nii"
-
-	var hdr nifti.Nifti1Header
-	hdr.LoadHeader(t1_path)
-
-	fmt.Printf("dim: %v", hdr.Dim)
+	read_nifti.Print_Dims()
+	audio.Debug()
 }

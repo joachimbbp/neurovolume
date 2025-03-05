@@ -1,5 +1,7 @@
 github.com/KyungWonPark/nifti v0.0.0-20210426021215-dbd70bb469cf h1:wChc03ioW0Ruvf3VJB3uWN+MKs7H0vz4wClMf2KWFZw=
 github.com/KyungWonPark/nifti v0.0.0-20210426021215-dbd70bb469cf/go.mod h1:iqs6plPqhJ21LUTBU0Se3xIxWxNNbXF4xYlYAJXqAgs=
+github.com/go-audio/audio v1.0.0 h1:zS9vebldgbQqktK4H0lUqWrG8P0NxCJVqcj7ZpNnwd4=
+github.com/go-audio/audio v1.0.0/go.mod h1:6uAu0+H2lHkwdGsAY+j2wHPNPpPoeg5AaEFh9FlA+Zs=
 github.com/klauspost/compress v1.10.5 h1:7q6vHIqubShURwQz8cQK6yIe/xC3IF0Vm7TGfqjewrc=
 github.com/klauspost/compress v1.10.5/go.mod h1:aoV0uJVorq1K+umq18yTdKaF57EivdYsUV+/s2qKfXs=
 github.com/klauspost/pgzip v1.2.3 h1:Ce2to9wvs/cuJ2b86/CKQoTYr9VHfpanYosZ0UBJqdw=
