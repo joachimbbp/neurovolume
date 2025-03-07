@@ -390,21 +390,51 @@ func (img *Nifti1Image) Getslice3D(z uint32) { //[][]float32
 	// print(img.nx, "x", img.ny)
 }
 
-func (img *Nifti1Image) BuildVolume() *tensor.Dense {
+func (img *Nifti1Image) BuildVolume(normalize bool) *tensor.Dense {
 	//I think this can always be 4D, any anatomical stuff will just have a t of 0?
 
 	//TODO
 	// - [ ] Could/Should this be Sparse and not Dense?
 	// - [ ] Better integration into the NiftiImage type: this should be a
+	// - [ ] this should also probably be float64 for VDB creation? I always felt like that was overkill, though... ?
+	// I feel like there has to be a more efficient way of doing this other than these nested loops!
 
 	volume := tensor.New(tensor.WithShape(int(img.nx), int(img.ny), int(img.nz), int(img.nt)), tensor.Of(tensor.Float32))
 	vshape := volume.Shape()
-	fmt.Println("v shape", vshape)
+
+	var min_val float32 = math.MaxFloat32
+	var max_val float32 = -math.MaxFloat32
+	if normalize {
+		println("Normalizing volume")
+		//Would probably be nice to dry this iteration...
+		for x := 0; x < vshape[0]; x++ {
+			for y := 0; y < vshape[1]; y++ {
+				for z := 0; z < vshape[2]; z++ {
+					for t := 0; t < vshape[3]; t++ {
+						val := img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t))
+						if val < min_val {
+							min_val = val
+						}
+						if val > max_val {
+							max_val = val
+						}
+					}
+				}
+			}
+		}
+		fmt.Println("volume normalized\n", "min ", min_val, "max ", max_val)
+	}
+
+	fmt.Println("Creating volume")
 	for x := 0; x < vshape[0]; x++ {
 		for y := 0; y < vshape[1]; y++ {
 			for z := 0; z < vshape[2]; z++ {
 				for t := 0; t < vshape[3]; t++ {
-					volume.SetAt(float32(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t))), x, y, z, t)
+					val := img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t))
+					if normalize {
+						val = val - min_val/(min_val-max_val)
+					}
+					volume.SetAt(val, x, y, z, t)
 				}
 			}
 		}
