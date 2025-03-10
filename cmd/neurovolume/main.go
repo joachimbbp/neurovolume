@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/joachimbbp/neurovolume/pkg/render"
 	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
@@ -14,8 +15,10 @@ func main() {
 	//-------------//
 
 	var t1_vol volume.Volume
-	t1_vol.LoadDataFromNifti(t1_path)
-
+	t1_vol.LoadDataFromNifti(t1_path) //Time Elapsed:  5178212542
+	t1_vol.NormalizeVolume()          //Time Elapsed:  5453341708
+	slice := t1_vol.GetSlice()
+	render.SaveAsImage(slice, "/Users/joachimpfefferkorn/repos/neurovolume/output/render.PNG")
 	//slice := t1_vol.GetSlice(1, 1)
 	//fmt.Println(minmax(slice))
 	//--------------//

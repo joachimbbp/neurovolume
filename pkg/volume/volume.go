@@ -1,11 +1,17 @@
 package volume
 
 import (
+	"math"
+
 	"github.com/joachimbbp/neurovolume/pkg/nifti"
 )
 
 type Volume struct {
-	Data [][][][]float64
+	Data       [][][][]float64
+	Shape      [4]int
+	MinVal     float64
+	MaxVal     float64
+	Normalized bool
 	//Modifier Stack
 	//VDB
 	// Audio
@@ -24,54 +30,89 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 	//TODO eliminate nifti and Gorgonia dependency
 	var img nifti.Nifti1Image //I hate that I have to bring this whole thing in! Later it will directly plug into the Volume type
 	img.LoadImage(filepath, true)
-	shape := [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}
-
-	//Normalization has to come *after* you build the volume as you won't know the min/max!
+	vol.Shape = [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}
 
 	//Still not sure *exactly* how this works
-	vol.Data = make([][][][]float64, shape[0])
+	vol.Data = make([][][][]float64, vol.Shape[0])
 	for x := range vol.Data {
-		vol.Data[x] = make([][][]float64, shape[1])
+		vol.Data[x] = make([][][]float64, vol.Shape[1])
 		for y := range vol.Data[x] {
-			vol.Data[x][y] = make([][]float64, shape[2])
+			vol.Data[x][y] = make([][]float64, vol.Shape[2])
 			for z := range vol.Data[x][y] {
-				vol.Data[x][y][z] = make([]float64, shape[3])
+				vol.Data[x][y][z] = make([]float64, vol.Shape[3])
 				for t := range vol.Data[x][y][z] {
 					vol.Data[x][y][z][t] = float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
 				}
 			}
 		}
 	}
+	vol.Normalized = false
+}
+func (vol *Volume) NormalizeVolume() {
+	vol.MinMax()
+	for x := 0; x < vol.Shape[0]; x++ {
+		for y := 0; y < vol.Shape[1]; y++ {
+			for z := 0; z < vol.Shape[2]; z++ {
+				for t := 0; t < vol.Shape[3]; t++ {
+					vol.Data[x][y][z][t] = vol.Data[x][y][z][t] - vol.MinVal/(vol.MinVal-vol.MaxVal)
+
+				}
+			}
+		}
+	}
+	vol.Normalized = true
 }
 
-// Returns an empty, 4D Tensor to populate with fMRI or MRI data
+// Middle of Plane for now
+func (vol *Volume) GetSlice() [][]float64 {
+	z := int(vol.Shape[2] / 2)
+	t := int(vol.Shape[3] / 2)
 
-// Normalizes a 4D Volume (probably can move this and GetShape4d into an internal thing)
-// func GetNormalizationData4D(volume [][][][]float64) (float64, float64) {
-// 	//TODO make this n-dimensional
-// 	var min_val float64 = math.MaxFloat32
-// 	var max_val float64 = -math.MaxFloat32
-// 	shape := GetShape4d(volume)
-// 	for x := 0; x < shape[0]; x++ {
-// 		for y := 0; y < shape[1]; y++ {
-// 			for z := 0; z < shape[2]; z++ {
-// 				for t := 0; t < shape[3]; t++ {
-// 					val := float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
-// 					if val < min_val {
-// 						min_val = val
-// 					}
-// 					if val > max_val {
-// 						max_val = val
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return min_val, max_val
-// }
+	slice := make([][]float64, len(vol.Data))
+
+	for x := range slice {
+		slice[x] = make([]float64, len(vol.Data[x]))
+		for y := range slice[x] {
+			slice[x][y] = vol.Data[x][y][z][t]
+		}
+	}
+	return slice
+}
+
+//------------
+
+// Gets the MinVal and Maxval from the volume Data
+func (vol *Volume) MinMax() (float64, float64) {
+	//TODO make this n-dimensional
+	var min_val float64 = math.MaxFloat64
+	var max_val float64 = -math.MaxFloat64
+	shape := getShape4d(vol.Data)
+	for x := 0; x < shape[0]; x++ {
+		for y := 0; y < shape[1]; y++ {
+			for z := 0; z < shape[2]; z++ {
+				for t := 0; t < shape[3]; t++ {
+					val := vol.Data[x][y][z][t]
+					if val < min_val {
+						min_val = val
+					}
+					if val > max_val {
+						max_val = val
+					}
+				}
+			}
+		}
+	}
+	return min_val, max_val
+}
+
+// Sets the Shape for the Volume
+func (vol *Volume) GetShape() {
+	//Just a wrapper around the garbage GPT code
+	vol.Shape = getShape4d(vol.Data)
+}
 
 // ChatGPT copypasta and it doesn't look great
-func GetShape4d(data [][][][]float64) [4]int {
+func getShape4d(data [][][][]float64) [4]int {
 	return [4]int{
 		len(data),
 		func() int {
