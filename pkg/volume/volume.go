@@ -1,6 +1,7 @@
 package volume
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/joachimbbp/neurovolume/pkg/nifti"
@@ -41,6 +42,16 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 			for z := range vol.Data[x][y] {
 				vol.Data[x][y][z] = make([]float64, vol.Shape[3])
 				for t := range vol.Data[x][y][z] {
+					/*------------------*/
+					// debug_data := float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
+					// if debug_data > 0.0 && debug_data != 32768 { //lots of that number appearing idk why
+					// 	fmt.Println(x, y, z, "value: ", debug_data)
+					// 	fmt.Println("type: ", reflect.TypeOf(debug_data))
+					// }
+					// vol.Data[x][y][z][t] = debug_data
+					// //Okay this actually looks good here!
+					/*------------------*/
+
 					vol.Data[x][y][z][t] = float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
 				}
 			}
@@ -48,6 +59,7 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 	}
 	vol.Normalized = false
 }
+
 func (vol *Volume) NormalizeVolume() {
 	vol.MinMax()
 	for x := 0; x < vol.Shape[0]; x++ {
@@ -82,10 +94,10 @@ func (vol *Volume) GetSlice() [][]float64 {
 //------------
 
 // Gets the MinVal and Maxval from the volume Data
-func (vol *Volume) MinMax() (float64, float64) {
+func (vol *Volume) MinMax() {
 	//TODO make this n-dimensional
-	var min_val float64 = math.MaxFloat64
-	var max_val float64 = -math.MaxFloat64
+	var min_val, max_val = math.MaxFloat64, -math.MaxFloat64
+
 	shape := getShape4d(vol.Data)
 	for x := 0; x < shape[0]; x++ {
 		for y := 0; y < shape[1]; y++ {
@@ -94,15 +106,20 @@ func (vol *Volume) MinMax() (float64, float64) {
 					val := vol.Data[x][y][z][t]
 					if val < min_val {
 						min_val = val
+						fmt.Println("New min found: ", min_val)
 					}
 					if val > max_val {
 						max_val = val
+						fmt.Println("New max found: ", max_val)
 					}
 				}
 			}
 		}
 	}
-	return min_val, max_val
+	vol.MinVal = min_val
+	vol.MaxVal = max_val
+	fmt.Println("Setting Min - > max \n          ", min_val, " -> ", max_val)
+
 }
 
 // Sets the Shape for the Volume
