@@ -108,10 +108,10 @@ type Nifti1Header struct {
 
 type Nifti1Image struct { /*!< Image storage struct **/
 	ndim     uint32    /*!< last dimension greater than 1 (1..7) */
-	nx       uint32    /*!< dimensions of grid array             */
-	ny       uint32    /*!< dimensions of grid array             */
-	nz       uint32    /*!< dimensions of grid array             */
-	nt       uint32    /*!< dimensions of grid array             */
+	Nx       uint32    /*!< dimensions of grid array             */
+	Ny       uint32    /*!< dimensions of grid array             */
+	Nz       uint32    /*!< dimensions of grid array             */
+	Nt       uint32    /*!< dimensions of grid array             */
 	nu       uint32    /*!< dimensions of grid array             */
 	nv       uint32    /*!< dimensions of grid array             */
 	nw       uint32    /*!< dimensions of grid array             */
@@ -218,10 +218,10 @@ func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 	}
 	// set dimensions of data array
 	img.ndim, img.dim[0] = uint32(header.Dim[0]), uint32(header.Dim[0])
-	img.nx, img.dim[1] = uint32(header.Dim[1]), uint32(header.Dim[1])
-	img.ny, img.dim[2] = uint32(header.Dim[2]), uint32(header.Dim[2])
-	img.nz, img.dim[3] = uint32(header.Dim[3]), uint32(header.Dim[3])
-	img.nt, img.dim[4] = uint32(header.Dim[4]), uint32(header.Dim[4])
+	img.Nx, img.dim[1] = uint32(header.Dim[1]), uint32(header.Dim[1])
+	img.Ny, img.dim[2] = uint32(header.Dim[2]), uint32(header.Dim[2])
+	img.Nz, img.dim[3] = uint32(header.Dim[3]), uint32(header.Dim[3])
+	img.Nt, img.dim[4] = uint32(header.Dim[4]), uint32(header.Dim[4])
 	img.nu, img.dim[5] = uint32(header.Dim[5]), uint32(header.Dim[5])
 	img.nv, img.dim[6] = uint32(header.Dim[6]), uint32(header.Dim[6])
 	img.nw, img.dim[7] = uint32(header.Dim[7]), uint32(header.Dim[7])
@@ -336,9 +336,9 @@ func gzipOpen(filepath string) (io.ReadCloser, error) {
 // x,y,z,t,start at zero
 func (img *Nifti1Image) GetAt(x, y, z, t uint32) float32 {
 	//fmt.Println("Getting at ", x, y, z, t)
-	tIndex := img.nx * img.ny * img.nz * t
-	zIndex := img.nx * img.ny * z
-	yIndex := img.nx * y
+	tIndex := img.Nx * img.Ny * img.Nz * t
+	zIndex := img.Nx * img.Ny * z
+	yIndex := img.Nx * y
 	xIndex := x
 	index := uint64(tIndex + zIndex + yIndex + xIndex)
 
@@ -353,8 +353,8 @@ func (img *Nifti1Image) byte2float(data []byte) float32 {
 
 func (img *Nifti1Image) GetSlice(z, t uint32) [][]float32 {
 	//So theres a glitch here?
-	sliceX := img.nx
-	sliceY := img.ny
+	sliceX := img.Nx
+	sliceY := img.Ny
 
 	fmt.Println("nx ", sliceX, "ny", sliceY)
 
@@ -399,7 +399,7 @@ func (img *Nifti1Image) BuildVolume(normalize bool) *tensor.Dense {
 	// - [ ] this should also probably be float64 for VDB creation? I always felt like that was overkill, though... ?
 	// I feel like there has to be a more efficient way of doing this other than these nested loops!
 
-	volume := tensor.New(tensor.WithShape(int(img.nx), int(img.ny), int(img.nz), int(img.nt)), tensor.Of(tensor.Float32))
+	volume := tensor.New(tensor.WithShape(int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)), tensor.Of(tensor.Float32))
 	vshape := volume.Shape()
 
 	var min_val float32 = math.MaxFloat32

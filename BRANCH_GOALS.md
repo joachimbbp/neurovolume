@@ -1,17 +1,12 @@
 # To-Do
 ## Go Scripts
-- [ ] convert nifti files to VDBs natively
-    - [ ] Eliminate NIfTI Dependency
-    - [ ] write custom VDB script
-    - Will include:
-        - nifti.go
-        - vdb.go
-
-- [ ] **Should the following work off an intermediate (possibly sparse) tensor format or directly on the VDB?**
-- [ ] Bold processing script
-    - bold.go
+- [ ] Load Volumes Natively
+- [ ] Bold processing
 - [ ] Generate audio from BOLD response
-    - audio.go
+- [ ] Custom VDB script
+- [ ] Eliminate dependencies
+    - [ ] NifTI
+    - [ ] Gorgonia
 ## Python/Blender
 - [ ] Integrate into Blender plugin
 
