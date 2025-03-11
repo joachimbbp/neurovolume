@@ -8,6 +8,7 @@
 - [ ] Eliminate dependencies
     - [ ] NifTI
     - [ ] Gorgonia
+- [ ] Test for NiFTI2 images
 - [ ] Add multithreading
 - [ ] Error handling
 ## Python/Blender

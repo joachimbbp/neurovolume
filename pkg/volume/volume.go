@@ -1,7 +1,6 @@
 package volume
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/joachimbbp/neurovolume/pkg/nifti"
@@ -33,7 +32,7 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 	img.LoadImage(filepath, true)
 	vol.Shape = [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}
 
-	//Still not sure *exactly* how this works
+	//Still not sure *exactly* how this loop works
 	vol.Data = make([][][][]float64, vol.Shape[0])
 	for x := range vol.Data {
 		vol.Data[x] = make([][][]float64, vol.Shape[1])
@@ -42,16 +41,6 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 			for z := range vol.Data[x][y] {
 				vol.Data[x][y][z] = make([]float64, vol.Shape[3])
 				for t := range vol.Data[x][y][z] {
-					/*------------------*/
-					// debug_data := float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
-					// if debug_data > 0.0 && debug_data != 32768 { //lots of that number appearing idk why
-					// 	fmt.Println(x, y, z, "value: ", debug_data)
-					// 	fmt.Println("type: ", reflect.TypeOf(debug_data))
-					// }
-					// vol.Data[x][y][z][t] = debug_data
-					// //Okay this actually looks good here!
-					/*------------------*/
-
 					vol.Data[x][y][z][t] = float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
 				}
 			}
@@ -75,27 +64,48 @@ func (vol *Volume) NormalizeVolume() {
 	vol.Normalized = true
 }
 
-// Middle of Plane for now
-func (vol *Volume) GetSlice() [][]float64 {
-	z := int(vol.Shape[2] / 2)
-	t := int(vol.Shape[3] / 2)
+// Middle of Horizontal Plane for now
+func (vol *Volume) GetMiddleSlices() ([][]float64, [][]float64, [][]float64) {
+	t := vol.Shape[3] / 2
 
-	slice := make([][]float64, len(vol.Data))
+	horizontal := make([][]float64, vol.Shape[0])
+	sagittal := make([][]float64, vol.Shape[1])
+	coronal := make([][]float64, vol.Shape[2])
+	//Might switch the names
 
-	for x := range slice {
-		slice[x] = make([]float64, len(vol.Data[x]))
-		for y := range slice[x] {
-			slice[x][y] = vol.Data[x][y][z][t]
+	println("making horizontal slice")
+	z := vol.Shape[2] / 2
+	for x := range horizontal {
+		horizontal[x] = make([]float64, vol.Shape[1])
+		for y := range horizontal[x] {
+			horizontal[x][y] = vol.Data[x][y][z][t]
 		}
 	}
-	return slice
+
+	println("making sagittal slice")
+	x := vol.Shape[0] / 2
+	for y := range sagittal {
+		sagittal[y] = make([]float64, vol.Shape[2])
+		for z := range sagittal[y] {
+			sagittal[y][z] = vol.Data[x][y][z][t]
+		}
+	}
+	println("making coronal slice")
+	y := vol.Shape[1] / 2
+	for z := range coronal {
+		coronal[z] = make([]float64, vol.Shape[0])
+		for x := range coronal[z] {
+			coronal[z][x] = vol.Data[x][y][z][t]
+		}
+	}
+
+	return horizontal, coronal, sagittal
 }
 
 //------------
 
-// Gets the MinVal and Maxval from the volume Data
+// Gets the Minimum and Maximum value from the volume Data
 func (vol *Volume) MinMax() {
-	//TODO make this n-dimensional
 	var min_val, max_val = math.MaxFloat64, -math.MaxFloat64
 
 	shape := getShape4d(vol.Data)
@@ -106,11 +116,9 @@ func (vol *Volume) MinMax() {
 					val := vol.Data[x][y][z][t]
 					if val < min_val {
 						min_val = val
-						fmt.Println("New min found: ", min_val)
 					}
 					if val > max_val {
 						max_val = val
-						fmt.Println("New max found: ", max_val)
 					}
 				}
 			}
@@ -118,7 +126,6 @@ func (vol *Volume) MinMax() {
 	}
 	vol.MinVal = min_val
 	vol.MaxVal = max_val
-	fmt.Println("Setting Min - > max \n          ", min_val, " -> ", max_val)
 
 }
 
@@ -128,7 +135,7 @@ func (vol *Volume) GetShape() {
 	vol.Shape = getShape4d(vol.Data)
 }
 
-// ChatGPT copypasta and it doesn't look great
+// ChatGPT copypasta and it doesn't look great (but it works)
 func getShape4d(data [][][][]float64) [4]int {
 	return [4]int{
 		len(data),

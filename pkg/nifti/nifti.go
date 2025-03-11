@@ -26,11 +26,13 @@ SOFTWARE.
 */
 
 /* ------------ TODO -------------------- */
-// - [ ] Get a png image of slice from copypasta version
-// - [ ] Eliminate gzip dependency
-// - [ ] combine image and header
-// - [ ] Export a tensor (equivalent to .get_fdata() in nibabel)
-
+/*
+- [ ] Get a png image of slice from copypasta version
+- [ ] Eliminate gzip dependency
+- [ ] combine image and header
+- [x] Export a tensor (equivalent to .get_fdata() in nibabel)
+	- done in volume.go
+*/
 package nifti
 
 import (
@@ -44,7 +46,6 @@ import (
 	"strings"
 
 	gzip "github.com/klauspost/pgzip"
-	"gorgonia.org/tensor"
 )
 
 type Nifti1Header struct {
@@ -349,96 +350,4 @@ func (img *Nifti1Image) GetAt(x, y, z, t uint32) float32 {
 func (img *Nifti1Image) byte2float(data []byte) float32 {
 	v := img.byte2floatF(data)
 	return v
-}
-
-func (img *Nifti1Image) GetSlice(z, t uint32) [][]float32 {
-	//So theres a glitch here?
-	sliceX := img.Nx
-	sliceY := img.Ny
-
-	fmt.Println("nx ", sliceX, "ny", sliceY)
-
-	slice := make([][]float32, sliceX)
-	fmt.Println("slice: ", slice)
-
-	fmt.Println("range slice")
-
-	for i := range slice {
-		slice[i] = make([]float32, sliceY)
-	}
-	fmt.Println("slice made")
-	var xi uint32
-	var yi uint32
-
-	for xi = 0; xi < sliceX; xi++ {
-		for yi = 0; yi < sliceY; yi++ {
-			slice[xi][yi] = img.GetAt(xi, yi, z, t)
-			// fmt.Println(xi, yi, z, t)
-		}
-	}
-	return slice
-}
-
-// rewriting because of glitch
-func (img *Nifti1Image) Getslice3D(z uint32) { //[][]float32
-
-	// slice := make([][]float32, img.nx, img.ny)
-	// for i := range slice {
-	// 	print(i)
-	// 	print("\n")
-	// }
-	// print(img.nx, "x", img.ny)
-}
-
-func (img *Nifti1Image) BuildVolume(normalize bool) *tensor.Dense {
-	//I think this can always be 4D, any anatomical stuff will just have a t of 0?
-
-	//TODO
-	// - [ ] Could/Should this be Sparse and not Dense?
-	// - [ ] Better integration into the NiftiImage type: this should be a
-	// - [ ] this should also probably be float64 for VDB creation? I always felt like that was overkill, though... ?
-	// I feel like there has to be a more efficient way of doing this other than these nested loops!
-
-	volume := tensor.New(tensor.WithShape(int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)), tensor.Of(tensor.Float32))
-	vshape := volume.Shape()
-
-	var min_val float32 = math.MaxFloat32
-	var max_val float32 = -math.MaxFloat32
-	if normalize {
-		println("Normalizing volume")
-		//Would probably be nice to dry this iteration...
-		for x := 0; x < vshape[0]; x++ {
-			for y := 0; y < vshape[1]; y++ {
-				for z := 0; z < vshape[2]; z++ {
-					for t := 0; t < vshape[3]; t++ {
-						val := img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t))
-						if val < min_val {
-							min_val = val
-						}
-						if val > max_val {
-							max_val = val
-						}
-					}
-				}
-			}
-		}
-		fmt.Println("volume normalized\n", "min ", min_val, "max ", max_val)
-	}
-
-	fmt.Println("Creating volume")
-	for x := 0; x < vshape[0]; x++ {
-		for y := 0; y < vshape[1]; y++ {
-			for z := 0; z < vshape[2]; z++ {
-				for t := 0; t < vshape[3]; t++ {
-					val := img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t))
-					if normalize {
-						val = val - min_val/(min_val-max_val)
-					}
-					volume.SetAt(val, x, y, z, t)
-				}
-			}
-		}
-	}
-	fmt.Print("Volume created")
-	return volume
 }
