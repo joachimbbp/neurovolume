@@ -335,14 +335,13 @@ func gzipOpen(filepath string) (io.ReadCloser, error) {
 }
 
 // x,y,z,t,start at zero
+// This is a really nifty (no pun intended) and elegant function -JBBP
 func (img *Nifti1Image) GetAt(x, y, z, t uint32) float32 {
-	//fmt.Println("Getting at ", x, y, z, t)
 	tIndex := img.Nx * img.Ny * img.Nz * t
 	zIndex := img.Nx * img.Ny * z
 	yIndex := img.Nx * y
 	xIndex := x
 	index := uint64(tIndex + zIndex + yIndex + xIndex)
-
 	return img.byte2float(img.data[index*uint64(img.nbyper) : (index+1)*uint64(img.nbyper)]) //shift byte
 }
 

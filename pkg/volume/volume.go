@@ -55,7 +55,7 @@ func (vol *Volume) NormalizeVolume() {
 		for y := 0; y < vol.Shape[1]; y++ {
 			for z := 0; z < vol.Shape[2]; z++ {
 				for t := 0; t < vol.Shape[3]; t++ {
-					vol.Data[x][y][z][t] = vol.Data[x][y][z][t] - vol.MinVal/(vol.MinVal-vol.MaxVal)
+					vol.Data[x][y][z][t] = (vol.Data[x][y][z][t] - vol.MinVal) / (vol.MaxVal - vol.MinVal)
 
 				}
 			}
@@ -64,14 +64,12 @@ func (vol *Volume) NormalizeVolume() {
 	vol.Normalized = true
 }
 
-// Middle of Horizontal Plane for now
 func (vol *Volume) GetMiddleSlices() ([][]float64, [][]float64, [][]float64) {
 	t := vol.Shape[3] / 2
 
 	horizontal := make([][]float64, vol.Shape[0])
 	sagittal := make([][]float64, vol.Shape[1])
 	coronal := make([][]float64, vol.Shape[2])
-	//Might switch the names
 
 	println("making horizontal slice")
 	z := vol.Shape[2] / 2
@@ -98,7 +96,7 @@ func (vol *Volume) GetMiddleSlices() ([][]float64, [][]float64, [][]float64) {
 			coronal[z][x] = vol.Data[x][y][z][t]
 		}
 	}
-
+	//Currently the orientation is a bit weird but that's okay!
 	return horizontal, coronal, sagittal
 }
 
