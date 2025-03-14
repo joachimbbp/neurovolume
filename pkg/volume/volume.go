@@ -27,7 +27,6 @@ type Volume struct {
 }
 
 func (vol *Volume) LoadDataFromNifti(filepath string) {
-	//TODO eliminate nifti and Gorgonia dependency
 	var img nifti.Nifti1Image //I hate that I have to bring this whole thing in! Later it will directly plug into the Volume type
 	img.LoadImage(filepath, true)
 	vol.Shape = [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}

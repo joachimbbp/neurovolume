@@ -1,24 +1,12 @@
 package render
 
 import (
-	"fmt"
-
 	"image"
 	"image/color"
 	"image/png"
 	"math"
 	"os"
-
-	"gorgonia.org/tensor"
 )
-
-func PrintSlice(vol *tensor.Dense) {
-	//saves a 2D slice as an image
-	//TODO - [ ] make this for all three axis, setable, etc
-	s := vol.Shape()
-	fmt.Println("vol shape: ", s, "t: ", s[3])
-
-}
 
 // GPT copypasta:
 // normalizeData scales the float64 values to the range [0, 255]

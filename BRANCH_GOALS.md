@@ -1,13 +1,13 @@
 # To-Do
 ## Go Scripts
-- [ ] Load Volumes Natively
+- [x] Load Volumes Natively
 - [ ] Bold processing
 - [ ] Generate audio from BOLD response
 - [ ] Custom VDB script
 ## Performance
-- [ ] Eliminate dependencies
-    - [ ] NifTI
-    - [ ] Gorgonia
+- [x] Eliminate dependencies
+    - [x] NifTI
+    - [x] Gorgonia
 - [ ] Test for NiFTI2 images
 - [ ] Add multithreading
 - [ ] Error handling

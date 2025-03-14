@@ -28,7 +28,7 @@ SOFTWARE.
 /* ------------ TODO -------------------- */
 /*
 - [ ] Get a png image of slice from copypasta version
-- [ ] Eliminate gzip dependency
+- [x] Eliminate gzip dependency (it became Standard Library, I'll count it!)
 - [ ] combine image and header
 - [x] Export a tensor (equivalent to .get_fdata() in nibabel)
 	- done in volume.go
@@ -36,6 +36,7 @@ SOFTWARE.
 package nifti
 
 import (
+	"compress/gzip" //gzip seems to be a STD version of "github.com/klauspost/pgzip" as of march 4th. Nice! (still untested)
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -44,8 +45,6 @@ import (
 	"os"
 	pkgPath "path/filepath"
 	"strings"
-
-	gzip "github.com/klauspost/pgzip"
 )
 
 type Nifti1Header struct {
