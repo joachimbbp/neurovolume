@@ -515,7 +515,7 @@ func WriteFromVolume(vol *volume.Volume) {
 	}
 	writeVDB(&buffer, &vdb, identity_matrix)
 
-	if err := os.WriteFile("volume_test2.vdb", buffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile("/Users/joachimpfefferkorn/repos/neurovolume/output/volume_test2.vdb", buffer.Bytes(), 0644); err != nil {
 		fmt.Println("Failed to write file:", err)
 	}
 
