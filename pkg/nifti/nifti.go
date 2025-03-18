@@ -273,9 +273,7 @@ func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 		println("nbyper is 2")
 
 		img.byte2floatF = func(b []byte) float32 {
-			//v := binary.LittleEndian.Uint16(b) //This is unsigned, but we're working with a signed short
 			v := int16(binary.LittleEndian.Uint16(b)) //casting this as a quick hack
-			//println("raw val byte2floatF ", v)
 			return float32(v)
 		}
 		img.float2byteF = func(buff []byte, x float32) {

@@ -491,26 +491,17 @@ func WriteSphere() {
 
 func WriteFromVolume(vol *volume.Volume) {
 	fmt.Println("Writing Volume VDB")
-	debug_voxels, err := os.Create("/Users/joachimpfefferkorn/repos/neurovolume/output/debug_nums.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer debug_voxels.Close()
 
 	var vdb VDB
 	vdb.node_5 = *NewNode5()
 	fmt.Println(vol.Shape)
 	fmt.Println("	Setting Voxels")
-	t := 0 //Just static for now!
+	t := 0
 	for z := 0; z < vol.Shape[2]; z++ {
 		for y := 0; y < vol.Shape[1]; y++ {
 			for x := 0; x < vol.Shape[0]; x++ {
-				//fmt.Println("		Value", float32(vol.Data[x][y][z][t]))
+
 				voxel := float32(vol.Data[x][y][z][t])
-				_, err := debug_voxels.WriteString("Raw Data" + fmt.Sprintf("%.5f", vol.Data[x][y][z][t]) + "Voxel: " + fmt.Sprintf("%.5f", voxel) + "\n")
-				if err != nil {
-					log.Fatal(err)
-				}
 
 				set_voxel(&vdb, [3]uint32{uint32(x), uint32(y), uint32(z)}, voxel)
 			}
