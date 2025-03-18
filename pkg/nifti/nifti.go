@@ -118,7 +118,7 @@ type Nifti1Image struct { /*!< Image storage struct **/
 	dim      [8]uint32 /*!< dim[0]=ndim, dim[1]=nx, etc.         */
 	nvox     uint64    /*!< number of voxels = nx*ny*nz*...*nw   */
 	nbyper   uint32    /*!< bytes per voxel, matches datatype    */
-	datatype int32     /*!< type of data in voxels: DT_* code    */
+	Datatype int32     /*!< type of data in voxels: DT_* code    */
 
 	dx     float32    /*!< grid spacings      */
 	dy     float32    /*!< grid spacings      */
@@ -185,7 +185,7 @@ type Nifti1Image struct { /*!< Image storage struct **/
 	volumeN     int                  //defined by me, volume vox num
 	byte2floatF func([]byte) float32 //defined by me, byte2floatF
 	float2byteF func([]byte, float32)
-	header      Nifti1Header //defined by me, it might be a good idea store the img header in the image structure
+	Header      Nifti1Header //defined by me, it might be a good idea store the img header in the image structure
 	//TODO Joachim, here, I agree that we should integrate the header into the image structure!
 
 	numExt int32 /*!< number of extensions in ext_list       */
@@ -208,14 +208,32 @@ func (header *Nifti1Header) LoadHeader(filepath string) {
 	// fmt.Printf("%+v\n", header)
 }
 
+func (img *Nifti1Image) PrintImgFields() {
+	println("Header:")
+	fmt.Printf("%#v", img.Header)
+	//specifics:
+	println("\nIMG:")
+	println("sclSlope")
+	fmt.Printf("%f\n", img.sclSlope)
+	println("sclIter")
+	fmt.Printf("%f\n", img.sclInter)
+	println("Datatype from")
+	fmt.Printf("%d\n", img.Datatype)
+
+}
+
 func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 	var header Nifti1Header
 	if filepath == "" {
-		header = img.header
+		header = img.Header
 	} else {
 		header.LoadHeader(filepath)
-		img.header = header
+		img.Header = header
 	}
+	// Set SCL (Joachim)
+	img.sclSlope = header.SclSlope //float32
+	img.sclInter = header.SclInter
+
 	// set dimensions of data array
 	img.ndim, img.dim[0] = uint32(header.Dim[0]), uint32(header.Dim[0])
 	img.Nx, img.dim[1] = uint32(header.Dim[1]), uint32(header.Dim[1])
@@ -243,6 +261,7 @@ func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 	// fmt.Println(header)
 	//setting function to convert float2byte or byte2float
 	if img.nbyper == 1 {
+		println("nbyper is 1")
 		img.byte2floatF = func(b []byte) float32 {
 			v := uint8(b[0])
 			return float32(v)
@@ -251,14 +270,20 @@ func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 			buff[0] = uint8(x)
 		}
 	} else if img.nbyper == 2 {
+		println("nbyper is 2")
+
 		img.byte2floatF = func(b []byte) float32 {
-			v := binary.LittleEndian.Uint16(b)
+			//v := binary.LittleEndian.Uint16(b) //This is unsigned, but we're working with a signed short
+			v := int16(binary.LittleEndian.Uint16(b)) //casting this as a quick hack
+			//println("raw val byte2floatF ", v)
 			return float32(v)
 		}
 		img.float2byteF = func(buff []byte, x float32) {
 			binary.LittleEndian.PutUint16(buff, uint16(x))
 		}
 	} else if img.nbyper == 4 {
+		println("nbyper is 4")
+
 		img.byte2floatF = func(b []byte) float32 {
 			v := binary.LittleEndian.Uint32(b)
 			return math.Float32frombits(v)
@@ -268,6 +293,8 @@ func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 			binary.LittleEndian.PutUint32(buff, v)
 		}
 	} else if img.nbyper == 8 {
+		println("nbyper is 8")
+
 		img.byte2floatF = func(b []byte) float32 {
 			v := binary.LittleEndian.Uint64(b)
 			return float32(math.Float64frombits(v))
@@ -333,15 +360,20 @@ func gzipOpen(filepath string) (io.ReadCloser, error) {
 	return f, nil
 }
 
-// x,y,z,t,start at zero
-// This is a really nifty (no pun intended) and elegant function -JBBP
 func (img *Nifti1Image) GetAt(x, y, z, t uint32) float32 {
 	tIndex := img.Nx * img.Ny * img.Nz * t
 	zIndex := img.Nx * img.Ny * z
 	yIndex := img.Nx * y
 	xIndex := x
 	index := uint64(tIndex + zIndex + yIndex + xIndex)
-	return img.byte2float(img.data[index*uint64(img.nbyper) : (index+1)*uint64(img.nbyper)]) //shift byte
+	rawVal := img.byte2float(img.data[index*uint64(img.nbyper) : (index+1)*uint64(img.nbyper)])
+	//print("raw val", rawVal, "\n")
+	if img.sclSlope != 0 {
+		// print("slopin'")
+		return img.sclSlope*rawVal + img.sclInter
+	} else {
+		return rawVal
+	}
 }
 
 // convert byte to float32,init in LoadImage

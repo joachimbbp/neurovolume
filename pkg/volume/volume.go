@@ -1,17 +1,23 @@
 package volume
 
 import (
+	"fmt"
+	"log"
 	"math"
+	"os"
 
 	"github.com/joachimbbp/neurovolume/pkg/nifti"
 )
 
 type Volume struct {
-	Data       [][][][]float64
-	Shape      [4]int
-	MinVal     float64
-	MaxVal     float64
-	Normalized bool
+	Data         [][][][]float64
+	Shape        [4]int
+	MinVal       float64
+	MaxVal       float64
+	Mean         float64
+	Median       float64
+	Normalized   bool
+	ScanDatatype string
 	//Modifier Stack
 	//VDB
 	// Audio
@@ -26,13 +32,85 @@ type Volume struct {
 	*/
 }
 
+func (vol *Volume) SaveAsCSV(filename string, divider int) {
+	println("Saving Data to CSV File ", filename)
+	f, err := os.Create(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	for t := 0; t < vol.Shape[3]; t++ {
+		println("	Time Stamp ", t+1, "/", vol.Shape[3])
+		for z := 0; z < vol.Shape[2]; z++ {
+			//println("		Z index ", z+1, "/", vol.Shape[2])
+			for y := 0; y < vol.Shape[1]; y++ {
+				for x := 0; x < vol.Shape[0]; x++ {
+					if x%divider == 0 {
+						// print(vol.Data[x][y][z][t])
+						_, err := f.WriteString(fmt.Sprintf("%.5f", float32(vol.Data[x][y][z][t])) + ",")
+						if err != nil {
+							log.Fatal(err)
+						}
+					} else {
+						continue
+					}
+				}
+			}
+		}
+	}
+}
+
 func (vol *Volume) LoadDataFromNifti(filepath string) {
 	var img nifti.Nifti1Image //I hate that I have to bring this whole thing in! Later it will directly plug into the Volume type
 	img.LoadImage(filepath, true)
 	vol.Shape = [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}
-
-	//Still not sure *exactly* how this loop works
 	vol.Data = make([][][][]float64, vol.Shape[0])
+	switch img.Header.Datatype { //don't confuse with the oddly named DataType!
+	case 0:
+		vol.ScanDatatype = "unknown"
+	case 1:
+		vol.ScanDatatype = "bool"
+	case 2:
+		vol.ScanDatatype = "unsigned char"
+	case 4:
+		vol.ScanDatatype = "signed short"
+	case 8:
+		vol.ScanDatatype = "signed int"
+	case 16:
+		vol.ScanDatatype = "float"
+	case 32:
+		vol.ScanDatatype = "complex"
+	case 64:
+		vol.ScanDatatype = "double"
+	case 128:
+		vol.ScanDatatype = "rgb"
+	case 255:
+		vol.ScanDatatype = "all"
+	case 256:
+		vol.ScanDatatype = "signed char"
+	case 512:
+		vol.ScanDatatype = "unsigned short"
+	case 768:
+		vol.ScanDatatype = "unsigned int"
+	case 1024:
+		vol.ScanDatatype = "long long"
+	case 1280:
+		vol.ScanDatatype = "unsigned long long"
+	case 1536:
+		vol.ScanDatatype = "long double"
+	case 1792:
+		vol.ScanDatatype = "double pair"
+	case 2048:
+		vol.ScanDatatype = "long double pair"
+	case 2304:
+		vol.ScanDatatype = "rgba"
+	default:
+		vol.ScanDatatype = "unknown"
+	}
+	println("Scan Datatype saved in volume: ", vol.ScanDatatype)
+
+	img.PrintImgFields() //For debugging ONLY!
+
 	for x := range vol.Data {
 		vol.Data[x] = make([][][]float64, vol.Shape[1])
 		for y := range vol.Data[x] {
@@ -41,6 +119,7 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 				vol.Data[x][y][z] = make([]float64, vol.Shape[3])
 				for t := range vol.Data[x][y][z] {
 					vol.Data[x][y][z][t] = float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
+					//println("LoadDataFromNifti data", vol.Data[x][y][z][t])
 				}
 			}
 		}
@@ -49,7 +128,7 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 }
 
 func (vol *Volume) NormalizeVolume() {
-	vol.MinMax()
+	vol.MinMax(true)
 	for x := 0; x < vol.Shape[0]; x++ {
 		for y := 0; y < vol.Shape[1]; y++ {
 			for z := 0; z < vol.Shape[2]; z++ {
@@ -99,12 +178,31 @@ func (vol *Volume) GetMiddleSlices() ([][]float64, [][]float64, [][]float64) {
 	return horizontal, coronal, sagittal
 }
 
-//------------
+// ------------
+func (vol *Volume) SetMean() {
+	var sum float64 = 0
+	var len float64 = 0
+	shape := getShape4d(vol.Data)
+	for x := 0; x < shape[0]; x++ {
+		for y := 0; y < shape[1]; y++ {
+			for z := 0; z < shape[2]; z++ {
+				for t := 0; t < shape[3]; t++ {
+					len += 1
+					sum += vol.Data[x][y][z][t]
+				}
+			}
+		}
+	}
+
+	vol.Mean = sum / len
+
+}
 
 // Gets the Minimum and Maximum value from the volume Data
-func (vol *Volume) MinMax() {
+func (vol *Volume) MinMax(printInfo bool) {
 	var min_val, max_val = math.MaxFloat64, -math.MaxFloat64
 
+	var min_idx, max_idx = [4]int{}, [4]int{}
 	shape := getShape4d(vol.Data)
 	for x := 0; x < shape[0]; x++ {
 		for y := 0; y < shape[1]; y++ {
@@ -113,9 +211,11 @@ func (vol *Volume) MinMax() {
 					val := vol.Data[x][y][z][t]
 					if val < min_val {
 						min_val = val
+						min_idx = [4]int{x, y, z, t}
 					}
 					if val > max_val {
 						max_val = val
+						max_idx = [4]int{x, y, z, t}
 					}
 				}
 			}
@@ -123,6 +223,12 @@ func (vol *Volume) MinMax() {
 	}
 	vol.MinVal = min_val
 	vol.MaxVal = max_val
+	if printInfo {
+		fmt.Println("Min Max Info")
+		fmt.Println("	Shape", vol.Shape)
+		fmt.Println("	Min: ", min_val, "at idx", min_idx)
+		fmt.Println("	Max: ", max_val, "at idx", max_idx)
+	}
 
 }
 
