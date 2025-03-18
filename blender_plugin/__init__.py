@@ -20,6 +20,7 @@ import pyopenvdb as vdb
 import numpy as np
 import os
 import pathlib
+import time
 
 low_clip: float = 0.0
 
@@ -95,7 +96,7 @@ def read_volumes(data_folder: str):
     print(f"searching in {data_folder}")
 
     vdb_paths = []
-
+    start_time = time.time()
     for npy in os.listdir(data_folder):
         name = pathlib.Path(f"{data_folder}/{npy}").name #TEMP
         print(f"name {name}")
@@ -120,6 +121,8 @@ def read_volumes(data_folder: str):
                 print(f"invalid size: {name} is {len(np_vol.shape)} dimensions")
                 continue
     print(f"All volumes read in:\n paths: {vdb_paths} ")
+    end_time = time.time()
+    print(f"Took {end_time - start_time} seconds")
     return vdb_paths
 
 def import_VDBs(vdb_paths):
