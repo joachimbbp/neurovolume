@@ -65,7 +65,7 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 	img.LoadImage(filepath, true)
 	vol.Shape = [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}
 	vol.Data = make([][][][]float64, vol.Shape[0])
-	switch img.Header.Datatype { //don't confuse with the oddly named DataType!
+	switch img.Datatype { //don't confuse with the oddly named DataType!
 	case 0:
 		vol.ScanDatatype = "unknown"
 	case 1:

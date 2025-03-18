@@ -9,9 +9,8 @@ import (
 	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
-func main() {
-	start_time := time.Now()
-	println("Main function executing")
+// Scratchpad for running tests
+func testing() {
 	t1_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/openneuro/sub-01_T1w.nii"
 	//t1_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/mni/mni_icbm152_t1_tal_nlin_sym_09a.nii"
 	//	bold_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/openneuro/sub-01_task-rest_bold.nii"
@@ -38,7 +37,18 @@ func main() {
 	render.SaveAsImage(sagittal, "/Users/joachimpfefferkorn/repos/neurovolume/output/sagittal.PNG")
 
 	vdb.WriteFromVolume(&t1_vol)
+}
+
+func main() {
+	println("Running Main")
+	t1_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/openneuro/sub-01_T1w.nii"
+	var t1_vol volume.Volume
+	t1_vol.LoadDataFromNifti(t1_path) //Time Elapsed:  5178212542
+
+	start_time := time.Now()
+	//-------------//
+	vdb.WriteFromVolume(&t1_vol)
 	//-------------//
 	end_time := time.Now()
-	println("Time Elapsed: ", end_time.Sub(start_time))
+	println("Time Elapsed: ", end_time.Sub(start_time), " nanoseconds")
 }

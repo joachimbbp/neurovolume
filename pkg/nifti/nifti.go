@@ -233,6 +233,7 @@ func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 	// Set SCL (Joachim)
 	img.sclSlope = header.SclSlope //float32
 	img.sclInter = header.SclInter
+	img.Datatype = int32(header.Datatype)
 
 	// set dimensions of data array
 	img.ndim, img.dim[0] = uint32(header.Dim[0]), uint32(header.Dim[0])
@@ -273,9 +274,7 @@ func (img *Nifti1Image) LoadImage(filepath string, rdata bool) {
 		println("nbyper is 2")
 
 		img.byte2floatF = func(b []byte) float32 {
-			//v := binary.LittleEndian.Uint16(b) //This is unsigned, but we're working with a signed short
 			v := int16(binary.LittleEndian.Uint16(b)) //casting this as a quick hack
-			//println("raw val byte2floatF ", v)
 			return float32(v)
 		}
 		img.float2byteF = func(buff []byte, x float32) {
@@ -366,7 +365,9 @@ func (img *Nifti1Image) GetAt(x, y, z, t uint32) float32 {
 	yIndex := img.Nx * y
 	xIndex := x
 	index := uint64(tIndex + zIndex + yIndex + xIndex)
-	rawVal := img.byte2float(img.data[index*uint64(img.nbyper) : (index+1)*uint64(img.nbyper)])
+
+	rawVal := img.getRawValue(img.data[index*uint64(img.nbyper) : (index+1)*uint64(img.nbyper)])
+
 	//print("raw val", rawVal, "\n")
 	if img.sclSlope != 0 {
 		// print("slopin'")
@@ -376,7 +377,19 @@ func (img *Nifti1Image) GetAt(x, y, z, t uint32) float32 {
 	}
 }
 
-// convert byte to float32,init in LoadImage
+// A re-write of the byte2float logic, will expand as we encounter new datatypes
+func (img *Nifti1Image) getRawValue(data []byte) float32 {
+	switch img.Header.Datatype { //This exists in three places (image, header, and volume), combine into one at some point
+	case 4: //We will expand this later and integrate into the volume logic
+		//signed short
+		return float32(int16(binary.LittleEndian.Uint16(data)))
+
+	default:
+		panic(fmt.Sprintf("Unknown datatype %v", img.Header.Datatype))
+	}
+}
+
+// DEPRICATED convert byte to float32,init in LoadImage
 func (img *Nifti1Image) byte2float(data []byte) float32 {
 	v := img.byte2floatF(data)
 	return v
