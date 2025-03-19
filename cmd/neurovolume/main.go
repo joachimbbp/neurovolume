@@ -9,7 +9,8 @@ import (
 	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
-func main() {
+// Test suite for anatomy scans (no temporal dimension)
+func gackTesting() {
 	start_time := time.Now()
 	println("Main function executing")
 	t1_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/openneuro/sub-01_T1w.nii"
@@ -41,4 +42,11 @@ func main() {
 	//-------------//
 	end_time := time.Now()
 	println("Time Elapsed: ", end_time.Sub(start_time))
+}
+
+func main() {
+	t1_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/openneuro/sub-01_T1w.nii"
+	var t1_vol volume.Volume
+	t1_vol.LoadDataFromNifti(t1_path)
+	println("basename: ", t1_vol.BaseName)
 }

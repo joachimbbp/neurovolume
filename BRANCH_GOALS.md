@@ -3,7 +3,7 @@
 - [x] Load Volumes Natively
 - [ ] Bold processing
 - [ ] Generate audio from BOLD response
-- [ ] Custom VDB script
+- [x] Custom VDB script
 ## Performance
 - [x] Eliminate dependencies
     - [x] NifTI

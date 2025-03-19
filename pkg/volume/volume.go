@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/joachimbbp/neurovolume/pkg/nifti"
 )
@@ -18,6 +19,7 @@ type Volume struct {
 	Median       float64
 	Normalized   bool
 	ScanDatatype string
+	BaseName     string
 	//Modifier Stack
 	//VDB
 	// Audio
@@ -32,39 +34,20 @@ type Volume struct {
 	*/
 }
 
-func (vol *Volume) SaveAsCSV(filename string, divider int) {
-	println("Saving Data to CSV File ", filename)
-	f, err := os.Create(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	for t := 0; t < vol.Shape[3]; t++ {
-		println("	Time Stamp ", t+1, "/", vol.Shape[3])
-		for z := 0; z < vol.Shape[2]; z++ {
-			//println("		Z index ", z+1, "/", vol.Shape[2])
-			for y := 0; y < vol.Shape[1]; y++ {
-				for x := 0; x < vol.Shape[0]; x++ {
-					if x%divider == 0 {
-						// print(vol.Data[x][y][z][t])
-						_, err := f.WriteString(fmt.Sprintf("%.5f", float32(vol.Data[x][y][z][t])) + ",")
-						if err != nil {
-							log.Fatal(err)
-						}
-					} else {
-						continue
-					}
-				}
-			}
-		}
-	}
+// Gets the basename of any filepath (if you use elsewhere, maybe make a utils package)
+func GetBasename(filepath string) string {
+	hierarchy := strings.Split(filepath, "/")
+	return strings.Split(hierarchy[len(hierarchy)-1], ".")[0] //hierarchy[len(hierarchy)-1]
 }
 
 func (vol *Volume) LoadDataFromNifti(filepath string) {
-	var img nifti.Nifti1Image //I hate that I have to bring this whole thing in! Later it will directly plug into the Volume type
+	var img nifti.Nifti1Image //OG Nifti File
 	img.LoadImage(filepath, true)
+	vol.BaseName = GetBasename(filepath)
 	vol.Shape = [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}
+
 	vol.Data = make([][][][]float64, vol.Shape[0])
+
 	switch img.Header.Datatype { //don't confuse with the oddly named DataType!
 	case 0:
 		vol.ScanDatatype = "unknown"
@@ -125,6 +108,34 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 		}
 	}
 	vol.Normalized = false
+}
+
+func (vol *Volume) SaveAsCSV(filename string, divider int) {
+	println("Saving Data to CSV File ", filename)
+	f, err := os.Create(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	for t := 0; t < vol.Shape[3]; t++ {
+		println("	Time Stamp ", t+1, "/", vol.Shape[3])
+		for z := 0; z < vol.Shape[2]; z++ {
+			//println("		Z index ", z+1, "/", vol.Shape[2])
+			for y := 0; y < vol.Shape[1]; y++ {
+				for x := 0; x < vol.Shape[0]; x++ {
+					if x%divider == 0 {
+						// print(vol.Data[x][y][z][t])
+						_, err := f.WriteString(fmt.Sprintf("%.5f", float32(vol.Data[x][y][z][t])) + ",")
+						if err != nil {
+							log.Fatal(err)
+						}
+					} else {
+						continue
+					}
+				}
+			}
+		}
+	}
 }
 
 func (vol *Volume) NormalizeVolume() {
