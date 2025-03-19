@@ -492,8 +492,8 @@ func WriteSphere() {
 
 // Create a sub folder by having a tag_with_a_slash/
 func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
+	var seqOutputFolder string
 	var filepath string
-	//filepath := fmt.Sprintf("%s/%s%s.vdb", outputFolder, vol.BaseName, tag)
 	var vdb VDB
 	vdb.node_5 = *NewNode5()
 	fmt.Println(vol.Shape)
@@ -503,6 +503,12 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
 		{0, 1, 0, 0},
 		{0, 0, 1, 0},
 		{0, 0, 0, 1},
+	}
+	if vol.Shape[3] != 1 {
+		seqOutputFolder = fmt.Sprintf("%s/%s_seq", outputFolder, vol.BaseName)
+		if err := os.MkdirAll(seqOutputFolder, os.ModePerm); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	fmt.Println("Setting VDB Voxels")
@@ -521,7 +527,7 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
 			fmt.Println("	Writing Static VDB to ", filepath)
 		} else {
 			//VDB Sequence
-			filepath = fmt.Sprintf("%s/%s%s_%s.vdb", outputFolder, vol.BaseName, tag, strconv.Itoa(t))
+			filepath = fmt.Sprintf("%s/%s%s_%s.vdb", seqOutputFolder, vol.BaseName, tag, strconv.Itoa(t))
 			fmt.Println("	Writing VDB frame to ", filepath)
 		}
 
