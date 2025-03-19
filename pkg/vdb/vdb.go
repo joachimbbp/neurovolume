@@ -529,6 +529,7 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
 		if err := os.WriteFile(filepath, buffer.Bytes(), 0644); err != nil {
 			fmt.Println("Failed to write file:", err)
 		}
+		buffer.Reset()
 
 	}
 

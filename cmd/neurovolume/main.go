@@ -20,5 +20,5 @@ func main() {
 	//Lets try it with no mean!
 	//NOPe, sans mean is fine. What on earth went wrong in the last re-factor????
 
-	vdb.WriteFromVolume(&bold_vol, "/Users/joachimpfefferkorn/repos/neurovolume/output", "shaddow_test")
+	vdb.WriteFromVolume(&bold_vol, "/Users/joachimpfefferkorn/repos/neurovolume/output", "buffer_moved")
 }
