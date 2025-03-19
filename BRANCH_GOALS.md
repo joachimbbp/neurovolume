@@ -1,7 +1,7 @@
 # To-Do
 ## Go Scripts
 - [x] Load Volumes Natively
-- [ ] Bold processing
+- [x] Bold processing
 - [ ] Generate audio from BOLD response
 - [x] Custom VDB script
 ## Performance
@@ -15,4 +15,4 @@
 - [ ] Integrate into Blender plugin
 
 # Later
-More advanced fMRI and MRI processing: combine grids, skull-stripping, directly edit VDBs, etc
+More advanced fMRI and MRI processing: combine grids, method of subtraction, motion extraction, skull-stripping, directly edit VDBs, etc
