@@ -39,6 +39,7 @@ import (
 	"math"
 	"math/bits"
 	"os"
+	"strconv"
 	"unsafe"
 
 	"github.com/joachimbbp/neurovolume/pkg/volume"
@@ -489,28 +490,13 @@ func WriteSphere() {
 	}
 }
 
-func WriteFromVolume(vol *volume.Volume, outputFolder string) {
-	filepath := fmt.Sprintf("%s/%s.vdb", outputFolder, vol.BaseName)
-
-	fmt.Println("Writing Volume VDB to ", filepath)
-
+// Create a sub folder by having a tag_with_a_slash/
+func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
+	var filepath string
+	//filepath := fmt.Sprintf("%s/%s%s.vdb", outputFolder, vol.BaseName, tag)
 	var vdb VDB
 	vdb.node_5 = *NewNode5()
 	fmt.Println(vol.Shape)
-	fmt.Println("	Setting Voxels")
-	t := 0
-	for z := 0; z < vol.Shape[2]; z++ {
-		for y := 0; y < vol.Shape[1]; y++ {
-			for x := 0; x < vol.Shape[0]; x++ {
-
-				voxel := float32(vol.Data[x][y][z][t])
-
-				set_voxel(&vdb, [3]uint32{uint32(x), uint32(y), uint32(z)}, voxel)
-			}
-		}
-	}
-
-	fmt.Println("	Writing VDB")
 	var buffer bytes.Buffer
 	identity_matrix := [4][4]float64{
 		{1, 0, 0, 0},
@@ -518,10 +504,32 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string) {
 		{0, 0, 1, 0},
 		{0, 0, 0, 1},
 	}
-	writeVDB(&buffer, &vdb, identity_matrix)
 
-	if err := os.WriteFile(filepath, buffer.Bytes(), 0644); err != nil {
-		fmt.Println("Failed to write file:", err)
+	fmt.Println("Setting VDB Voxels")
+	for t := 0; t < vol.Shape[3]; t++ {
+		for z := 0; z < vol.Shape[2]; z++ {
+			for y := 0; y < vol.Shape[1]; y++ {
+				for x := 0; x < vol.Shape[0]; x++ {
+					voxel := float32(vol.Data[x][y][z][t])
+					set_voxel(&vdb, [3]uint32{uint32(x), uint32(y), uint32(z)}, voxel)
+				}
+			}
+		}
+		if vol.Shape[3] == 1 {
+			//Single, static VDB
+			filepath = fmt.Sprintf("%s/%s%s.vdb", outputFolder, vol.BaseName, tag)
+			fmt.Println("	Writing Static VDB to ", filepath)
+		} else {
+			//VDB Sequence
+			filepath = fmt.Sprintf("%s/%s%s_%s.vdb", outputFolder, vol.BaseName, tag, strconv.Itoa(t))
+			fmt.Println("	Writing VDB frame to ", filepath)
+		}
+
+		writeVDB(&buffer, &vdb, identity_matrix)
+		if err := os.WriteFile(filepath, buffer.Bytes(), 0644); err != nil {
+			fmt.Println("Failed to write file:", err)
+		}
+
 	}
 
 }

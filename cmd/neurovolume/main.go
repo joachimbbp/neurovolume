@@ -8,15 +8,17 @@ import (
 // Test suite for anatomy scans (no temporal dimension)
 
 func main() {
-	t1_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
-	var t1_vol volume.Volume
-	t1_vol.LoadDataFromNifti(t1_path)
+	bold_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold"
+	//bold_path := "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
 
-	t1_vol.NormalizeVolume() //Time Elapsed:  5453341708
+	var bold_vol volume.Volume
+	bold_vol.LoadDataFromNifti(bold_path)
+
+	bold_vol.NormalizeVolume() //Time Elapsed:  5453341708
 	// t1_vol.MinMax(true)
 	//t1_vol.SetMean() //I need to set the mean for it to worK???????
 	//Lets try it with no mean!
 	//NOPe, sans mean is fine. What on earth went wrong in the last re-factor????
 
-	vdb.WriteFromVolume(&t1_vol, "/Users/joachimpfefferkorn/repos/neurovolume/output")
+	vdb.WriteFromVolume(&bold_vol, "/Users/joachimpfefferkorn/repos/neurovolume/output", "shaddow_test")
 }
