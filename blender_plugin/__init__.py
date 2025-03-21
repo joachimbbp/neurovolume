@@ -26,12 +26,14 @@ bl_info = {
 print("Neurovolume is running")
 import bpy
 import os
+
 import json
 
 # endregion
 #------------------------------------------------------------------------------
 # region:                               Backend Functions
 #------------------------------------------------------------------------------
+
 def get_basename(path):
     hierarchy = path.split("/")
     return hierarchy[-1].split(".")[0]
@@ -63,11 +65,14 @@ def load_vdb(nifti_filepath):
         for filename in os.listdir(vdb_seq_folder):
             if filename.endswith(".vdb"):
                 vdb_sequence.append({"name": filename})
+
             else:
                 continue
+
         vdb_sequence.sort(key=vdb_frames_sort)
         print(f"loading in VDB sequence:\n{vdb_sequence}")
         bpy.ops.object.volume_import(filepath=vdb_seq_folder, directory=vdb_seq_folder, files=vdb_sequence, relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+
 
     else:
         print("Invalid Frame number: ", metadata["Frames"])
