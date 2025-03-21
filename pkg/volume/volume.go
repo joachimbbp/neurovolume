@@ -1,6 +1,7 @@
 package volume
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -32,6 +33,30 @@ type Volume struct {
 	   - The Modifier Stack
 	   - The output VDB
 	*/
+}
+type Metadata struct { //We just care about the Frames for now. Perhaps this eventually could be the header!
+	Frames int
+}
+
+// Saves out necessary metadata (for now, only if it is a sequence or not)
+func (vol *Volume) SaveMetadata(outputFolder string) {
+
+	metadata := Metadata{
+		Frames: vol.Shape[3],
+	}
+
+	println("Saving metadata:\n		", metadata.Frames, "\n", "	to ", outputFolder)
+
+	filepath := fmt.Sprintf("%s/%s_metadata.json", outputFolder, vol.BaseName)
+
+	f, err_c := os.Create(filepath)
+	if err_c != nil {
+		log.Fatal(err_c)
+	}
+	defer f.Close()
+
+	json_output, _ := json.MarshalIndent(metadata, "", "\t")
+	f.Write(json_output)
 }
 
 // Gets the basename of any filepath (if you use elsewhere, maybe make a utils package)
@@ -243,7 +268,7 @@ func (vol *Volume) MinMax(printInfo bool) {
 
 }
 
-// Sets the Shape for the Volume
+// Sets the Shape for the Volume SEEMS SO UNNECESSARY!!!!
 func (vol *Volume) GetShape() {
 	//Just a wrapper around the garbage GPT code
 	vol.Shape = getShape4d(vol.Data)

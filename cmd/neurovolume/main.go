@@ -15,7 +15,8 @@ func main() {
 
 	var vol volume.Volume
 	vol.LoadDataFromNifti(niftiPath)
-
+	vol.SaveMetadata(outputFolder)
 	vol.NormalizeVolume()
 	vdb.WriteFromVolume(&vol, outputFolder, "")
+
 }

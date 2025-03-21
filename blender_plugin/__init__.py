@@ -16,6 +16,8 @@ bl_info = {
 print("Neurovolume is running")
 import bpy
 import os
+import json
+
 
 #------------------------------------------------------------------------------
 #                                   Backend Functions
@@ -49,19 +51,69 @@ class Volume(bpy.types.Operator):
     """Load in NPY file and convert it to VDB"""
     bl_idname = "load.volume"
     bl_label = "Load Volume"
+
     
     def execute(self, context):
+        
+
         #For now we are just going to print what is input   
         print("Creating VDB from NIfTI File")
         nifti_filepath = context.scene.path_input
         output_filepath = "/Users/joachimpfefferkorn/repos/neurovolume/output"
         exe_path = "/Users/joachimpfefferkorn/repos/neurovolume/cmd/neurovolume/main"
-        os.system(f"{exe_path} {nifti_filepath} {output_filepath}")
         
-        vdb_filename = f"{get_basename(nifti_filepath)}.vdb"
-        vdb_filepath = f"{output_filepath}/{vdb_filename}"
-        print(f"loading in {vdb_filepath}")
-        bpy.ops.object.volume_import(filepath=vdb_filepath, directory=output_filepath, files=[{"name":vdb_filename, "name":vdb_filename}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+
+        os.system(f"{exe_path} {nifti_filepath} {output_filepath}")
+        vdb_basename = get_basename(nifti_filepath)
+        vdb_metadata_filepath = f"{output_filepath}/{vdb_basename}_metadata.json"
+
+        metadata = json.load(open(vdb_metadata_filepath))
+
+        if metadata["Frames"] == 1:
+            vdb_filename = f"{vdb_basename}.vdb"
+            vdb_filepath = f"{output_filepath}/{vdb_filename}"
+            print(f"loading in static VDB: {vdb_filepath}")
+            bpy.ops.object.volume_import(filepath=vdb_filepath, directory=output_filepath, files=[{"name":vdb_filename}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+        elif metadata["Frames"] > 1:
+
+#----------BOLD stuff
+
+            #THIS IS A TOTAL MESS
+            #leaving this for the night but don't take any of this BOLD stuff to be at all meaningful
+            #it's a total mess and there are obvious, leet-code-eque, intro to compsci kind of solves
+            #for pulling this sequence together, I am just tired and in a rush and I'm going to get
+            #to this tomorrow
+            
+            print("loading VDB seq")
+            vdb_seq_folder = f"{output_filepath}/{vdb_basename}_seq"
+            vdbs = {}
+            for name in os.listdir(vdb_seq_folder):
+                if name.endswith(".vdb"):
+                    frame_num = int(name.split(".")[0].split("_")[-1])
+                    print("num: ", frame_num, type(frame_num))
+                    vdbs[frame_num] = name
+                else:
+                    continue
+            print("vdbs: \n", vdbs)
+            vdbs = sorted(vdbs)
+            vdb_seq = []
+            for vdb in vdbs:
+                vdb_seq.append(vdb.values())
+
+            vdbs.sort(key="frame")
+            print("VDB seq debug (will be long):\n", vdb_seq)
+
+            print(f"loading in VDB sequence:\n{vdbs}")
+            bpy.ops.object.volume_import(filepath=vdb_filepath, directory=vdb_seq_folder, files=vdbs, relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+
+#------------------------
+
+        else:
+            print("Invalid Frame number: ", metadata["Frames"])
+            self.report({'INFO'}, "VDBs loaded into scene, Invalid Frame Number")
+            return {"FINISHED"}
+
+        
 
         self.report({'INFO'}, "VDBs loaded into scene")
         return {"FINISHED"}
