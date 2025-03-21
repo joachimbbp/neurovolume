@@ -1,69 +1,77 @@
-# Neurovolume
-![Looped of a BOLD image using the method of subtraction, motion extraction, and frame cross-dissolve frame interpolation](readme_media/bold_mos_me_loop.gif)
-Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This project is currently a work in progress.
-
-
-# Usage
-The usage for Neurovolume is presently spread across a few different scripts. Once we remove dependencies and write our own custom functions, we will be able to package this entire project within a single Blender plugin. We will also provide a library which can be adapted into other plugins and standalone tools.
-
-It is possible to use the `functions.py` library to pull some time-series VDBs out of 4D fMRI data. This work, including frame-interpolation and method of subtraction, can be found in the `bold_processing.ipynb`
-
-## Basic Pipeline for Static MRIs
 ![Render of a non-skull stripped MNI Template](readme_media/mni_template_render.png)
-- This project uses poetry for dependency management. With poetry installed, you can build and enter the virtual environment with `poetry install`
-- Run the `niigz2npy` script. This converts all compressed `nii.gz` `NIFTI` files to `.npy` files containing normalized numpy arrays. (Make sure your output folder is empty).
 
-```shell
-cd src/neurovolume
-Python niigz2npy.py <path/to/output/folder/> <input/folder/one/> <input/folder/two> </etc.../>
+🧠 Neurovolume is a VDB-based fMRI visualization and analysis pipeline. This project is currently a work in progress.
+
+
+# Installation and Usage
+💾 **Software Requirements**
+- Neurovolume is primarily written in Go, visit [go.dev](https://go.dev/doc/install) to download and install Go.
+- Currently, the only front end is a Blender Plugin. For development we used `Version 4.3.2 (4.3.2 2024-12-17)`, which you can download [here](https://www.blender.org/download/releases/4-3/). It should work on most other versions as well.
+
+
+🛠️ **Compiling Go Code**
+
+- After cloning the github repo, navigate to `cmd` folder with `cd neurovolume/cmd/neurovolume`
+- You can compile the code to an executable here with `go build main.go`
+
+🌩️ **Creating a VDB from a NIfTI file**
+- This executable can now be run from the command line with:
+`./main /path/to/nifti/file.nii /path/to/output/folder`
+    - (read on to see how you can run it through a Blender plugin)
+- ⚠️ **Warning:** This project has only been tested for NIfTI-1 files. NIfTI-2 files are not yet supported.
+- ⚠️ **Warning:** GZ unzipping is currently untested. Please unzip all `.nii.gz` files to `.nii` before opening them with Neurovolume. You can do so by double clicking on the file (at least in macOS).
+
+🔌 **Setting Up the Blender Add-On**
+- After compiling the Go code, open the Blender plugin located at `neurovolume/blender_plugin/__init__.py`
+- Edit the following lines to match the paths on your machine:
+```python
+# Where you will save the VDB and metadata:
+user_set_output_path = "/Users/username/repos/neurovolume/output"
+# Path to your Go executable:
+user_set_exe_path = "/Users/username/repos/neurovolume/cmd/neurovolume/main"
+# Optional, the default path that appears when you first open the panel:
+user_set_default_nifti = "/Users/username/repos/neurovolume/media/sub-01_T1w.nii" 
 ```
-- Open Blender and import the plugin found at `blender_plugin/__init__.py`
-You can do this by copy and pasting the code into the blenders text editor and running it there.
-- Once this is running, a GUI should appear on the right side of the 3D view. Paste the path to the folder containing your `.npy` files and click `Load .npy Files into Blender`
-- This should load the VDB files into Blender for shading, animation, rendering, etc.
-![Blender Instructions](readme_media/blender_instructions.png)
+- Install the Blender plugin using one of the following methods::
+    - With [Jacques Lucke's vsCode extension for Blender](https://github.com/JacquesLucke/blender_vscode) (recommended)
+    - [Via the Add-ons section](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html)
+    - Copy-pasting the add-on into Blender's [Text-editor](https://docs.blender.org/manual/en/latest/editors/text_editor.html) and then clicking the triangular "play" button to run.
+
+**Running The Blender Plugin**
+- From the Neurovolume panel, enter the path to your NIfTI file and click `Load VDB from NIfTI`
+- 🕰️ **Please Note**, this might take a few seconds to a few minutes. The program is not responsive at this point yet. If you would like to check progress I recommend running Blender from the terminal to see the print statements roll by.
+- Enjoy!
+![Render of a non-skull stripped MNI Template](readme_media/Blender_viewport.png)
+
 
 # Why VDB?
-VDBs are a highly performant, art-directable, volumetric data structure that supports animations.  Unlike typical meshed-based pipelines using the marching cubes algorithm, this volume-based approach preserves the scan’s normalized density data throughout the visualization pipeline. The animation support will also be particularly useful when animating fMRI data as outlined in the roadmap below.
+
+VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Unlike typical meshed-based pipelines using the marching cubes algorithm, our volume-based approach will preserve the scan’s normalized density data throughout the visualization pipeline. The animation support is particularly useful for animating BOLD response.
 
 For more information on VDBs, see the [openVDB website](https://www.openvdb.org/)
+![Loop of a BOLD image using the method of subtraction, motion extraction, and frame cross-dissolve frame interpolation](readme_media/bold_mos_me_loop.gif)
 
-# Blender, VDB, and Neuroscience Programming Environments
-This project uses Poetry to manage dependencies and create a virtual environment. However, our Blender environment includes two dependencies -`pyopenvdb` and `bpy`- which are very hard to integrate into our current code base. Furthermore, `ants` and `nibabel`, our fMRI processing libraries, are very hard to use within blender.
 
-Throughout the development, we have used a few different techniques to resolve these issues, including a [docker file](https://github.com/joachimbbp/openvdb_docker) specifically for OpenVDB.
-
-Currently, we are using VSCode with [Jacques Lucke's Blender Extension](https://github.com/JacquesLucke/blender_vscode) to write our Blender plugin. This plugin holds all of the `bpy` and `pyopenvdb` code, while our `functions.py` and `niigz2npy.py` are written within the poetry environment. As we replace `ants` (and perhaps even `pyopenvdb`) with our own, dependency-minimal code, we will be able to write all of this within the same environment. This will hopefully create maximally portable code which can be easily adapted for many 3D softwares.
-
-# Roadmap
-Global Goal: write everything with dependencies available only within Blender's Python environment. Once this is achieved, we can easily package everything within a single Blender plugin and our separate library will be robust and portable.
-
-Once achieved, the repo will contain the following:
-- Stand-alone Blender Plugin containing all the functionality to convert `NIFTI` files into `VDB`.
-- A minimal-dependency library containing fMRI processing tools for other projects (such as command-line tools or other VFX software plugins)
-- A library for visualization (and possibly alignment) within Jupyter Notebooks (can include matplotlib dependencies, etc) 
-
-## To Do
+# To-Do
 **Blender**
-- [ ] Blender Plugin can directly import and process `NIFTI` files
-    - Fully integrates `niigz2npy` and replaces `nibabel` functions with native `numpy`-only functions
-    - Blender Plugin can implement method of subtraction for fMRI sequences
+- [x] Blender Plugin can directly import and process `NIFTI` files
+    - [ ] Blender Plugin can implement method of subtraction for fMRI sequences
 - [ ] VDB Grid Alignment and Combination in Blender
-
-
+- [ ] GUI Loading animations
 
 **fMRI**
 - [x] Add fMRI Sequence import functionality in Blender Plugin
 - [x] Method of Subtraction from Neutral Stimulus
     - Exists in the `bold_diffing` notebook. Currently this gives the user the most control, although we should integrate this into the Blender plugin when we implement the native `NIFTI` file parsing.
-- [ ] Frame Interpolation Options for Realtime Playback
-    - [x] Cross dissolve
+- [ ] Frame Interpolation Options for Realtime Playback (re implement in the Go-Backend)
+    - [ ] Cross dissolve
     - [ ] Morph
 
 **Dev**
-- [ ] Clean up `poetry` dependencies
-- [ ] Standardize Dimension Naming Conventions
-    - `x y z t` vs `0 1 2 3` vs `Horizontal Coronal Sagittal Time`
+- [ ] Increase performance in native VDB writer (try to match PyOpenVDB)
+- [ ] Add support for `gz` files
+- [ ] Add support for `NIfTI-2` files
+
 
 # Dataset Citation
 This software was tested using the following datasets.

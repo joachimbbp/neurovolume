@@ -27,9 +27,14 @@ SOFTWARE.
 
 /* ------------ TODO -------------------- */
 /*
-- [ ] Get a png image of slice from copypasta version
+Generally, this could use a big rewrite. Mostly I think that
+the header and the image should be combined, and perhaps all of this
+logic should directly plug into the volume struct.
+
+- [x] Get a png image of slice from copypasta version
 - [x] Eliminate gzip dependency (it became Standard Library, I'll count it!)
-- [ ] combine image and header
+- 		[ ] Re-integrate gzip functionality
+
 - [x] Export a tensor (equivalent to .get_fdata() in nibabel)
 	- done in volume.go
 */

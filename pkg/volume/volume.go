@@ -21,48 +21,9 @@ type Volume struct {
 	Normalized   bool
 	ScanDatatype string
 	BaseName     string
-	//Modifier Stack
-	//VDB
-	// Audio
-	//CAN I LEAVE SOME OF THESE BLANK IF THEY DON'T EXIST?
-	/*
-	   	Don't get caught in inheritance hell! Don't inherit anything from this! Why would you? Every scan is a 4D vol (anat is just 1 frame!)
-
-	   This Volume struct exists only because the computer needs to store a few things:
-	   - The Raw Data in Scanner Space (will be modified by transforms and stuff, read from the NIfTI file, before written here)
-	   - The Modifier Stack
-	   - The output VDB
-	*/
 }
-type Metadata struct { //We just care about the Frames for now. Perhaps this eventually could be the header!
+type Metadata struct {
 	Frames int
-}
-
-// Saves out necessary metadata (for now, only if it is a sequence or not)
-func (vol *Volume) SaveMetadata(outputFolder string) {
-
-	metadata := Metadata{
-		Frames: vol.Shape[3],
-	}
-
-	println("Saving metadata:\n		", metadata.Frames, "\n", "	to ", outputFolder)
-
-	filepath := fmt.Sprintf("%s/%s_metadata.json", outputFolder, vol.BaseName)
-
-	f, err_c := os.Create(filepath)
-	if err_c != nil {
-		log.Fatal(err_c)
-	}
-	defer f.Close()
-
-	json_output, _ := json.MarshalIndent(metadata, "", "\t")
-	f.Write(json_output)
-}
-
-// Gets the basename of any filepath (if you use elsewhere, maybe make a utils package)
-func GetBasename(filepath string) string {
-	hierarchy := strings.Split(filepath, "/")
-	return strings.Split(hierarchy[len(hierarchy)-1], ".")[0] //hierarchy[len(hierarchy)-1]
 }
 
 func (vol *Volume) LoadDataFromNifti(filepath string) {
@@ -117,7 +78,7 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 	}
 	println("Scan Datatype saved in volume: ", vol.ScanDatatype)
 
-	img.PrintImgFields() //For debugging ONLY!
+	//	img.PrintImgFields() //For debugging ONLY!
 
 	for x := range vol.Data {
 		vol.Data[x] = make([][][]float64, vol.Shape[1])
@@ -127,7 +88,6 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 				vol.Data[x][y][z] = make([]float64, vol.Shape[3])
 				for t := range vol.Data[x][y][z] {
 					vol.Data[x][y][z][t] = float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
-					//println("LoadDataFromNifti data", vol.Data[x][y][z][t])
 				}
 			}
 		}
@@ -135,6 +95,97 @@ func (vol *Volume) LoadDataFromNifti(filepath string) {
 	vol.Normalized = false
 }
 
+/*------- Essential Utilities ---------*/
+func (vol *Volume) SaveMetadata(outputFolder string) {
+	//Currently we only care about whether or not it is a sequence, but this eventually could just save the Header out (which might be useful)
+	metadata := Metadata{
+		Frames: vol.Shape[3],
+	}
+
+	println("Saving metadata:\n		", metadata.Frames, "\n", "	to ", outputFolder)
+
+	filepath := fmt.Sprintf("%s/%s_metadata.json", outputFolder, vol.BaseName)
+
+	f, err_c := os.Create(filepath)
+	if err_c != nil {
+		log.Fatal(err_c)
+	}
+	defer f.Close()
+
+	json_output, _ := json.MarshalIndent(metadata, "", "\t")
+	f.Write(json_output)
+}
+func GetBasename(filepath string) string {
+	//Move to a general utils if you use it elsewhere
+	hierarchy := strings.Split(filepath, "/")
+	return strings.Split(hierarchy[len(hierarchy)-1], ".")[0] //hierarchy[len(hierarchy)-1]
+}
+
+/*------- Math-y/Normalization things ---------*/
+func (vol *Volume) NormalizeVolume() {
+	vol.MinMax(true)
+	for x := 0; x < vol.Shape[0]; x++ {
+		for y := 0; y < vol.Shape[1]; y++ {
+			for z := 0; z < vol.Shape[2]; z++ {
+				for t := 0; t < vol.Shape[3]; t++ {
+					vol.Data[x][y][z][t] = (vol.Data[x][y][z][t] - vol.MinVal) / (vol.MaxVal - vol.MinVal)
+
+				}
+			}
+		}
+	}
+	vol.Normalized = true
+}
+func (vol *Volume) SetMean() {
+	var sum float64 = 0
+	var len float64 = 0
+	shape := vol.Shape
+	for x := 0; x < shape[0]; x++ {
+		for y := 0; y < shape[1]; y++ {
+			for z := 0; z < shape[2]; z++ {
+				for t := 0; t < shape[3]; t++ {
+					len += 1
+					sum += vol.Data[x][y][z][t]
+				}
+			}
+		}
+	}
+
+	vol.Mean = sum / len
+}
+func (vol *Volume) MinMax(printInfo bool) {
+	var min_val, max_val = math.MaxFloat64, -math.MaxFloat64
+
+	var min_idx, max_idx = [4]int{}, [4]int{}
+	shape := vol.Shape
+	for x := 0; x < shape[0]; x++ {
+		for y := 0; y < shape[1]; y++ {
+			for z := 0; z < shape[2]; z++ {
+				for t := 0; t < shape[3]; t++ {
+					val := vol.Data[x][y][z][t]
+					if val < min_val {
+						min_val = val
+						min_idx = [4]int{x, y, z, t}
+					}
+					if val > max_val {
+						max_val = val
+						max_idx = [4]int{x, y, z, t}
+					}
+				}
+			}
+		}
+	}
+	vol.MinVal = min_val
+	vol.MaxVal = max_val
+	if printInfo {
+		fmt.Println("Min Max Info")
+		fmt.Println("	Shape", vol.Shape)
+		fmt.Println("	Min: ", min_val, "at idx", min_idx)
+		fmt.Println("	Max: ", max_val, "at idx", max_idx)
+	}
+}
+
+/*------- Debugging and Render Helpers ---------*/
 func (vol *Volume) SaveAsCSV(filename string, divider int) {
 	println("Saving Data to CSV File ", filename)
 	f, err := os.Create(filename)
@@ -162,22 +213,6 @@ func (vol *Volume) SaveAsCSV(filename string, divider int) {
 		}
 	}
 }
-
-func (vol *Volume) NormalizeVolume() {
-	vol.MinMax(true)
-	for x := 0; x < vol.Shape[0]; x++ {
-		for y := 0; y < vol.Shape[1]; y++ {
-			for z := 0; z < vol.Shape[2]; z++ {
-				for t := 0; t < vol.Shape[3]; t++ {
-					vol.Data[x][y][z][t] = (vol.Data[x][y][z][t] - vol.MinVal) / (vol.MaxVal - vol.MinVal)
-
-				}
-			}
-		}
-	}
-	vol.Normalized = true
-}
-
 func (vol *Volume) GetMiddleSlices() ([][]float64, [][]float64, [][]float64) {
 	t := vol.Shape[3] / 2
 
@@ -212,92 +247,4 @@ func (vol *Volume) GetMiddleSlices() ([][]float64, [][]float64, [][]float64) {
 	}
 	//Currently the orientation is a bit weird but that's okay!
 	return horizontal, coronal, sagittal
-}
-
-// ------------
-func (vol *Volume) SetMean() {
-	var sum float64 = 0
-	var len float64 = 0
-	shape := getShape4d(vol.Data)
-	for x := 0; x < shape[0]; x++ {
-		for y := 0; y < shape[1]; y++ {
-			for z := 0; z < shape[2]; z++ {
-				for t := 0; t < shape[3]; t++ {
-					len += 1
-					sum += vol.Data[x][y][z][t]
-				}
-			}
-		}
-	}
-
-	vol.Mean = sum / len
-
-}
-
-// Gets the Minimum and Maximum value from the volume Data
-func (vol *Volume) MinMax(printInfo bool) {
-	var min_val, max_val = math.MaxFloat64, -math.MaxFloat64
-
-	var min_idx, max_idx = [4]int{}, [4]int{}
-	shape := getShape4d(vol.Data)
-	for x := 0; x < shape[0]; x++ {
-		for y := 0; y < shape[1]; y++ {
-			for z := 0; z < shape[2]; z++ {
-				for t := 0; t < shape[3]; t++ {
-					val := vol.Data[x][y][z][t]
-					if val < min_val {
-						min_val = val
-						min_idx = [4]int{x, y, z, t}
-					}
-					if val > max_val {
-						max_val = val
-						max_idx = [4]int{x, y, z, t}
-					}
-				}
-			}
-		}
-	}
-	vol.MinVal = min_val
-	vol.MaxVal = max_val
-	if printInfo {
-		fmt.Println("Min Max Info")
-		fmt.Println("	Shape", vol.Shape)
-		fmt.Println("	Min: ", min_val, "at idx", min_idx)
-		fmt.Println("	Max: ", max_val, "at idx", max_idx)
-	}
-
-}
-
-// Sets the Shape for the Volume SEEMS SO UNNECESSARY!!!!
-func (vol *Volume) GetShape() {
-	//Just a wrapper around the garbage GPT code
-	vol.Shape = getShape4d(vol.Data)
-}
-
-// ChatGPT copypasta and it doesn't look great (but it works)
-func getShape4d(data [][][][]float64) [4]int {
-	return [4]int{
-		len(data),
-		func() int {
-			if len(data) > 0 {
-				return len(data[0])
-			} else {
-				return 0
-			}
-		}(),
-		func() int {
-			if len(data) > 0 && len(data[0]) > 0 {
-				return len(data[0][0])
-			} else {
-				return 0
-			}
-		}(),
-		func() int {
-			if len(data) > 0 && len(data[0]) > 0 && len(data[0][0]) > 0 {
-				return len(data[0][0][0])
-			} else {
-				return 0
-			}
-		}(),
-	}
 }
