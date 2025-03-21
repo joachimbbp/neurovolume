@@ -39,7 +39,6 @@ import (
 	"math"
 	"math/bits"
 	"os"
-	"strconv"
 	"unsafe"
 
 	"github.com/joachimbbp/neurovolume/pkg/volume"
@@ -527,7 +526,7 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
 			fmt.Println("	Writing Static VDB to ", filepath)
 		} else {
 			//VDB Sequence
-			filepath = fmt.Sprintf("%s/%s%s_%s.vdb", seqOutputFolder, vol.BaseName, tag, strconv.Itoa(t))
+			filepath = fmt.Sprintf("%s/%s%s_%04d.vdb", seqOutputFolder, vol.BaseName, tag, t)
 			fmt.Println("	Writing VDB frame to ", filepath)
 		}
 
