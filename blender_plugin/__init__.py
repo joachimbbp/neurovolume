@@ -47,15 +47,15 @@ class Neurovolume(bpy.types.Panel):
         self.layout.prop(context.scene, "path_input")
         self.layout.operator("load.volume", text="Load VDB from NIfTI")
 
+
+def vdb_frames_sort(entry: dict):
+    return int(entry["name"].split(".")[0].split("_")[-1])
 class Volume(bpy.types.Operator):
     """Load in NPY file and convert it to VDB"""
     bl_idname = "load.volume"
     bl_label = "Load Volume"
 
-    
     def execute(self, context):
-        
-
         #For now we are just going to print what is input   
         print("Creating VDB from NIfTI File")
         nifti_filepath = context.scene.path_input
@@ -74,37 +74,24 @@ class Volume(bpy.types.Operator):
             vdb_filepath = f"{output_filepath}/{vdb_filename}"
             print(f"loading in static VDB: {vdb_filepath}")
             bpy.ops.object.volume_import(filepath=vdb_filepath, directory=output_filepath, files=[{"name":vdb_filename}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-        elif metadata["Frames"] > 1:
-
 #----------BOLD stuff
-
-            #THIS IS A TOTAL MESS
-            #leaving this for the night but don't take any of this BOLD stuff to be at all meaningful
-            #it's a total mess and there are obvious, leet-code-eque, intro to compsci kind of solves
-            #for pulling this sequence together, I am just tired and in a rush and I'm going to get
-            #to this tomorrow
-            
+        elif metadata["Frames"] > 1:            
             print("loading VDB seq")
             vdb_seq_folder = f"{output_filepath}/{vdb_basename}_seq"
-            vdbs = {}
-            for name in os.listdir(vdb_seq_folder):
-                if name.endswith(".vdb"):
-                    frame_num = int(name.split(".")[0].split("_")[-1])
-                    print("num: ", frame_num, type(frame_num))
-                    vdbs[frame_num] = name
+            vdb_sequence = []
+
+            for filename in os.listdir(vdb_seq_folder):
+                if filename.endswith(".vdb"):
+                    #frame_num = int(name.split(".")[0].split("_")[-1])
+                    vdb_sequence.append({"name": filename})
                 else:
                     continue
-            print("vdbs: \n", vdbs)
-            vdbs = sorted(vdbs)
-            vdb_seq = []
-            for vdb in vdbs:
-                vdb_seq.append(vdb.values())
+            vdb_sequence.sort(key=vdb_frames_sort)
+            print(f"loading in VDB sequence:\n{vdb_sequence}")
+            bpy.ops.object.volume_import(filepath=vdb_seq_folder, directory=vdb_seq_folder, files=vdb_sequence, relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
 
-            vdbs.sort(key="frame")
-            print("VDB seq debug (will be long):\n", vdb_seq)
+            #bpy.ops.object.volume_import(filepath="/Users/joachimpfefferkorn/repos/neurovolume/output/sub-01_task-emotionalfaces_run-1_bold_seq/", directory="/Users/joachimpfefferkorn/repos/neurovolume/output/sub-01_task-emotionalfaces_run-1_bold_seq/", files=[{"name":"sub-01_task-emotionalfaces_run-1_bold_0000.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0000.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0001.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0001.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0002.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0002.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0003.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0003.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0004.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0004.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0005.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0005.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0006.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0006.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0007.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0007.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0008.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0008.vdb"}, {"name":"sub-01_task-emotionalfaces_run-1_bold_0009.vdb", "name":"sub-01_task-emotionalfaces_run-1_bold_0009.vdb"}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
 
-            print(f"loading in VDB sequence:\n{vdbs}")
-            bpy.ops.object.volume_import(filepath=vdb_filepath, directory=vdb_seq_folder, files=vdbs, relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
 
 #------------------------
 

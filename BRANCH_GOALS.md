@@ -12,7 +12,7 @@
 - [ ] Add multithreading
 - [ ] Error handling
 ## Python/Blender
-- [ ] Integrate into Blender plugin
+- [x] Integrate into Blender plugin
 
 # Later
 More advanced fMRI and MRI processing: combine grids, method of subtraction, motion extraction, skull-stripping, directly edit VDBs, etc
