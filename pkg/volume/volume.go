@@ -7,92 +7,20 @@ import (
 	"math"
 	"os"
 	"strings"
-
-	"github.com/joachimbbp/neurovolume/pkg/nifti"
 )
 
 type Volume struct {
 	Data         [][][][]float64
-	Shape        [4]int
-	MinVal       float64
-	MaxVal       float64
+	Shape        [4]int  //Could probably clamp at int16 if memory becomes an issue
+	MinVal       float64 // For normalization
+	MaxVal       float64 // For normalization
 	Mean         float64
-	Median       float64
 	Normalized   bool
 	ScanDatatype string
 	BaseName     string
 }
 type Metadata struct {
 	Frames int
-}
-
-func (vol *Volume) LoadDataFromNifti(filepath string) {
-	var img nifti.Nifti1Image //OG Nifti File
-	img.LoadImage(filepath, true)
-	vol.BaseName = GetBasename(filepath)
-	vol.Shape = [4]int{int(img.Nx), int(img.Ny), int(img.Nz), int(img.Nt)}
-
-	vol.Data = make([][][][]float64, vol.Shape[0])
-
-	switch img.Header.Datatype { //don't confuse with the oddly named DataType!
-	case 0:
-		vol.ScanDatatype = "unknown"
-	case 1:
-		vol.ScanDatatype = "bool"
-	case 2:
-		vol.ScanDatatype = "unsigned char"
-	case 4:
-		vol.ScanDatatype = "signed short"
-	case 8:
-		vol.ScanDatatype = "signed int"
-	case 16:
-		vol.ScanDatatype = "float"
-	case 32:
-		vol.ScanDatatype = "complex"
-	case 64:
-		vol.ScanDatatype = "double"
-	case 128:
-		vol.ScanDatatype = "rgb"
-	case 255:
-		vol.ScanDatatype = "all"
-	case 256:
-		vol.ScanDatatype = "signed char"
-	case 512:
-		vol.ScanDatatype = "unsigned short"
-	case 768:
-		vol.ScanDatatype = "unsigned int"
-	case 1024:
-		vol.ScanDatatype = "long long"
-	case 1280:
-		vol.ScanDatatype = "unsigned long long"
-	case 1536:
-		vol.ScanDatatype = "long double"
-	case 1792:
-		vol.ScanDatatype = "double pair"
-	case 2048:
-		vol.ScanDatatype = "long double pair"
-	case 2304:
-		vol.ScanDatatype = "rgba"
-	default:
-		vol.ScanDatatype = "unknown"
-	}
-	println("Scan Datatype saved in volume: ", vol.ScanDatatype)
-
-	//	img.PrintImgFields() //For debugging ONLY!
-
-	for x := range vol.Data {
-		vol.Data[x] = make([][][]float64, vol.Shape[1])
-		for y := range vol.Data[x] {
-			vol.Data[x][y] = make([][]float64, vol.Shape[2])
-			for z := range vol.Data[x][y] {
-				vol.Data[x][y][z] = make([]float64, vol.Shape[3])
-				for t := range vol.Data[x][y][z] {
-					vol.Data[x][y][z][t] = float64(img.GetAt(uint32(x), uint32(y), uint32(z), uint32(t)))
-				}
-			}
-		}
-	}
-	vol.Normalized = false
 }
 
 /*------- Essential Utilities ---------*/
@@ -200,7 +128,6 @@ func (vol *Volume) SaveAsCSV(filename string, divider int) {
 			for y := 0; y < vol.Shape[1]; y++ {
 				for x := 0; x < vol.Shape[0]; x++ {
 					if x%divider == 0 {
-						// print(vol.Data[x][y][z][t])
 						_, err := f.WriteString(fmt.Sprintf("%.5f", float32(vol.Data[x][y][z][t])) + ",")
 						if err != nil {
 							log.Fatal(err)
