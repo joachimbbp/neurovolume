@@ -75,6 +75,8 @@ type Nifti1Header struct {
 }
 
 func (header *Nifti1Header) loadHeader(filepath string) {
+	fmt.Println("Loading Header")
+	//Right now gzipOpen is called twice, might not be the most performant
 	reader, gErr := gzipOpen(filepath)
 	if gErr != nil {
 		panic(fmt.Sprintf("Error unzipping NIfTI1 Header:\n\t%s", gErr))
@@ -96,7 +98,7 @@ type Nifti1Image struct {
 }
 
 func (img *Nifti1Image) LoadImage(filepath string) {
-	//Setup
+	fmt.Println("Loading Image")
 	img.Filepath = filepath
 	var header Nifti1Header
 	header.loadHeader(filepath)
@@ -211,29 +213,15 @@ func (img *Nifti1Image) BuildVolume() Volume {
 	return vol
 }
 
-func (img *Nifti1Image) getAt(x int, y int, z int, t int, shape [4]int) float32 { //Changed the index to int16 from uint32
-	// fmt.Println("💅Debuggy get at. Shape: ", shape)
-
-	// tIndex := shape[1] * shape[2] * shape[3] * t //img.Nx * img.Ny * img.Nz * t
-	// zIndex := shape[1] * shape[2] * z            //img.Nx * img.Ny * z
-	// yIndex := shape[1] * y                       //img.Nx * y
-	// xIndex := x
-	// index := uint64(tIndex + zIndex + yIndex + xIndex)
-	nx := shape[0] // x
-	ny := shape[1] // y
-	nz := shape[2] // z
-	//	nt := shape[3] // t
-
+func (img *Nifti1Image) getAt(x int, y int, z int, t int, shape [4]int) float32 {
+	nx := shape[0]
+	ny := shape[1]
+	nz := shape[2]
 	index := uint64(t*nx*ny*nz + z*nx*ny + y*nx + x)
-
-	//  rawVal := img.byte2floatF(img.rawData[index*uint64(img.bytesPerVoxel) : (index+1)*uint64(img.bytesPerVoxel)])
 	rawVal := img.byte2floatF(img.rawData[index*uint64(img.bytesPerVoxel) : (index+1)*uint64(img.bytesPerVoxel)])
-
-	// fmt.Println("debuggy rawVal", rawVal)
 	if img.Header.SclSlope != 0 {
 		return img.Header.SclSlope*rawVal + img.Header.SclInter
 	} else {
 		return rawVal
 	}
-
 }
