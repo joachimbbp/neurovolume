@@ -19,7 +19,6 @@
 `./main /path/to/nifti/file.nii /path/to/output/folder`
     - (read on to see how you can run it through a Blender plugin)
 - ⚠️ **Warning:** This project has only been tested for NIfTI-1 files. NIfTI-2 files are not yet supported.
-- ⚠️ **Warning:** GZ unzipping is currently untested. Please unzip all `.nii.gz` files to `.nii` before opening them with Neurovolume. You can do so by double clicking on the file (at least in macOS).
 
 🔌 **Setting Up the Blender Add-On**
 - After compiling the Go code, open the Blender plugin located at `neurovolume/blender_plugin/__init__.py`
@@ -69,8 +68,9 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 
 **Dev**
 - [ ] Increase performance in native VDB writer (try to match PyOpenVDB)
-- [ ] Add support for `gz` files
+- [x] Add support for `gz` files
 - [ ] Add support for `NIfTI-2` files
+- [ ] Unit Testing
 
 
 # Dataset Citation
