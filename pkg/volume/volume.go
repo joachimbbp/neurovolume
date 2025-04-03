@@ -6,7 +6,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"strings"
 )
 
 type Volume struct {
@@ -42,11 +41,6 @@ func (vol *Volume) SaveMetadata(outputFolder string) {
 
 	json_output, _ := json.MarshalIndent(metadata, "", "\t")
 	f.Write(json_output)
-}
-func GetBasename(filepath string) string {
-	//Move to a general utils if you use it elsewhere
-	hierarchy := strings.Split(filepath, "/")
-	return strings.Split(hierarchy[len(hierarchy)-1], ".")[0] //hierarchy[len(hierarchy)-1]
 }
 
 /*------- Math-y/Normalization things ---------*/

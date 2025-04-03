@@ -62,7 +62,7 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 - [x] Add fMRI Sequence import functionality in Blender Plugin
 - [x] Method of Subtraction from Neutral Stimulus
     - Exists in the `bold_diffing` notebook. Currently this gives the user the most control, although we should integrate this into the Blender plugin when we implement the native `NIFTI` file parsing.
-- [ ] Frame Interpolation Options for Realtime Playback (re implement in the Go-Backend)
+- [ ] Frame Interpolation Options for Realtime Playback (re-implement in the Go-Backend)
     - [ ] Cross dissolve
     - [ ] Morph
 

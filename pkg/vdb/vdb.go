@@ -495,7 +495,6 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
 	var filepath string
 	var vdb VDB
 	vdb.node_5 = *NewNode5()
-	fmt.Println(vol.Shape)
 	var buffer bytes.Buffer
 	identity_matrix := [4][4]float64{
 		{1, 0, 0, 0},
@@ -510,7 +509,6 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
 		}
 	}
 
-	fmt.Println("Setting VDB Voxels")
 	for t := 0; t < vol.Shape[3]; t++ {
 		for z := 0; z < vol.Shape[2]; z++ {
 			for y := 0; y < vol.Shape[1]; y++ {

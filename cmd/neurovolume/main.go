@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/joachimbbp/neurovolume/pkg/open"
 	"github.com/joachimbbp/neurovolume/pkg/vdb"
-	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
 func main() {
@@ -21,14 +21,10 @@ func main() {
 	*/
 
 	niftiPath := os.Args[1]
-
-	var img volume.Nifti1Image
-	img.LoadImage(niftiPath)
-	fmt.Println("Loaded ", img.Filepath, "\nHeader vals:\n	", img.Header) //TODO pretty print functions for debugging
-
-	vol := img.BuildVolume()
-	fmt.Println("volume shape: ", vol.Shape)
+	vol := open.NIfTI1(niftiPath)
+	fmt.Println(vol.BaseName, " loaded, shape: ", vol.Shape)
 	vol.NormalizeVolume()
+	fmt.Println("Normalized: ", vol.Normalized)
 
 	outputFolder := os.Args[2]
 	vol.SaveMetadata(outputFolder)
