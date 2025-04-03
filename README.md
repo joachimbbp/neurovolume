@@ -45,7 +45,7 @@ user_set_default_nifti = "/Users/username/repos/neurovolume/media/sub-01_T1w.nii
 
 # Why VDB?
 
-VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Unlike typical meshed-based pipelines using the marching cubes algorithm, our volume-based approach will preserve the scan’s normalized density data throughout the visualization pipeline. The animation support is particularly useful for animating BOLD response.
+VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Our volume-based approach aims to provide easy access to the original density data throughout the visualization and analysis pipeline.
 
 For more information on VDBs, see the [openVDB website](https://www.openvdb.org/)
 ![Loop of a BOLD image using the method of subtraction, motion extraction, and frame cross-dissolve frame interpolation](readme_media/bold_mos_me_loop.gif)
@@ -62,7 +62,7 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 - [x] Add fMRI Sequence import functionality in Blender Plugin
 - [x] Method of Subtraction from Neutral Stimulus
     - Exists in the `bold_diffing` notebook. Currently this gives the user the most control, although we should integrate this into the Blender plugin when we implement the native `NIFTI` file parsing.
-- [ ] Frame Interpolation Options for Realtime Playback (re implement in the Go-Backend)
+- [ ] Frame Interpolation Options for Realtime Playback (re-implement in the Go-Backend)
     - [ ] Cross dissolve
     - [ ] Morph
 

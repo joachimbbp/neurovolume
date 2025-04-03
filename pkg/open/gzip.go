@@ -1,4 +1,4 @@
-package volume
+package open
 
 import (
 	"compress/gzip"
@@ -9,7 +9,7 @@ import (
 )
 
 // Opens files whether or not they are gziped
-func gzipOpen(filepath string) (io.ReadCloser, error) { //from Heng Huang's repo
+func GZipOrAnything(filepath string) (io.ReadCloser, error) { //from Heng Huang's repo
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, err

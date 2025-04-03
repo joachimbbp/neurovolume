@@ -4,16 +4,19 @@
 - Step two, build volume with that image
 */
 
-package volume
+package open
 
 import (
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
+
+	"github.com/joachimbbp/neurovolume/pkg/utils"
+	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
-type Nifti1Header struct {
+type NIfTI1Header struct {
 	//from Heng Huang's repo
 
 	/**** 348 bytes total ****/
@@ -74,10 +77,10 @@ type Nifti1Header struct {
 	Magic [4]byte /*!< MUST be "ni1\0" or "n+1\0". */
 }
 
-func (header *Nifti1Header) loadHeader(filepath string) {
+func (header *NIfTI1Header) loadHeader(filepath string) {
 	fmt.Println("Loading Header")
 	//Right now gzipOpen is called twice, might not be the most performant
-	reader, gErr := gzipOpen(filepath)
+	reader, gErr := GZipOrAnything(filepath)
 	if gErr != nil {
 		panic(fmt.Sprintf("Error unzipping NIfTI1 Header:\n\t%s", gErr))
 	}
@@ -88,19 +91,20 @@ func (header *Nifti1Header) loadHeader(filepath string) {
 	}
 }
 
-type Nifti1Image struct {
+// Custom NIfTI1 Image for Neurovolume (probably more minimal than other "img" types)
+type NIfT1Image struct {
 	Data          [][][][]float64
-	Header        Nifti1Header
+	Header        NIfTI1Header
 	Filepath      string
 	bytesPerVoxel uint32
 	byte2floatF   func([]byte) float32
 	rawData       []byte
 }
 
-func (img *Nifti1Image) LoadImage(filepath string) {
+func (img *NIfT1Image) loadImage(filepath string) {
 	fmt.Println("Loading Image")
 	img.Filepath = filepath
-	var header Nifti1Header
+	var header NIfTI1Header
 	header.loadHeader(filepath)
 	img.Header = header
 	img.bytesPerVoxel = uint32(img.Header.Bitpix) / 8
@@ -130,7 +134,7 @@ func (img *Nifti1Image) LoadImage(filepath string) {
 	// Read in Raw data
 	var data []byte
 	var err error
-	reader, err := gzipOpen(filepath)
+	reader, err := GZipOrAnything(filepath)
 	if err != nil {
 		fmt.Println("open data error")
 		return
@@ -145,15 +149,17 @@ func (img *Nifti1Image) LoadImage(filepath string) {
 	img.rawData = data[uint(img.Header.VoxOffset):len(data)]
 }
 
-func (img *Nifti1Image) BuildVolume() Volume {
-	var vol Volume
+func NIfTI1(filepath string) volume.Volume {
+	var img NIfT1Image
+	img.loadImage(filepath)
+	var vol volume.Volume
 	vol.Shape = [4]int{
 		int(img.Header.Dim[1]),
 		int(img.Header.Dim[2]),
 		int(img.Header.Dim[3]),
 		int(img.Header.Dim[4]),
 	}
-	vol.BaseName = GetBasename(img.Filepath)
+	vol.BaseName = utils.GetBasename(img.Filepath)
 	switch img.Header.Datatype {
 	case 0:
 		vol.ScanDatatype = "unknown"
@@ -213,7 +219,7 @@ func (img *Nifti1Image) BuildVolume() Volume {
 	return vol
 }
 
-func (img *Nifti1Image) getAt(x int, y int, z int, t int, shape [4]int) float32 {
+func (img *NIfT1Image) getAt(x int, y int, z int, t int, shape [4]int) float32 {
 	nx := shape[0]
 	ny := shape[1]
 	nz := shape[2]
