@@ -46,9 +46,9 @@ func main() {
 	vdb.WriteFromVolume(&result, outputFolder, "")
 	experimental.SaveMetadata(outputFolder)
 	vdb.WriteFromVolume(&experimental, outputFolder, "")
-	// control.SaveMetadata(outputFolder)
-	// vdb.WriteFromVolume(&control, outputFolder, "")
+	control.SaveMetadata(outputFolder)
+	vdb.WriteFromVolume(&control, outputFolder, "")
 
-	// result.SetMean() //for debugging only
-	// result.PrintVolumeInfo()
+	result.SetMean() //for debugging only
+	result.PrintVolumeInfo()
 }
