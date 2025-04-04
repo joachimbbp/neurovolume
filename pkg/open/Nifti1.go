@@ -80,7 +80,7 @@ type NIfTI1Header struct {
 func (header *NIfTI1Header) loadHeader(filepath string) {
 	fmt.Println("Loading Header")
 	//Right now gzipOpen is called twice, might not be the most performant
-	reader, gErr := GZipOrAnything(filepath)
+	_, reader, gErr := GZipOrAnything(filepath)
 	if gErr != nil {
 		panic(fmt.Sprintf("Error unzipping NIfTI1 Header:\n\t%s", gErr))
 	}
@@ -99,6 +99,7 @@ type NIfT1Image struct {
 	bytesPerVoxel uint32
 	byte2floatF   func([]byte) float32
 	rawData       []byte
+	fromGZ        bool
 }
 
 func (img *NIfT1Image) loadImage(filepath string) {
@@ -131,10 +132,11 @@ func (img *NIfT1Image) loadImage(filepath string) {
 	default:
 		panic("(img *Nifti1Image) byte2float only supports 8, 16, 32, and 64-bit formats")
 	}
-	// Read in Raw data
+
 	var data []byte
 	var err error
-	reader, err := GZipOrAnything(filepath)
+	isGZ, reader, err := GZipOrAnything(filepath)
+	img.fromGZ = isGZ
 	if err != nil {
 		fmt.Println("open data error")
 		return
@@ -147,6 +149,7 @@ func (img *NIfT1Image) loadImage(filepath string) {
 		return
 	}
 	img.rawData = data[uint(img.Header.VoxOffset):len(data)]
+
 }
 
 func NIfTI1(filepath string) volume.Volume {
@@ -216,6 +219,11 @@ func NIfTI1(filepath string) volume.Volume {
 		}
 	}
 	vol.Normalized = false
+	if img.fromGZ {
+		vol.DerivedFrom = "NIfTI1 GZ"
+	} else {
+		vol.DerivedFrom = "NIfTI1"
+	}
 	return vol
 }
 

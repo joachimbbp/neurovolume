@@ -52,19 +52,21 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 
 
 # To-Do
-**Blender**
+**Blender (frontend)**
 - [x] Blender Plugin can directly import and process `NIFTI` files
     - [ ] Blender Plugin can implement method of subtraction for fMRI sequences
 - [ ] VDB Grid Alignment and Combination in Blender
 - [ ] GUI Loading animations
+- [ ] Method of Subtraction Module
+- [ ] Grid combination module
 
-**fMRI**
+**fMRI (backend)**
 - [x] Add fMRI Sequence import functionality in Blender Plugin
 - [x] Method of Subtraction from Neutral Stimulus
-    - Exists in the `bold_diffing` notebook. Currently this gives the user the most control, although we should integrate this into the Blender plugin when we implement the native `NIFTI` file parsing.
 - [ ] Frame Interpolation Options for Realtime Playback (re-implement in the Go-Backend)
     - [ ] Cross dissolve
     - [ ] Morph
+- [ ] BOLD and Anatomy Grid combination
 
 **Dev**
 - [ ] Increase performance in native VDB writer (try to match PyOpenVDB)
