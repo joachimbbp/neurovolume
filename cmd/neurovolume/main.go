@@ -33,7 +33,6 @@ func main() {
 
 	experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
 	control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
-
 	result := volume.Subtract(experimental, control)
 	fmt.Println(result.Shape)
 }
