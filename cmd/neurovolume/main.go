@@ -1,11 +1,6 @@
 package main
 
-import (
-	"fmt"
-
-	"github.com/joachimbbp/neurovolume/pkg/open"
-	"github.com/joachimbbp/neurovolume/pkg/volume"
-)
+import "github.com/joachimbbp/neurovolume/pkg/utils"
 
 func main() {
 	/*
@@ -31,8 +26,24 @@ func main() {
 		vdb.WriteFromVolume(&vol, outputFolder, "")
 	*/
 
-	experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
-	control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
-	result := volume.Subtract(experimental, control)
-	fmt.Println(result.Shape)
+	outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
+	utils.ClearOutputFolder(outputFolder)
+
+	// experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
+	// experimental.NormalizeVolume(true)
+	// control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
+	// control.NormalizeVolume(true)
+
+	// result := volume.Subtract(experimental, control)
+	// result.NormalizeVolume(true)
+
+	// result.SaveMetadata(outputFolder)
+	// vdb.WriteFromVolume(&result, outputFolder, "")
+	// experimental.SaveMetadata(outputFolder)
+	// vdb.WriteFromVolume(&experimental, outputFolder, "")
+	// control.SaveMetadata(outputFolder)
+	// vdb.WriteFromVolume(&control, outputFolder, "")
+
+	// result.SetMean() //for debugging only
+	// result.PrintVolumeInfo()
 }

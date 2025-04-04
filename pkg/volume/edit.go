@@ -16,7 +16,7 @@ func Subtract(experimental Volume, control Volume) Volume {
 			}
 		}
 	} else {
-		panic("Some kind of edge case")
+		fmt.Println("Experimental and Control are of equal length. Experimental: ", experimental.Shape, "Control: ", control.Shape)
 	}
 
 	var result Volume
@@ -30,10 +30,17 @@ func Subtract(experimental Volume, control Volume) Volume {
 				result.Data[x][y][z] = make([]float64, experimental.Shape[3])
 				for t := range experimental.Data[x][y][z] {
 					result.Data[x][y][z][t] = experimental.Data[x][y][z][t] - control.Data[x][y][z][t]
+					if result.Data[x][y][z][t] < 0.0 { //clip at zero
+						//fmt.Println("Clipping: ", result.Data[x][y][z][t])
+						result.Data[x][y][z][t] = 0.0
+					}
 				}
 			}
 		}
 	}
+	result.DerivedFrom = "Method of Subtraction"
+
+	result.BaseName = experimental.BaseName + "_MINUS_" + control.BaseName
 	return result
 }
 
@@ -72,5 +79,13 @@ func TrimFrames(input Volume, length int) Volume {
 			}
 		}
 	}
+
+	output.BaseName = input.BaseName + "_TRIMMED"
+	output.DerivedFrom = "Frame Trimming"
+	output.NormalizeVolume(true)
+	output.SetMean() //For debugging only
+	fmt.Println("New Volume from Frame Trimming info:")
+	output.PrintVolumeInfo()
+
 	return output
 }

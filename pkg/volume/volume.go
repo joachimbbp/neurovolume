@@ -9,14 +9,17 @@ import (
 )
 
 type Volume struct {
-	Data         [][][][]float64
-	Shape        [4]int  //Could probably clamp at int16 if memory becomes an issue
-	MinVal       float64 // For normalization
-	MaxVal       float64 // For normalization
-	Mean         float64
-	Normalized   bool
+	BaseName string
+	Data     [][][][]float64
+	Shape    [4]int //Could probably clamp at int16 if memory becomes an issue
+
+	Normalized bool
+	MinVal     float64 // For normalization
+	MaxVal     float64 // For normalization
+	Mean       float64
+
 	ScanDatatype string
-	BaseName     string
+	DerivedFrom  string
 }
 type Metadata struct {
 	Frames int
@@ -44,7 +47,8 @@ func (vol *Volume) SaveMetadata(outputFolder string) {
 }
 
 /*------- Math-y/Normalization things ---------*/
-func (vol *Volume) NormalizeVolume() {
+func (vol *Volume) NormalizeVolume(resetMinMax bool) {
+	fmt.Println("Normalizing Volume. Start minmax:")
 	vol.MinMax(true)
 	for x := 0; x < vol.Shape[0]; x++ {
 		for y := 0; y < vol.Shape[1]; y++ {
@@ -55,6 +59,10 @@ func (vol *Volume) NormalizeVolume() {
 				}
 			}
 		}
+	}
+	if resetMinMax {
+		fmt.Println("Volume Normalized. End minmax should be 0.0-1.0:")
+		vol.MinMax(true)
 	}
 	vol.Normalized = true
 }
@@ -168,4 +176,15 @@ func (vol *Volume) GetMiddleSlices() ([][]float64, [][]float64, [][]float64) {
 	}
 	//Currently the orientation is a bit weird but that's okay!
 	return horizontal, coronal, sagittal
+}
+
+func (vol *Volume) PrintVolumeInfo() {
+	fmt.Println("Volume Information:")
+	fmt.Println("	Basename: ", vol.BaseName)
+	fmt.Println("	Shape: ", vol.Shape)
+	fmt.Println("	Normalized: ", vol.Normalized)
+	fmt.Println("	Min val:", vol.MinVal, "Max val: ", vol.MaxVal)
+	fmt.Println("	Mean: ", vol.Mean)
+	fmt.Println("	Scan Derived From: ", vol.DerivedFrom)
+	fmt.Println("	Original Scan Datatype: ", vol.ScanDatatype)
 }
