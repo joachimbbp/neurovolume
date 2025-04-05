@@ -56,9 +56,20 @@ func main() {
 	//interpolation testing:
 	outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
 	utils.ClearOutputFolder(outputFolder)
+
 	experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
-	stretched := volume.DissolveToRealtime(&experimental, 24)
+	experimental.NormalizeVolume(true)
+
+	control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
+	control.NormalizeVolume(true)
+
+	mos := volume.SubtractAndClip(experimental, control)
+	mos.NormalizeVolume(true)
+
+	stretched := volume.DissolveToRealtime(&mos, 24)
 	stretched.NormalizeVolume(true)
+
+	vdb.WriteFromVolume(&mos, outputFolder, "")
 	vdb.WriteFromVolume(&stretched, outputFolder, "")
 	stretched.PrintVolumeInfo()
 }

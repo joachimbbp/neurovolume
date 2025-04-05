@@ -52,10 +52,12 @@ func DissolveToRealtime(input *Volume, outputFPS float32) Volume {
 						ogFrameIndex += 1
 
 					} else { //This is an interframe
+						//fmt.Println("interframe at ", x, y, z, t)
 						interframeIndex += 1
-						aScalar = float64((frameDuration - interframeIndex) / frameDuration)
-						bScalar = float64(interframeIndex / frameDuration)
+						aScalar = float64(frameDuration-interframeIndex) / float64(frameDuration)
+						bScalar = float64(interframeIndex) / float64(frameDuration)
 						stretched.Data[x][y][z][t] = (aVox * aScalar) + (bVox * bScalar)
+						// fmt.Println(stretched.Data[x][y][z][t])
 					}
 
 				}

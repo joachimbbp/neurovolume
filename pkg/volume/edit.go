@@ -4,6 +4,7 @@ import "fmt"
 
 // subtracts the control from the experimental data and clips all negative values at zero
 func SubtractAndClip(experimental Volume, control Volume) Volume {
+	//maybe this should take pointers instead?
 	if experimental.Shape[3] != control.Shape[3] {
 		fmt.Printf("Mismatched Frame Lengths: experimental: %v control: %v\n", experimental.Shape[3], control.Shape[3])
 		if control.Shape[0] == experimental.Shape[0] && control.Shape[1] == experimental.Shape[1] && control.Shape[2] == experimental.Shape[2] {
