@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/joachimbbp/neurovolume/pkg/open"
+	"github.com/joachimbbp/neurovolume/pkg/utils"
+	"github.com/joachimbbp/neurovolume/pkg/vdb"
 	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
@@ -52,8 +54,11 @@ func main() {
 	// result.PrintVolumeInfo()
 
 	//interpolation testing:
-	// outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
+	outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
+	utils.ClearOutputFolder(outputFolder)
 	experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
 	stretched := volume.DissolveToRealtime(&experimental, 24)
+	stretched.NormalizeVolume(true)
+	vdb.WriteFromVolume(&stretched, outputFolder, "")
 	stretched.PrintVolumeInfo()
 }

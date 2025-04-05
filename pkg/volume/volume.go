@@ -183,7 +183,7 @@ func (vol *Volume) PrintVolumeInfo() {
 	fmt.Println("Volume Information:")
 	fmt.Println("	Basename: ", vol.BaseName)
 	fmt.Println("	Shape: ", vol.Shape)
-	fmt.Println("	Frames Per Second: ", vol.FPS)
+	fmt.Println("	Frames Per Second: ", vol.ScanDatatype)
 	fmt.Println("	Normalized: ", vol.Normalized)
 	fmt.Println("	Min val:", vol.MinVal, "Max val: ", vol.MaxVal)
 	fmt.Println("	Mean: ", vol.Mean)
