@@ -11,7 +11,8 @@ import (
 type Volume struct {
 	BaseName string
 	Data     [][][][]float64
-	Shape    [4]int //Could probably clamp at int16 if memory becomes an issue
+	Shape    [4]int  //Could probably clamp at int16 if memory becomes an issue
+	FPS      float32 //Frames Per Second
 
 	Normalized bool
 	MinVal     float64 // For normalization
@@ -19,7 +20,7 @@ type Volume struct {
 	Mean       float64
 
 	ScanDatatype string
-	DerivedFrom  string
+	DerivedFrom  string //Last stage of creation (perhaps make a list later, or linked list to previous vol, bigger question with modifier stack tbh)
 }
 type Metadata struct {
 	Frames int
@@ -182,6 +183,7 @@ func (vol *Volume) PrintVolumeInfo() {
 	fmt.Println("Volume Information:")
 	fmt.Println("	Basename: ", vol.BaseName)
 	fmt.Println("	Shape: ", vol.Shape)
+	fmt.Println("	Frames Per Second: ", vol.FPS)
 	fmt.Println("	Normalized: ", vol.Normalized)
 	fmt.Println("	Min val:", vol.MinVal, "Max val: ", vol.MaxVal)
 	fmt.Println("	Mean: ", vol.Mean)

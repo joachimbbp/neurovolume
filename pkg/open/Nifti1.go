@@ -156,6 +156,13 @@ func NIfTI1(filepath string) volume.Volume {
 	var img NIfT1Image
 	img.loadImage(filepath)
 	var vol volume.Volume
+
+	if img.Header.Pixdim[4] == 0 {
+		vol.FPS = 0
+	} else {
+		vol.FPS = 1 / img.Header.Pixdim[4] //Pixdim[4] being seconds per frame
+	}
+
 	vol.Shape = [4]int{
 		int(img.Header.Dim[1]),
 		int(img.Header.Dim[2]),

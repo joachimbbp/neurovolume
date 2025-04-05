@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/joachimbbp/neurovolume/pkg/open"
+	"github.com/joachimbbp/neurovolume/pkg/utils"
 	"github.com/joachimbbp/neurovolume/pkg/vdb"
 )
 
@@ -21,10 +22,12 @@ func main() {
 	*/
 
 	niftiPath := os.Args[1]
+	outputFolder := os.Args[2]
+	utils.ClearOutputFolder(outputFolder)
+
 	vol := open.NIfTI1(niftiPath)
 	vol.NormalizeVolume(true)
 
-	outputFolder := os.Args[2]
 	vol.SaveMetadata(outputFolder)
 	vdb.WriteFromVolume(&vol, outputFolder, "")
 	fmt.Println("Read in Volume:")
@@ -33,7 +36,6 @@ func main() {
 	//METHOD OF SUBTRACTION, hard coded example:
 	/*
 		outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
-		utils.ClearOutputFolder(outputFolder)
 
 		experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
 		experimental.NormalizeVolume(true)

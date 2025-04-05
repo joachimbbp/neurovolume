@@ -40,7 +40,7 @@ func SubtractAndClip(experimental Volume, control Volume) Volume {
 		}
 	}
 	result.DerivedFrom = "Method of Subtraction"
-
+	result.FPS = experimental.FPS
 	result.BaseName = experimental.BaseName + "_MINUS_" + control.BaseName
 	return result
 }
@@ -82,6 +82,7 @@ func TrimFrames(input Volume, length int) Volume {
 	}
 
 	output.BaseName = input.BaseName + "_TRIMMED"
+	output.FPS = input.FPS
 	output.DerivedFrom = "Frame Trimming"
 	output.NormalizeVolume(true)
 	output.SetMean() //For debugging only
