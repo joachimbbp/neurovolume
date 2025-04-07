@@ -43,7 +43,9 @@ def vdb_frames_sort(entry: dict):
 
 def load_vdb(nifti_filepath):
     print("Creating VDB from NIfTI File")
+    print("     NIfTI Filepath: ", nifti_filepath)
     output_filepath = user_set_output_path
+    print("     Output Folder: ", output_filepath)
     exe_path = user_set_exe_path
 
     os.system(f"{exe_path} {nifti_filepath} {output_filepath}")

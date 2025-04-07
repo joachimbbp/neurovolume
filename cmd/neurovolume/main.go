@@ -1,10 +1,11 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/joachimbbp/neurovolume/pkg/open"
-	"github.com/joachimbbp/neurovolume/pkg/utils"
 	"github.com/joachimbbp/neurovolume/pkg/vdb"
-	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
 func main() {
@@ -19,57 +20,35 @@ func main() {
 
 	*/
 
-	// niftiPath := os.Args[1]
-	// outputFolder := os.Args[2]
-	// utils.ClearOutputFolder(outputFolder)
+	niftiPath := os.Args[1]
+	outputFolder := os.Args[2]
+	//utils.ClearOutputFolder(outputFolder)
 
-	// vol := open.NIfTI1(niftiPath)
-	// vol.NormalizeVolume(true)
+	vol := open.NIfTI1(niftiPath)
+	vol.NormalizeVolume(true)
 
-	// vol.SaveMetadata(outputFolder)
-	// vdb.WriteFromVolume(&vol, outputFolder, "")
-	// fmt.Println("Read in Volume:")
-	// vol.PrintVolumeInfo()
+	vol.SaveMetadata(outputFolder)
+	vdb.WriteFromVolume(&vol, outputFolder, "")
+	fmt.Println("Read in Volume:")
+	vol.PrintVolumeInfo()
 
-	//METHOD OF SUBTRACTION, hard coded example:
-
+	/*--------Method of Subtraction with Interpolation: --------------*/
 	// outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
+	// utils.ClearOutputFolder(outputFolder)
 
 	// experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
 	// experimental.NormalizeVolume(true)
+
 	// control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
 	// control.NormalizeVolume(true)
 
-	// result := volume.SubtractAndClip(experimental, control)
-	// result.NormalizeVolume(true)
+	// mos := volume.SubtractAndClip(experimental, control)
+	// mos.NormalizeVolume(true)
 
-	// result.SaveMetadata(outputFolder)
-	// vdb.WriteFromVolume(&result, outputFolder, "")
-	// experimental.SaveMetadata(outputFolder)
-	// vdb.WriteFromVolume(&experimental, outputFolder, "")
-	// control.SaveMetadata(outputFolder)
-	// vdb.WriteFromVolume(&control, outputFolder, "")
+	// stretched := volume.DissolveToRealtime(&mos, 24)
+	// stretched.NormalizeVolume(true)
 
-	// result.SetMean() //for debugging only
-	// result.PrintVolumeInfo()
-
-	//interpolation testing:
-	outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
-	utils.ClearOutputFolder(outputFolder)
-
-	experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
-	experimental.NormalizeVolume(true)
-
-	control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
-	control.NormalizeVolume(true)
-
-	mos := volume.SubtractAndClip(experimental, control)
-	mos.NormalizeVolume(true)
-
-	stretched := volume.DissolveToRealtime(&mos, 24)
-	stretched.NormalizeVolume(true)
-
-	vdb.WriteFromVolume(&mos, outputFolder, "")
-	vdb.WriteFromVolume(&stretched, outputFolder, "")
-	stretched.PrintVolumeInfo()
+	// vdb.WriteFromVolume(&mos, outputFolder, "")
+	// vdb.WriteFromVolume(&stretched, outputFolder, "")
+	// stretched.PrintVolumeInfo()
 }
