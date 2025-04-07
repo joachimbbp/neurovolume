@@ -70,7 +70,7 @@ func (vol *Volume) NormalizeVolume(resetMinMax bool) {
 func (vol *Volume) SetMean() {
 	var sum float64 = 0
 	var len float64 = 0
-	shape := vol.Shape
+	shape := vol.Shape //kinda redundant?
 	for x := 0; x < shape[0]; x++ {
 		for y := 0; y < shape[1]; y++ {
 			for z := 0; z < shape[2]; z++ {
