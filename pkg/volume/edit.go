@@ -2,7 +2,11 @@ package volume
 
 import "fmt"
 
-// subtracts the control from the experimental data and clips all negative values at zero
+/*
+	subtracts the control from the experimental data and clips all negative values at zero
+
+Low-key deprecated though, you *really* don't want to be losing this data!
+*/
 func SubtractAndClip(experimental Volume, control Volume) Volume {
 	//maybe this should take pointers instead?
 	if experimental.Shape[3] != control.Shape[3] {
