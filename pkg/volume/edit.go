@@ -2,8 +2,13 @@ package volume
 
 import "fmt"
 
-// subtracts the control from the experimental data and clips all negative values at zero
+/*
+	subtracts the control from the experimental data and clips all negative values at zero
+
+Low-key deprecated though, you *really* don't want to be losing this data!
+*/
 func SubtractAndClip(experimental Volume, control Volume) Volume {
+	//maybe this should take pointers instead?
 	if experimental.Shape[3] != control.Shape[3] {
 		fmt.Printf("Mismatched Frame Lengths: experimental: %v control: %v\n", experimental.Shape[3], control.Shape[3])
 		if control.Shape[0] == experimental.Shape[0] && control.Shape[1] == experimental.Shape[1] && control.Shape[2] == experimental.Shape[2] {
@@ -40,7 +45,7 @@ func SubtractAndClip(experimental Volume, control Volume) Volume {
 		}
 	}
 	result.DerivedFrom = "Method of Subtraction"
-
+	result.FPS = experimental.FPS
 	result.BaseName = experimental.BaseName + "_MINUS_" + control.BaseName
 	return result
 }
@@ -82,6 +87,7 @@ func TrimFrames(input Volume, length int) Volume {
 	}
 
 	output.BaseName = input.BaseName + "_TRIMMED"
+	output.FPS = input.FPS
 	output.DerivedFrom = "Frame Trimming"
 	output.NormalizeVolume(true)
 	output.SetMean() //For debugging only

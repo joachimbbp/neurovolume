@@ -63,8 +63,8 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 **fMRI (backend)**
 - [x] Add fMRI Sequence import functionality in Blender Plugin
 - [x] Method of Subtraction from Neutral Stimulus
-- [ ] Frame Interpolation Options for Realtime Playback (re-implement in the Go-Backend)
-    - [ ] Cross dissolve
+- [x] Frame Interpolation Options for Realtime Playback (re-implement in the Go-Backend)
+    - [x] Cross dissolve
     - [ ] Morph
 - [ ] BOLD and Anatomy Grid combination
 

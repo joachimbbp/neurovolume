@@ -21,36 +21,34 @@ func main() {
 	*/
 
 	niftiPath := os.Args[1]
+	outputFolder := os.Args[2]
+	//utils.ClearOutputFolder(outputFolder)
+
 	vol := open.NIfTI1(niftiPath)
 	vol.NormalizeVolume(true)
 
-	outputFolder := os.Args[2]
 	vol.SaveMetadata(outputFolder)
 	vdb.WriteFromVolume(&vol, outputFolder, "")
 	fmt.Println("Read in Volume:")
 	vol.PrintVolumeInfo()
 
-	//METHOD OF SUBTRACTION, hard coded example:
-	/*
-		outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
-		utils.ClearOutputFolder(outputFolder)
+	/*--------Method of Subtraction with Interpolation: --------------*/
+	// outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
+	// utils.ClearOutputFolder(outputFolder)
 
-		experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
-		experimental.NormalizeVolume(true)
-		control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
-		control.NormalizeVolume(true)
+	// experimental := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
+	// experimental.NormalizeVolume(true)
 
-		result := volume.SubtractAndClip(experimental, control)
-		result.NormalizeVolume(true)
+	// control := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-rest_bold.nii.gz")
+	// control.NormalizeVolume(true)
 
-		result.SaveMetadata(outputFolder)
-		vdb.WriteFromVolume(&result, outputFolder, "")
-		experimental.SaveMetadata(outputFolder)
-		vdb.WriteFromVolume(&experimental, outputFolder, "")
-		control.SaveMetadata(outputFolder)
-		vdb.WriteFromVolume(&control, outputFolder, "")
+	// mos := volume.SubtractAndClip(experimental, control)
+	// mos.NormalizeVolume(true)
 
-		result.SetMean() //for debugging only
-		result.PrintVolumeInfo()
-	*/
+	// stretched := volume.DissolveToRealtime(&mos, 24)
+	// stretched.NormalizeVolume(true)
+
+	// vdb.WriteFromVolume(&mos, outputFolder, "")
+	// vdb.WriteFromVolume(&stretched, outputFolder, "")
+	// stretched.PrintVolumeInfo()
 }
