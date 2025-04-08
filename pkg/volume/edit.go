@@ -7,7 +7,7 @@ import "fmt"
 
 Low-key deprecated though, you *really* don't want to be losing this data!
 */
-func SubtractAndClip(experimental Volume, control Volume) Volume {
+func SubtractAndClip(experimental Grid, control Grid) Grid {
 	//maybe this should take pointers instead?
 	if experimental.Shape[3] != control.Shape[3] {
 		fmt.Printf("Mismatched Frame Lengths: experimental: %v control: %v\n", experimental.Shape[3], control.Shape[3])
@@ -25,7 +25,7 @@ func SubtractAndClip(experimental Volume, control Volume) Volume {
 		fmt.Println("Experimental and Control are of equal length. Experimental: ", experimental.Shape, "Control: ", control.Shape)
 	}
 
-	var result Volume
+	var result Grid
 	result.Shape = experimental.Shape
 	result.Data = make([][][][]float64, result.Shape[0])
 	for x := range experimental.Data {
@@ -50,7 +50,7 @@ func SubtractAndClip(experimental Volume, control Volume) Volume {
 	return result
 }
 
-func TrimFrames(input Volume, length int) Volume {
+func TrimFrames(input Grid, length int) Grid {
 	fmt.Println("Trimming frames. Length:", length, " input shape: ", input.Shape)
 
 	if length > input.Shape[3] {
@@ -58,7 +58,7 @@ func TrimFrames(input Volume, length int) Volume {
 		return input
 	}
 
-	var output Volume
+	var output Grid
 	output.Shape = [4]int{
 		input.Shape[0],
 		input.Shape[1],

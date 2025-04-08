@@ -459,7 +459,7 @@ func WriteSphere() {
 }
 
 // Create a sub folder by having a tag_with_a_slash/
-func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
+func WriteFromVolume(grid *volume.Grid, outputFolder string, tag string) {
 	var seqOutputFolder string
 	var filepath string
 	var vdb VDB
@@ -471,29 +471,29 @@ func WriteFromVolume(vol *volume.Volume, outputFolder string, tag string) {
 		{0, 0, 1, 0},
 		{0, 0, 0, 1},
 	}
-	if vol.Shape[3] != 1 {
-		seqOutputFolder = fmt.Sprintf("%s/%s_seq", outputFolder, vol.BaseName)
+	if grid.Shape[3] != 1 {
+		seqOutputFolder = fmt.Sprintf("%s/%s_seq", outputFolder, grid.BaseName)
 		if err := os.MkdirAll(seqOutputFolder, os.ModePerm); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	for t := 0; t < vol.Shape[3]; t++ {
-		for z := 0; z < vol.Shape[2]; z++ {
-			for y := 0; y < vol.Shape[1]; y++ {
-				for x := 0; x < vol.Shape[0]; x++ {
-					voxel := float32(vol.Data[x][y][z][t])
+	for t := 0; t < grid.Shape[3]; t++ {
+		for z := 0; z < grid.Shape[2]; z++ {
+			for y := 0; y < grid.Shape[1]; y++ {
+				for x := 0; x < grid.Shape[0]; x++ {
+					voxel := float32(grid.Data[x][y][z][t])
 					set_voxel(&vdb, [3]uint32{uint32(x), uint32(y), uint32(z)}, voxel)
 				}
 			}
 		}
-		if vol.Shape[3] == 1 {
+		if grid.Shape[3] == 1 {
 			//Single, static VDB
-			filepath = fmt.Sprintf("%s/%s%s.vdb", outputFolder, vol.BaseName, tag)
+			filepath = fmt.Sprintf("%s/%s%s.vdb", outputFolder, grid.BaseName, tag)
 			fmt.Println("	Writing Static VDB to ", filepath)
 		} else {
 			//VDB Sequence
-			filepath = fmt.Sprintf("%s/%s%s_%04d.vdb", seqOutputFolder, vol.BaseName, tag, t)
+			filepath = fmt.Sprintf("%s/%s%s_%04d.vdb", seqOutputFolder, grid.BaseName, tag, t)
 			fmt.Println("	Writing VDB frame to ", filepath)
 		}
 

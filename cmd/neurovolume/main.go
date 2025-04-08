@@ -24,13 +24,13 @@ func main() {
 	outputFolder := os.Args[2]
 	//utils.ClearOutputFolder(outputFolder)
 
-	vol := open.NIfTI1(niftiPath)
-	vol.NormalizeVolume(true)
+	grid := open.NIfTI1(niftiPath)
+	grid.NormalizeVolume(true)
 
-	vol.SaveMetadata(outputFolder)
-	vdb.WriteFromVolume(&vol, outputFolder, "")
-	fmt.Println("Read in Volume:")
-	vol.PrintVolumeInfo()
+	grid.SaveMetadata(outputFolder)
+	vdb.WriteFromVolume(&grid, outputFolder, "")
+	fmt.Println("Read in Grid:")
+	grid.PrintVolumeInfo()
 
 	/*--------Method of Subtraction with Interpolation: --------------*/
 	// outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"

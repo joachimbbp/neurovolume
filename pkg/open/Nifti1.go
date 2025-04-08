@@ -152,86 +152,86 @@ func (img *NIfT1Image) loadImage(filepath string) {
 
 }
 
-func NIfTI1(filepath string) volume.Volume {
+func NIfTI1(filepath string) volume.Grid {
 	var img NIfT1Image
 	img.loadImage(filepath)
-	var vol volume.Volume
+	var grid volume.Grid
 
 	if img.Header.Pixdim[4] == 0 {
-		vol.FPS = 0
+		grid.FPS = 0
 	} else {
-		vol.FPS = 1 / img.Header.Pixdim[4] //Pixdim[4] being seconds per frame
+		grid.FPS = 1 / img.Header.Pixdim[4] //Pixdim[4] being seconds per frame
 	}
 
-	vol.Shape = [4]int{
+	grid.Shape = [4]int{
 		int(img.Header.Dim[1]),
 		int(img.Header.Dim[2]),
 		int(img.Header.Dim[3]),
 		int(img.Header.Dim[4]),
 	}
-	vol.BaseName = utils.GetBasename(img.Filepath)
+	grid.BaseName = utils.GetBasename(img.Filepath)
 	switch img.Header.Datatype {
 	case 0:
-		vol.ScanDatatype = "unknown"
+		grid.ScanDatatype = "unknown"
 	case 1:
-		vol.ScanDatatype = "bool"
+		grid.ScanDatatype = "bool"
 	case 2:
-		vol.ScanDatatype = "unsigned char"
+		grid.ScanDatatype = "unsigned char"
 	case 4:
-		vol.ScanDatatype = "signed short"
+		grid.ScanDatatype = "signed short"
 	case 8:
-		vol.ScanDatatype = "signed int"
+		grid.ScanDatatype = "signed int"
 	case 16:
-		vol.ScanDatatype = "float"
+		grid.ScanDatatype = "float"
 	case 32:
-		vol.ScanDatatype = "complex"
+		grid.ScanDatatype = "complex"
 	case 64:
-		vol.ScanDatatype = "double"
+		grid.ScanDatatype = "double"
 	case 128:
-		vol.ScanDatatype = "rgb"
+		grid.ScanDatatype = "rgb"
 	case 255:
-		vol.ScanDatatype = "all"
+		grid.ScanDatatype = "all"
 	case 256:
-		vol.ScanDatatype = "signed char"
+		grid.ScanDatatype = "signed char"
 	case 512:
-		vol.ScanDatatype = "unsigned short"
+		grid.ScanDatatype = "unsigned short"
 	case 768:
-		vol.ScanDatatype = "unsigned int"
+		grid.ScanDatatype = "unsigned int"
 	case 1024:
-		vol.ScanDatatype = "long long"
+		grid.ScanDatatype = "long long"
 	case 1280:
-		vol.ScanDatatype = "unsigned long long"
+		grid.ScanDatatype = "unsigned long long"
 	case 1536:
-		vol.ScanDatatype = "long double"
+		grid.ScanDatatype = "long double"
 	case 1792:
-		vol.ScanDatatype = "double pair"
+		grid.ScanDatatype = "double pair"
 	case 2048:
-		vol.ScanDatatype = "long double pair"
+		grid.ScanDatatype = "long double pair"
 	case 2304:
-		vol.ScanDatatype = "rgba"
+		grid.ScanDatatype = "rgba"
 	default:
-		vol.ScanDatatype = "unknown"
+		grid.ScanDatatype = "unknown"
 	}
-	vol.Data = make([][][][]float64, vol.Shape[0])
-	for x := range vol.Data {
-		vol.Data[x] = make([][][]float64, vol.Shape[1])
-		for y := range vol.Data[x] {
-			vol.Data[x][y] = make([][]float64, vol.Shape[2])
-			for z := range vol.Data[x][y] {
-				vol.Data[x][y][z] = make([]float64, vol.Shape[3])
-				for t := range vol.Data[x][y][z] {
-					vol.Data[x][y][z][t] = float64(img.getAt(x, y, z, t, vol.Shape))
+	grid.Data = make([][][][]float64, grid.Shape[0])
+	for x := range grid.Data {
+		grid.Data[x] = make([][][]float64, grid.Shape[1])
+		for y := range grid.Data[x] {
+			grid.Data[x][y] = make([][]float64, grid.Shape[2])
+			for z := range grid.Data[x][y] {
+				grid.Data[x][y][z] = make([]float64, grid.Shape[3])
+				for t := range grid.Data[x][y][z] {
+					grid.Data[x][y][z][t] = float64(img.getAt(x, y, z, t, grid.Shape))
 				}
 			}
 		}
 	}
-	vol.Normalized = false
+	grid.Normalized = false
 	if img.fromGZ {
-		vol.DerivedFrom = "NIfTI1 GZ"
+		grid.DerivedFrom = "NIfTI1 GZ"
 	} else {
-		vol.DerivedFrom = "NIfTI1"
+		grid.DerivedFrom = "NIfTI1"
 	}
-	return vol
+	return grid
 }
 
 func (img *NIfT1Image) getAt(x int, y int, z int, t int, shape [4]int) float32 {

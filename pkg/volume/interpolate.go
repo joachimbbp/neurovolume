@@ -6,8 +6,8 @@ import (
 )
 
 // Creates a volume based on
-func DissolveToRealtime(input *Volume, outputFPS float32) Volume {
-	var stretched Volume
+func DissolveToRealtime(input *Grid, outputFPS float32) Grid {
+	var stretched Grid
 	stretched.Data = make([][][][]float64, stretched.Shape[0])
 	stretched.FPS = outputFPS
 	frameDuration := int(outputFPS / 0.5)
