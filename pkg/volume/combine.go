@@ -28,10 +28,10 @@ func (a *affine3D) apply(input point) point {
 	return output
 }
 
-// Adds bold
-func AddBold(bold Grid, transform affine3D) Grid {
-	totalPoints := bold.Shape[0] * bold.Shape[1] * bold.Shape[2] * bold.Shape[3]
-	cloud := make([]point, totalPoints)
+// Adds bold to
+func CombineAnatAndBold(bold Grid, anat Grid) {
+	//totalPoints := bold.Shape[0] * bold.Shape[1] * bold.Shape[2] * bold.Shape[3]
+	var cloud []point
 
 	var maxX int = 0
 	var maxY int = 0
@@ -42,7 +42,7 @@ func AddBold(bold Grid, transform affine3D) Grid {
 		for y := 0; y < bold.Shape[1]; y++ {
 			for z := 0; z < bold.Shape[2]; z++ {
 				for t := 0; t < bold.Shape[3]; t++ {
-					newPoint = transform.apply(point{x: float32(x), y: float32(y), z: float32(z), value: bold.Data[x][y][z][t]})
+					newPoint = bold.SpatialTransform.apply(point{x: float32(x), y: float32(y), z: float32(z), value: bold.Data[x][y][z][t]})
 					cloud = append(cloud, newPoint)
 
 					if newPoint.x > float32(maxX) {
@@ -60,10 +60,24 @@ func AddBold(bold Grid, transform affine3D) Grid {
 
 	}
 
-	var output Grid
-	output.Shape = [4]int{maxX, maxY, maxZ}
-	return output
+	// Now move through the anatomy scan and match
+	for x := 0; x < anat.Shape[0]; x++ {
+		for y := 0; y < anat.Shape[1]; y++ {
+			for z := 0; z < anat.Shape[2]; z++ {
+				for t := 0; t < anat.Shape[3]; t++ {
+					print(t) //bye red squiggles
+					//check if there is a cloud point "here"
+					//best way of thinking about this?
+					//probably hash the cloud to return a
+				}
+			}
+		}
+	}
 
+}
+
+func GetAverageBoldValues(x, y, z, t int, cloud []point) {
+	//
 }
 
 // func (vol *Volume) FromCloud(cloud []point) Volume {
