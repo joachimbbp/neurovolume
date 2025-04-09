@@ -1,6 +1,9 @@
 package volume
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type point struct {
 	x, y, z, t float64
@@ -43,7 +46,7 @@ func (affine *affine3D) rotateZ(theta float64) {
 }
 
 // Adds bold to
-func CombineAnatAndBold(bold Grid, anat Grid) {
+func CombineAnatAndBold(bold Grid, anat Grid) Grid {
 	//totalPoints := bold.Shape[0] * bold.Shape[1] * bold.Shape[2] * bold.Shape[3]
 	var cloud []point
 	var newPoint point
@@ -59,12 +62,14 @@ func CombineAnatAndBold(bold Grid, anat Grid) {
 		}
 
 	}
+	fmt.Println("Bold cloud created")
 
 	var transformedBold Grid
 	transformedBold.Shape = anat.Shape //Were just clipping it to the anatomy bounds for now
 
 	// Now move through the anatomy scan and match
 	for x := 0; x < anat.Shape[0]; x++ {
+		fmt.Println("X: ", x)
 		for y := 0; y < anat.Shape[1]; y++ {
 			for z := 0; z < anat.Shape[2]; z++ {
 				for t := 0; t < anat.Shape[3]; t++ {
@@ -73,6 +78,9 @@ func CombineAnatAndBold(bold Grid, anat Grid) {
 			}
 		}
 	}
+	fmt.Println("Bold grid created")
+
+	return transformedBold
 
 }
 
@@ -96,6 +104,7 @@ func getAverageBoldValues(x, y, z, t int, cloud []point) float64 {
 			if yff <= point.y && point.y <= yfc {
 				if zff <= point.z && point.z <= zfc {
 					if tff <= point.t && point.t <= tfc {
+						//fmt.Println("Adding ", point.value, "from ", x, y, z)
 						totalScalar += point.value
 					}
 				}

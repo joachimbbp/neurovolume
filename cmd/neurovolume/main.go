@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/joachimbbp/neurovolume/pkg/open"
-	"github.com/joachimbbp/neurovolume/pkg/vdb"
+	"github.com/joachimbbp/neurovolume/pkg/render"
+	"github.com/joachimbbp/neurovolume/pkg/utils"
+	"github.com/joachimbbp/neurovolume/pkg/volume"
 )
 
 func main() {
@@ -20,19 +21,36 @@ func main() {
 
 	*/
 
-	niftiPath := os.Args[1]
-	outputFolder := os.Args[2]
-	//utils.ClearOutputFolder(outputFolder)
+	outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
+	utils.ClearOutputFolder(outputFolder)
 
-	grid := open.NIfTI1(niftiPath)
-	grid.NormalizeVolume(true)
+	bold := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii.gz")
+	bold.NormalizeVolume(true)
 
-	grid.SaveMetadata(outputFolder)
-	vdb.WriteFromVolume(&grid, outputFolder, "")
-	fmt.Println("Read in Grid:")
-	grid.PrintVolumeInfo()
+	anat := open.NIfTI1("/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii.gz")
+	anat.NormalizeVolume(true)
 
-	/*--------Method of Subtraction with Interpolation: --------------*/
+	transformedBold := volume.CombineAnatAndBold(bold, anat)
+
+	fmt.Println("Rendering")
+	tmid, _, _ := render.GetMiddleSlices(&transformedBold)
+	render.SaveAsImage(tmid, outputFolder+"/"+"transfomredBold.png")
+
+	/* // Default
+	// niftiPath := os.Args[1]
+	// outputFolder := os.Args[2]
+	// //utils.ClearOutputFolder(outputFolder)
+
+	// grid := open.NIfTI1(niftiPath)
+	// grid.NormalizeVolume(true)
+
+	// grid.SaveMetadata(outputFolder)
+	// vdb.WriteFromVolume(&grid, outputFolder, "")
+	// fmt.Println("Read in Grid:")
+	// grid.PrintVolumeInfo()
+	*/
+
+	/* //--------Method of Subtraction with Interpolation: --------------
 	// outputFolder := "/Users/joachimpfefferkorn/repos/neurovolume/output"
 	// utils.ClearOutputFolder(outputFolder)
 
@@ -51,4 +69,5 @@ func main() {
 	// vdb.WriteFromVolume(&mos, outputFolder, "")
 	// vdb.WriteFromVolume(&stretched, outputFolder, "")
 	// stretched.PrintVolumeInfo()
+	*/
 }
