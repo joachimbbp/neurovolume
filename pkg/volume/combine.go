@@ -1,72 +1,74 @@
 package volume
 
+import "math"
+
 type point struct {
-	x, y, z, t float32
+	x, y, z, t float64
 	value      float64
 }
 
 type affine3D struct {
-	// Row-major 3x4 matrix:
-	// [ x1 x2 x3 tx ]
-	// [ y1 y2 y3 ty ]
-	// [ z1 z2 z3 tz ]
-	// [ 0  0  0  1  ] ????
-	x1, x2, x3, tx float32
-	y1, y2, y3, ty float32
-	z1, z2, z3, tz float32
+	a1, a2, a3, a4 float64
+	b1, b2, b3, b4 float64
+	c1, c2, c3, c4 float64
 }
 
-func (a *affine3D) apply(input point) point {
+func (affine *affine3D) apply(input point) point {
+	// the t of the input point will be always set to 1
+	// while input is 4D, the transform will only take place within 3D
+
 	var output point
 	output.value = input.value
 
-	output.x = a.x1*input.x + a.x2*input.y + a.x3*input.z + a.tx
-	output.y = a.y1*input.x + a.y2*input.y + a.y3*input.z + a.ty
-	output.z = a.z1*input.x + a.z2*input.y + a.z3*input.z + a.tz
+	output.x = affine.a1*input.x + affine.a2*input.y + affine.a3*input.z
+	output.y = affine.b1*input.x + affine.b2*input.y + affine.b3*input.z
+	output.z = affine.c1*input.x + affine.c2*input.y + affine.c3*input.z
+
 	return output
+}
+
+// yaw
+func (affine *affine3D) rotateZ(theta float64) {
+	affine.a1 = math.Cos(theta)
+	affine.b1 = math.Sin(theta)
+	affine.c1 = 0
+
+	affine.a2 = -math.Sin(theta)
+	affine.b2 = math.Cos(theta)
+	affine.b3 = 0
+
+	affine.a3 = 0
+	affine.b3 = 0
+	affine.c3 = 0
 }
 
 // Adds bold to
 func CombineAnatAndBold(bold Grid, anat Grid) {
 	//totalPoints := bold.Shape[0] * bold.Shape[1] * bold.Shape[2] * bold.Shape[3]
 	var cloud []point
-
-	var maxX int = 0
-	var maxY int = 0
-	var maxZ int = 0
 	var newPoint point
 
 	for x := 0; x < bold.Shape[0]; x++ {
 		for y := 0; y < bold.Shape[1]; y++ {
 			for z := 0; z < bold.Shape[2]; z++ {
 				for t := 0; t < bold.Shape[3]; t++ {
-					newPoint = bold.SpatialTransform.apply(point{x: float32(x), y: float32(y), z: float32(z), t: float32(t), value: bold.Data[x][y][z][t]})
+					newPoint = bold.SpatialTransform.apply(point{x: float64(x), y: float64(y), z: float64(z), t: float64(t), value: bold.Data[x][y][z][t]})
 					cloud = append(cloud, newPoint)
-
-					// if newPoint.x > float32(maxX) {
-					// 	maxX = int(math.Ceil(float64(newPoint.x)))
-					// }
-					// if newPoint.y > float32(maxY) {
-					// 	maxY = int(math.Ceil(float64(newPoint.y)))
-					// }
-					// if newPoint.z > float32(maxZ) {
-					// 	maxZ = int(math.Ceil(float64(newPoint.z)))
-					// }
 				}
 			}
 		}
 
 	}
 
+	var transformedBold Grid
+	transformedBold.Shape = anat.Shape //Were just clipping it to the anatomy bounds for now
+
 	// Now move through the anatomy scan and match
 	for x := 0; x < anat.Shape[0]; x++ {
 		for y := 0; y < anat.Shape[1]; y++ {
 			for z := 0; z < anat.Shape[2]; z++ {
 				for t := 0; t < anat.Shape[3]; t++ {
-					print(t) //bye red squiggles
-					//check if there is a cloud point "here"
-					//best way of thinking about this?
-					//probably hash the cloud to return a
+					transformedBold.Data[x][y][z][t] = getAverageBoldValues(x, y, z, t, cloud)
 				}
 			}
 		}
@@ -75,15 +77,15 @@ func CombineAnatAndBold(bold Grid, anat Grid) {
 }
 
 // Returns the average bold values within the given pos->(pos+1) value
-func GetAverageBoldValues(x, y, z, t int, cloud []point) float64 {
-	xff := float32(x)     //x float floor
-	xfc := float32(x + 1) //x float ceiling
-	yff := float32(y)
-	yfc := float32(y + 1)
-	zff := float32(z)
-	zfc := float32(z + 1)
-	tff := float32(t)
-	tfc := float32(t + 1)
+func getAverageBoldValues(x, y, z, t int, cloud []point) float64 {
+	xff := float64(x)     //x float floor
+	xfc := float64(x + 1) //x float ceiling
+	yff := float64(y)
+	yfc := float64(y + 1)
+	zff := float64(z)
+	zfc := float64(z + 1)
+	tff := float64(t)
+	tfc := float64(t + 1)
 
 	numPoints := float64(0)
 	totalScalar := float64(0)
@@ -101,5 +103,4 @@ func GetAverageBoldValues(x, y, z, t int, cloud []point) float64 {
 		}
 	}
 	return totalScalar / numPoints
-
 }
