@@ -35,6 +35,7 @@ func main() {
 	fmt.Println("Rendering")
 	tmid, _, _ := render.GetMiddleSlices(&transformedBold)
 	render.SaveAsImage(tmid, outputFolder+"/"+"transfomredBold.png")
+	fmt.Println("Done")
 
 	/* // Default
 	// niftiPath := os.Args[1]

@@ -50,12 +50,14 @@ func CombineAnatAndBold(bold Grid, anat Grid) Grid {
 	//totalPoints := bold.Shape[0] * bold.Shape[1] * bold.Shape[2] * bold.Shape[3]
 	var cloud []point
 	var newPoint point
+	var rot90 affine3D
+	rot90.rotateZ(90)
 
 	for x := 0; x < bold.Shape[0]; x++ {
 		for y := 0; y < bold.Shape[1]; y++ {
 			for z := 0; z < bold.Shape[2]; z++ {
 				for t := 0; t < bold.Shape[3]; t++ {
-					newPoint = bold.SpatialTransform.apply(point{x: float64(x), y: float64(y), z: float64(z), t: float64(t), value: bold.Data[x][y][z][t]})
+					newPoint = rot90.apply(point{x: float64(x), y: float64(y), z: float64(z), t: float64(t), value: bold.Data[x][y][z][t]})
 					cloud = append(cloud, newPoint)
 				}
 			}
@@ -68,11 +70,17 @@ func CombineAnatAndBold(bold Grid, anat Grid) Grid {
 	transformedBold.Shape = anat.Shape //Were just clipping it to the anatomy bounds for now
 
 	// Now move through the anatomy scan and match
+	transformedBold.Data = make([][][][]float64, transformedBold.Shape[0])
 	for x := 0; x < anat.Shape[0]; x++ {
-		fmt.Println("X: ", x)
+		transformedBold.Data[x] = make([][][]float64, transformedBold.Shape[1])
 		for y := 0; y < anat.Shape[1]; y++ {
+			transformedBold.Data[x][y] = make([][]float64, transformedBold.Shape[2])
 			for z := 0; z < anat.Shape[2]; z++ {
+				fmt.Println("At ", x, y, z, "out of ", anat.Shape[0], anat.Shape[1], anat.Shape[2])
+				transformedBold.Data[x][y][z] = make([]float64, transformedBold.Shape[3])
 				for t := 0; t < anat.Shape[3]; t++ {
+					// fmt.Println("T: ", t)
+
 					transformedBold.Data[x][y][z][t] = getAverageBoldValues(x, y, z, t, cloud)
 				}
 			}
@@ -86,6 +94,8 @@ func CombineAnatAndBold(bold Grid, anat Grid) Grid {
 
 // Returns the average bold values within the given pos->(pos+1) value
 func getAverageBoldValues(x, y, z, t int, cloud []point) float64 {
+	//fmt.Println("getting average bold vales at ", x, y, z, t)
+
 	xff := float64(x)     //x float floor
 	xfc := float64(x + 1) //x float ceiling
 	yff := float64(y)
@@ -104,12 +114,17 @@ func getAverageBoldValues(x, y, z, t int, cloud []point) float64 {
 			if yff <= point.y && point.y <= yfc {
 				if zff <= point.z && point.z <= zfc {
 					if tff <= point.t && point.t <= tfc {
-						//fmt.Println("Adding ", point.value, "from ", x, y, z)
+						//						fmt.Println("Adding ", point.value, "from ", x, y, z)
+						//fmt.Println("i: ", i)
 						totalScalar += point.value
 					}
 				}
 			}
 		}
 	}
-	return totalScalar / numPoints
+	if numPoints == 0.0 {
+		return 0.0
+	} else {
+		return totalScalar / numPoints
+	}
 }
