@@ -1,10 +1,8 @@
 package volume
 
-import "math"
-
 type point struct {
-	x, y, z float32
-	value   float64
+	x, y, z, t float32
+	value      float64
 }
 
 type affine3D struct {
@@ -42,18 +40,18 @@ func CombineAnatAndBold(bold Grid, anat Grid) {
 		for y := 0; y < bold.Shape[1]; y++ {
 			for z := 0; z < bold.Shape[2]; z++ {
 				for t := 0; t < bold.Shape[3]; t++ {
-					newPoint = bold.SpatialTransform.apply(point{x: float32(x), y: float32(y), z: float32(z), value: bold.Data[x][y][z][t]})
+					newPoint = bold.SpatialTransform.apply(point{x: float32(x), y: float32(y), z: float32(z), t: float32(t), value: bold.Data[x][y][z][t]})
 					cloud = append(cloud, newPoint)
 
-					if newPoint.x > float32(maxX) {
-						maxX = int(math.Ceil(float64(newPoint.x)))
-					}
-					if newPoint.y > float32(maxY) {
-						maxY = int(math.Ceil(float64(newPoint.y)))
-					}
-					if newPoint.z > float32(maxZ) {
-						maxZ = int(math.Ceil(float64(newPoint.z)))
-					}
+					// if newPoint.x > float32(maxX) {
+					// 	maxX = int(math.Ceil(float64(newPoint.x)))
+					// }
+					// if newPoint.y > float32(maxY) {
+					// 	maxY = int(math.Ceil(float64(newPoint.y)))
+					// }
+					// if newPoint.z > float32(maxZ) {
+					// 	maxZ = int(math.Ceil(float64(newPoint.z)))
+					// }
 				}
 			}
 		}
@@ -76,11 +74,32 @@ func CombineAnatAndBold(bold Grid, anat Grid) {
 
 }
 
-func GetAverageBoldValues(x, y, z, t int, cloud []point) {
-	//
+// Returns the average bold values within the given pos->(pos+1) value
+func GetAverageBoldValues(x, y, z, t int, cloud []point) float64 {
+	xff := float32(x)     //x float floor
+	xfc := float32(x + 1) //x float ceiling
+	yff := float32(y)
+	yfc := float32(y + 1)
+	zff := float32(z)
+	zfc := float32(z + 1)
+	tff := float32(t)
+	tfc := float32(t + 1)
+
+	numPoints := float64(0)
+	totalScalar := float64(0)
+
+	// very terrible naive search, you can make this much more performant!
+	for _, point := range cloud {
+		if xff <= point.x && point.x <= xfc {
+			if yff <= point.y && point.y <= yfc {
+				if zff <= point.z && point.z <= zfc {
+					if tff <= point.t && point.t <= tfc {
+						totalScalar += point.value
+					}
+				}
+			}
+		}
+	}
+	return totalScalar / numPoints
+
 }
-
-// func (vol *Volume) FromCloud(cloud []point) Volume {
-
-// 	return vol
-// }
