@@ -53,9 +53,12 @@ pub const Header = extern struct {
     magic: [4]u8,
 };
 
-pub const NIfTI1Image = extern struct {
+pub const Image = extern struct {
     // data: []const u8,
-    dimensions: [4]usize,
+    header: Header,
+    fn printHeader(self: *const Image) void {
+        std.debug.print("{any}", .{self.header});
+    }
 };
 
 test "open" {
@@ -64,8 +67,10 @@ test "open" {
     const file = try std.fs.cwd().openFile(bold, .{});
     defer file.close();
     const reader = file.reader();
-    const header = try reader.readStruct(Header);
-    std.debug.print("{any}", .{header});
+    const h = try reader.readStruct(Header);
+
+    const img = Image{ .header = h };
+    (&img).printHeader();
 }
 
 //convention:
