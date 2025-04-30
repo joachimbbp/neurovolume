@@ -60,16 +60,24 @@ pub const Image = extern struct {
         std.debug.print("{any}", .{self.header});
     }
 };
-
-test "open" {
-    // const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-    const bold = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold";
-    const file = try std.fs.cwd().openFile(bold, .{});
+pub fn initImage(path: []const u8) !Image {
+    const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
     const reader = file.reader();
-    const h = try reader.readStruct(Header);
+    const header = try reader.readStruct(Header);
+    return Image{ .header = header };
+}
 
-    const img = Image{ .header = h };
+test "open" {
+    const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    // const bold = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold";
+    // const file = try std.fs.cwd().openFile(bold, .{});
+    // defer file.close();
+    // const reader = file.reader();
+    // const h = try reader.readStruct(Header);
+
+    // const img = Image{ .header = h };
+    const img = try initImage(static);
     (&img).printHeader();
 }
 
