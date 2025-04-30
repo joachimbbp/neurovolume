@@ -56,28 +56,22 @@ pub const Header = extern struct {
 pub const Image = extern struct {
     // data: []const u8,
     header: Header,
-    fn printHeader(self: *const Image) void {
+    pub fn printHeader(self: *const Image) void {
         std.debug.print("{any}", .{self.header});
     }
+    pub fn init(filepath: []const u8) !Image {
+        const file = try std.fs.cwd().openFile(filepath, .{});
+        defer file.close();
+        const reader = file.reader();
+        const header = try reader.readStruct(Header); //Perhaps there is better error handling
+        return Image{ .header = header };
+    }
 };
-pub fn initImage(path: []const u8) !Image {
-    const file = try std.fs.cwd().openFile(path, .{});
-    defer file.close();
-    const reader = file.reader();
-    const header = try reader.readStruct(Header);
-    return Image{ .header = header };
-}
 
 test "open" {
     const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-    // const bold = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold";
-    // const file = try std.fs.cwd().openFile(bold, .{});
-    // defer file.close();
-    // const reader = file.reader();
-    // const h = try reader.readStruct(Header);
 
-    // const img = Image{ .header = h };
-    const img = try initImage(static);
+    const img = try Image.init(static);
     (&img).printHeader();
 }
 
