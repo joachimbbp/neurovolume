@@ -4,3 +4,5 @@ __pycache__
 .pynb_checkpoints
 .DS_Store
 *.vdb
+.zig-cache
+zig-out
