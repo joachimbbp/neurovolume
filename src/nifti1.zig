@@ -1,6 +1,5 @@
 const std = @import("std");
 
-//Nifit1 Header
 pub const Header = extern struct {
     sizeofHdr: i32, //Must be 348
     dataType: [10]u8,
@@ -54,23 +53,40 @@ pub const Header = extern struct {
 };
 
 pub const Image = extern struct {
-    // data: []const u8,
     header: Header,
+    data_start: *const u8,
+    data_len: usize, //data and data_len lets you get the raw data from data[0..data_len]
+    //byteToFloat
+
     pub fn printHeader(self: *const Image) void {
         std.debug.print("{any}", .{self.header});
     }
     pub fn init(filepath: []const u8) !Image {
+        //Load File
         const file = try std.fs.cwd().openFile(filepath, .{});
         defer file.close();
+
+        //Load Header
         const reader = file.reader();
         const header = try reader.readStruct(Header); //Perhaps there is better error handling
-        return Image{ .header = header };
+
+        //Load Data
+        //const c = @as(i32, @intFromFloat(b));
+        const vox_offset = @as(u32, @intFromFloat(header.voxOffset)); //@intFromFloat(u32, @intFromFloat(header.voxOffset));
+
+        try file.seekTo(vox_offset);
+        const file_size = try file.getEndPos();
+        const allocator = std.heap.page_allocator;
+
+        const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
+        _ = try file.readAll(raw_data);
+
+        return Image{ .header = header, .data_start = raw_data.ptr, .data_len = raw_data.len };
     }
 };
 
 test "open" {
     const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-
     const img = try Image.init(static);
     (&img).printHeader();
 }
