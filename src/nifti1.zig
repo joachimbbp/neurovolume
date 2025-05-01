@@ -53,10 +53,8 @@ pub const Header = extern struct {
 };
 
 pub const Image = extern struct {
-    header: Header,
-    data_start: *const u8,
-    data_len: usize, //data and data_len lets you get the raw data from data[0..data_len]
-    //byteToFloat
+    header: *const Header,
+    data: *const []u8,
 
     pub fn printHeader(self: *const Image) void {
         std.debug.print("{any}", .{self.header});
@@ -81,7 +79,7 @@ pub const Image = extern struct {
         const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
         _ = try file.readAll(raw_data);
 
-        return Image{ .header = header, .data_start = raw_data.ptr, .data_len = raw_data.len };
+        return Image{ .header = &header, .data = &raw_data };
     }
 };
 
