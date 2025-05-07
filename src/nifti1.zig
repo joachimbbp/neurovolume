@@ -56,11 +56,39 @@ pub const Image = struct { //not sure why this was originally an extern struct?
     header: *const Header,
     data: []u8,
     allocator: *const std.mem.Allocator,
+    bytes_to_float: *const fn ([]u8) f32,
+
+    //      byte to float options
+    //          Numbers is not iteration but the corresponding bitpix possibility
+    //          non-trival amount of gpt copypasta (quick translation from Go) but this seems correct
+
+    const Errors = error{
+        UnsupportedBitPix,
+    };
+
+    fn btf1(b: []u8) f32 {
+        return @floatFromInt(b[0]);
+    }
+    fn btf2(b: []u8) f32 {
+        const raw = std.mem.readInt(u16, b[0..2], .little);
+        const signed: i16 = @bitCast(raw);
+        return @floatFromInt(signed);
+    }
+    fn btf4(b: []u8) f32 {
+        const raw = std.mem.readInt(u32, b[0..4], .little);
+        const signed: i32 = @bitCast(raw);
+        return @floatFromInt(signed);
+    }
+    fn btf8(b: []u8) f32 {
+        const raw = std.mem.readInt(u64, b[0..8], .little);
+        const signed: i64 = @bitCast(raw);
+        return @floatFromInt(signed);
+    }
 
     pub fn printHeader(self: *const Image) void {
         std.debug.print("{any}", .{self.header});
     }
-    pub fn init(filepath: []const u8) !Image {
+    pub fn init(filepath: []const u8) anyerror!Image {
         const allocator = &std.heap.page_allocator;
         //Load File
         const file = try std.fs.cwd().openFile(filepath, .{});
@@ -79,7 +107,21 @@ pub const Image = struct { //not sure why this was originally an extern struct?
         const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
         _ = try file.readAll(raw_data);
 
-        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator };
+        //Build byte to float
+        const bytes_to_float: *const fn ([]u8) f32 = switch (header_ptr.*.bitpix) {
+            //bitPix / 8 (the bit depth) corresponds to the proper amount of bytes
+            //to convert to a float
+            8 => &btf1,
+            16 => &btf2,
+            32 => &btf4,
+            64 => &btf8,
+            else => {
+                std.debug.print("Unsupported bit pix: {}\n", .{header_ptr.*.bitpix});
+                return error.UnsupportedBitPix;
+            },
+        };
+
+        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .bytes_to_float = bytes_to_float };
     }
 
     pub fn deinit(self: *const Image) void {
