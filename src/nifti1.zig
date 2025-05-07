@@ -54,13 +54,10 @@ pub const Header = extern struct {
 
 pub const Image = struct { //not sure why this was originally an extern struct?
     header: *const Header,
-    data: []u8,
+    data: []const u8,
     allocator: *const std.mem.Allocator,
+    data_type: []const u8,
     bytes_to_float: *const fn ([]u8) f32,
-
-    //      byte to float options
-    //          Numbers is not iteration but the corresponding bitpix possibility
-    //          non-trival amount of gpt copypasta (quick translation from Go) but this seems correct
 
     const Errors = error{
         UnsupportedBitPix,
@@ -88,6 +85,7 @@ pub const Image = struct { //not sure why this was originally an extern struct?
     pub fn printHeader(self: *const Image) void {
         std.debug.print("{any}", .{self.header});
     }
+
     pub fn init(filepath: []const u8) anyerror!Image {
         const allocator = &std.heap.page_allocator;
         //Load File
@@ -121,7 +119,31 @@ pub const Image = struct { //not sure why this was originally an extern struct?
             },
         };
 
-        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .bytes_to_float = bytes_to_float };
+        //datatype
+        const data_type: []const u8 = switch (header_ptr.*.datatype) {
+            0 => "unknown",
+            1 => "bool",
+            2 => "unsigned char",
+            4 => "signed short",
+            8 => "signed int",
+            16 => "float",
+            32 => "complex",
+            64 => "double",
+            128 => "rgb",
+            255 => "all",
+            256 => "signed char",
+            512 => "unsigned short",
+            768 => "unsigned int",
+            1024 => "long long",
+            1280 => "unsigned long long",
+            1536 => "long double",
+            1792 => "double pair",
+            2048 => "long double pair",
+            2304 => "rgba",
+            else => "unknown",
+        };
+
+        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .bytes_to_float = bytes_to_float, .data_type = data_type };
     }
 
     pub fn deinit(self: *const Image) void {
@@ -134,6 +156,8 @@ test "open" {
     const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
     const img = try Image.init(static);
     (&img).printHeader();
+    std.debug.print("\ndatatype: {s}\n", .{img.data_type});
+
     img.deinit();
 }
 
