@@ -57,31 +57,28 @@ pub const Image = struct { //not sure why this was originally an extern struct?
     data: []const u8,
     allocator: *const std.mem.Allocator,
     data_type: []const u8,
-    bytes_to_float: *const fn ([]u8) f32,
 
     const Errors = error{
         UnsupportedBitPix,
     };
+    const Bytes = enum(i16) {
+        one = 8,
+        two = 16,
+        four = 32,
+        eight = 64,
+    };
 
-    fn btf1(b: []u8) f32 {
-        return @floatFromInt(b[0]);
-    }
-    fn btf2(b: []u8) f32 {
-        const raw = std.mem.readInt(u16, b[0..2], .little);
-        const signed: i16 = @bitCast(raw);
+    fn btf(comptime bytes: Bytes, b: *const [@intFromEnum(bytes)]u8) f32 {
+        const Int = @Type(.{ .int = .{ .bits = @intFromEnum(bytes), .signedness = .signed } });
+        const signed = std.mem.readInt(Int, b, .little);
         return @floatFromInt(signed);
     }
-    fn btf4(b: []u8) f32 {
-        const raw = std.mem.readInt(u32, b[0..4], .little);
-        const signed: i32 = @bitCast(raw);
-        return @floatFromInt(signed);
+    pub fn bytesToFloat(self: *const Image, bytes: []const u8) !f32 {
+        const num_bytes = std.meta.intToEnum(Bytes, self.header.bitpix) catch return error.UnsupportedBitPix;
+        switch (num_bytes) {
+            inline else => |b| return btf(b, bytes[0..@intFromEnum(b)]),
+        }
     }
-    fn btf8(b: []u8) f32 {
-        const raw = std.mem.readInt(u64, b[0..8], .little);
-        const signed: i64 = @bitCast(raw);
-        return @floatFromInt(signed);
-    }
-
     pub fn printHeader(self: *const Image) void {
         std.debug.print("{any}", .{self.header});
     }
@@ -104,20 +101,6 @@ pub const Image = struct { //not sure why this was originally an extern struct?
 
         const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
         _ = try file.readAll(raw_data);
-
-        //Build byte to float
-        const bytes_to_float: *const fn ([]u8) f32 = switch (header_ptr.*.bitpix) {
-            //bitPix / 8 (the bit depth) corresponds to the proper amount of bytes
-            //to convert to a float
-            8 => &btf1,
-            16 => &btf2,
-            32 => &btf4,
-            64 => &btf8,
-            else => {
-                std.debug.print("Unsupported bit pix: {}\n", .{header_ptr.*.bitpix});
-                return error.UnsupportedBitPix;
-            },
-        };
 
         //datatype
         const data_type: []const u8 = switch (header_ptr.*.datatype) {
@@ -143,10 +126,11 @@ pub const Image = struct { //not sure why this was originally an extern struct?
             else => "unknown",
         };
 
-        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .bytes_to_float = bytes_to_float, .data_type = data_type };
+        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .data_type = data_type };
     }
 
     pub fn deinit(self: *const Image) void {
+        //TODO everything else
         self.allocator.destroy(self.header);
         self.allocator.free(self.data);
     }
