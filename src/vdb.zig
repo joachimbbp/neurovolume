@@ -20,7 +20,7 @@ pub const Node5 = extern struct {
 pub const Node4 = extern struct {
     mask: [64]u64,
     node_3: std.AutoHashMap(u32, *Node3), 
-    pub const init: Nod4 = .{
+    pub const init: Node4 = .{
         .mask = .{0} ** 64,
         .node_3 = .empty,
     };
@@ -31,7 +31,7 @@ pub const Node3 = extern struct {
 
 pub fn testSphere(allocator: std.mem.Allocator) :!void { //either return an error or nothing
     std.debug.print("Creating Test VDB Sphere", .{});
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = std.ArrayList(u8w.init(allocator);
     defer buffer.deinit();
 
     // var vdb: Node5 = {}

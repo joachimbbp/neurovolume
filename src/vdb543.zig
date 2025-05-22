@@ -2,49 +2,71 @@
 const std = @import("std");
 
 const VDB = extern struct {
-    node_5: Node5,
-    //to make this n-dimensional:
-    //node_5: std.AutoHashMap(Node5)
+    five_node: Node5,
+    //NOTE:  to make this arbitrarily large:
+    //five_node: std.AutoHashMap(Node5), (and probably rename to five_nodes)
     //some mask that encompasses all the node5 (how many?)
+
+
 };
+fn VDBinit() VDB{
 const Node5 = extern struct {
     mask: [512]u64,
-    node_4: std.AutoHashMap(u32, *Node4),
+    four_nodes: std.AutoHashMap(u32, *Node4),
 };
 const Node4 = extern struct {
     mask: [64]u64,
-    node_3: std.AutoHashMap(u32, *Node3),
+    three_nodes: std.AutoHashMap(u32, *Node3),
+    pub const init: Node4 = .{
+        .mask = .{0} ** 64,
+        .node_3 = .empty,
+        };
 };
 const Node3 = extern struct {
     mask: [8]u64,
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
 };
 
-//Bit index functions
-//As to not take up tons of memory, these are not packaged with the node structs
+//NOTE: Bit index functions:
 //Generalized Function to pack the whole thing down into xxxyyyzzz:
+//From the original: bit_index = z + y * dim + x * dim^2
 //bit_index = z | (y << dim) | (x << (dim << 1))
+//TODO:
+// - [ ] Dry out pedagogical code (4096-1) etc
+// - [ ] make comptime zig
 fn getBitIndex4(position: [3]u32) u32 {
-    //relative_position being the position relative to nearest five node
-    //4096 being the total voxel span of a five node
     const relative_position: [3]u32 = .{ position[0] & (4096 - 1), position[1] & (4096 - 1), position[2] & (4096 - 1) };
     const index_3d: [3]u32 = .{
         relative_position[0] >> 7,
         relative_position[1] >> 7,
         relative_position[2] >> 7,
     };
-    //Figures out the relative (x,y,z) coordinates of the 4-node relative to the 5-node
-    //dimension being 5
     return index_3d[2] | (index_3d[1] << 5) | (index_3d[0] << 10);
 }
-// fn getBitIndex3(position: [3]u32) u32{
-//     const relative_poisition: [3]u32 = .{
-//                 position[0] & (4096 - 1),
-//                 position[1] & (4096 - 1),
-//                 position[2] & (4096 - 1),
-//                 };
-// // fn setVoxel(vdb: *VDB, position: [3]u32, data: f16) !void{
-// //This is very readable but not the most efficient
-// //TODO: have this set voxels one 3-node at a time to reduce syscalls
-//
-// }
+fn getBitIndex3(position: [3]u32) u32 {
+    const relative_position: [3]u32 = .{ position[0] & (128 - 1), position[1] & (128 - 1), position[2] & (128 - 1) };
+    const index_3d: [3]u32 = .{
+        relative_position[0] >> 3,
+        relative_position[1] >> 3,
+        relative_position[2] >> 3,
+    };
+    return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
+}
+fn getBitIndex0(position: [3]u32) u32 {
+    const relative_position: [3]u32 = .{ position[0] & (8 - 1), position[1] & (8 - 1), position[2] & (8 - 1) };
+    const index_3d: [3]u32 = .{ relative_position[0] >> 0, relative_position[1] >> 0, relative_position[3] >> 0 };
+    return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
+}
+
+//TODO:
+//- [ ] have this set voxels one 3-node at a time to reduce syscalls
+//- [ ] have the value type mirror the input data type
+
+fn setVoxel(vdb: *VDB, position: [3]u32, value: f16) void {
+    bit_index_4 = getBitIndex4(position);
+    bit_index_3 = getBitIndex3(position);
+    bit_index_0 = getBitIndex0(position);
+
+    node_5 =  &vdb.five_node;
+    node_4 = node_5.node
+};
