@@ -2,29 +2,33 @@
 const std = @import("std");
 
 const VDB = extern struct {
-    five_node: Node5,
+    five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
-    //five_node: std.AutoHashMap(Node5), (and probably rename to five_nodes)
-    //some mask that encompasses all the node5 (how many?)
-
-
+    //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
 };
-fn VDBinit() VDB{
 const Node5 = extern struct {
     mask: [512]u64,
     four_nodes: std.AutoHashMap(u32, *Node4),
+    const init: Node5 = .{
+        .mask = .{0} ** 512,
+        .four_nodes = .empty,
+    };
 };
 const Node4 = extern struct {
     mask: [64]u64,
     three_nodes: std.AutoHashMap(u32, *Node3),
-    pub const init: Node4 = .{
+    const init: Node4 = .{
         .mask = .{0} ** 64,
-        .node_3 = .empty,
-        };
+        .three_nodes = .empty,
+    };
 };
 const Node3 = extern struct {
     mask: [8]u64,
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
+    const init: Node3 = .{
+        .mask = .{0} ** 8,
+        .data = .empty,
+    };
 };
 
 //NOTE: Bit index functions:
@@ -63,10 +67,25 @@ fn getBitIndex0(position: [3]u32) u32 {
 //- [ ] have the value type mirror the input data type
 
 fn setVoxel(vdb: *VDB, position: [3]u32, value: f16) void {
-    bit_index_4 = getBitIndex4(position);
-    bit_index_3 = getBitIndex3(position);
-    bit_index_0 = getBitIndex0(position);
+    const bit_index_4 = getBitIndex4(position);
+    const bit_index_3 = getBitIndex3(position);
+    const bit_index_0 = getBitIndex0(position);
 
-    node_5 =  &vdb.five_node;
-    node_4 = node_5.node
-};
+    const node_5 = &vdb.*.five_node.init;
+
+    var node_4 = node_5.nodes_4[bit_index_4];
+    if (node_4 == .empty) {
+        node_4 = node_4.init;
+        node_5.four_nodes.put(bit_index_4, node_4);
+    }
+    var node_3 = node_4.nodes_3[bit_index_3];
+    if (node_3 == .empty) {
+        node_3 = node_3.init;
+        node_4.three_nodes.put(bit_index_3, node_3);
+    }
+    node_5.mask[bit_index_4 >> 6] |= 1 << (bit_index_4 & (64 - 1));
+    node_4.mask[bit_index_3 >> 6] |= 1 << (bit_index_3 & (64 - 1));
+    node_3.mask[bit_index_0 >> 6] |= 1 << (bit_index_0 & (64 - 1));
+
+    node_3.data[bit_index_0] = value;
+}
