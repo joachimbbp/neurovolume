@@ -72,7 +72,7 @@ const VDB = extern struct {
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
 };
 const Node5 = extern struct {
-    mask: [512]u64,
+    mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
     four_nodes: std.AutoHashMap(u32, *Node4),
     const init: Node5 = .{
         .mask = .{0} ** 512,
@@ -154,7 +154,44 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16) void {
 
     node_3.data[bit_index_0] = value;
 }
-//
-// fn writeTree(bytes: *[]const u8, vdb *VDB) {
-//
-// }
+
+fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) !void {
+    //origin of 5-node:
+    try writeVec3i(buffer, .{ 0, 0, 0 });
+    //child masks:
+    for (node.mask) |child_mask| {
+        try writeU64(buffer, child_mask);
+    }
+    //Presently we don't have any values masks, so just zeroing those out
+    for (node.mask) |value_mask| {
+        try writeU64(value_mask, 0);
+    }
+    //Write uncompressed (signified by 6) node values
+    try writeU8(buffer, 6);
+    var i: u8 = 0;
+    while (i <= 4096) : (i += 1) {
+        try writeU16(buffer, 0);
+    }
+}
+
+fn writeTree(buffer: *[]const u8, vdb: *VDB) !void {
+    try writeU32(buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
+    try writeU32(buffer, 0); //Root node background value
+    try writeU32(buffer, 0); //number of tiles
+    try writeU32(buffer, 1); //number of 5 nodes
+
+    const node_5 = &vdb.five_node;
+
+    try writeNode5Header(buffer, node_5);
+    //Iterate 4-nodes
+    for (node_5.mask, 0..) |mask, mask_idx| {
+        //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
+        while (mask != 0) : (mask &= mask - 1) {
+            var bit_index: u32 = @as(mask_idx, u32) * 64 + @as(@ctz(mask), u32); //64 being the depth of the u64 datatype used in the mask
+            //NOTE: I don't feel like I have fully internalized the bit_index math
+
+            //stopped work here
+
+        }
+    }
+}
