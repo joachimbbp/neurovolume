@@ -1,6 +1,71 @@
 //Minimal 543 vdb writer based off the JengaFX repo
 const std = @import("std");
 
+//IO helper functions
+fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) !void {
+    try buffer.appendSlice(pointer[0..len]);
+}
+fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) !void {
+    const byte_data = @as([*]const u8, @ptrCast(slice.ptr))[0 .. s.len * @sizeOf(T)];
+    try buffer.appendSlice(byte_data);
+}
+fn writeU8(buffer: *std.ArrayList(u8), value: u8) !void {
+    try buffer.append(value);
+}
+//NOTE:
+//Check endianness for these
+//These could probably be dryed with comptimes
+fn writeU16(buffer: *std.ArrayList(u8), value: u16) !void {
+    try writePointer(buffer, &value, @sizeOf(value));
+}
+fn writeU32(buffer: *std.ArrayList(u8), value: u32) !void {
+    try writePointer(buffer, &value, @sizeOf(value));
+}
+fn writeU64(buffer: *std.ArrayList(u8), value: u64) !void {
+    try writePointer(buffer, &value, @sizeOf(value));
+}
+fn writeU128(buffer: *std.ArrayList(u8), value: u128) !void {
+    try writePointer(buffer, &value, @sizeOf(value));
+}
+//NOTE: another good argument for comptiming these: this vdb data value should be arbitrary:
+fn writeF64(buffer: *std.ArrayList(u8), value: f64) !void {
+    try writePointer(buffer, &value, @sizeOf(value));
+}
+fn castInt32ToU32(value: i32) u32 {
+    const result: u32 = @bitCast(value);
+    return result;
+}
+fn writeVec3i(buffer: *std.ArrayList(u8), value: [3]i32) !void {
+    try writeU32(buffer, castInt32ToU32(value[0]));
+    try writeU32(buffer, castInt32ToU32(value[1]));
+    try writeU32(buffer, castInt32ToU32(value[2]));
+}
+
+fn writeString(buffer: *std.ArrayList(u8), string: []const u8) !void {
+    try buffer.append(string);
+}
+fn writeName(buffer: *std.ArrayList(u8), name: []const u8) !void {
+    try writeU32(buffer, @as(u8, name.len));
+    try writeString(buffer, name);
+}
+fn writeMetaString(buffer: *std.ArrayList(u8), name: []const u8, string: []const u8) !void {
+    writeName(buffer, name);
+    writeName(buffer, "string");
+    writeName(buffer, string);
+}
+fn writeMetaBool(buffer: *std.ArrayList(u8), name: []const u8, value: bool) !void {
+    try writeName(buffer, name);
+    try writeName(buffer, "bool");
+    try writeU32(buffer, 1); //bool is stored in one whole byte
+    try writeU8(buffer, if (value) 1 else 0);
+}
+fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) !void {
+    try writeName(buffer, name);
+    try writeName(buffer, "vec3i");
+    try writeU32(buffer, 3 * @sizeOf(i32));
+    try writeVec3i(buffer, value);
+}
+//VDB nodes
 const VDB = extern struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
@@ -89,3 +154,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16) void {
 
     node_3.data[bit_index_0] = value;
 }
+//
+// fn writeTree(bytes: *[]const u8, vdb *VDB) {
+//
+// }
