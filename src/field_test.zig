@@ -3,7 +3,7 @@ const ToyNode = struct {
     toy_mask: [5]u64,
     other_nodes: std.AutoHashMap(u32, *ToyNode),
     // const init: ToyNode = .{ .toy_mask = .{0} ** 5, .other_nodes = .empty };
-    pub fn init(allocator: std.mem.Allocator) ToyNode {
+    fn init(allocator: std.mem.Allocator) ToyNode {
         return ToyNode{
             .toy_mask = .{0} ** 5,
             .other_nodes = std.AutoHashMap(u32, *ToyNode).init(allocator),

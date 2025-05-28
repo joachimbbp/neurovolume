@@ -6,7 +6,7 @@ fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) !voi
     try buffer.appendSlice(pointer[0..len]);
 }
 fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) !void {
-    const byte_data = @as([*]const u8, @ptrCast(slice.ptr))[0 .. s.len * @sizeOf(T)];
+    const byte_data = std.mem.sliceAsBytes(slice); //@as([*]const u8, @ptrCast(slice.ptr))[0 .. slice.len * @sizeOf(T)];
     try buffer.appendSlice(byte_data);
 }
 fn writeU8(buffer: *std.ArrayList(u8), value: u8) !void {
@@ -67,36 +67,42 @@ fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) 
 }
 //VDB nodes
 //WARNING: these are VERY BROKEN ZIG CODE. This will not work! Check field_test.zig for an example of how to add allocators and write this properly!
-const VDB = extern struct {
+const VDB = struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    const init: VDB = .{
-        .five_node = .empty };
+    // init: VDB = .{ .five_node = Node5.init };
+    fn init(allocator: std.mem.Allocator) !VDB {
+        const node5 = try allocator.create(Node5);
+        node5.* = Node5.init(allocator); //from chatGPT. I don't really understand this!
+        return VDB{ .five_node = node5 };
+    }
+    fn deinit(self: *VDB, allocator: std.mem.Allocator) void {
+        //chatGPT copypasta
+        self.five_node.four_nodes.deinit();
+        allocator.destroy(self.five_node);
+    }
 };
-const Node5 = extern struct {
+const Node5 = struct {
     mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
     four_nodes: std.AutoHashMap(u32, *Node4),
-    const init: Node5 = .{
-        .mask = .{0} ** 512,
-        .four_nodes = .empty,
-    };
+    fn init(allocator: std.mem.Allocator) Node5 {
+        return Node5{ .mask = .{0} ** 512, .four_nodes = std.AutoHashMap(u32, *Node4).init(allocator) };
+    }
 };
-const Node4 = extern struct {
+const Node4 = struct {
     mask: [64]u64,
     three_nodes: std.AutoHashMap(u32, *Node3),
-    const init: Node4 = .{
-        .mask = .{0} ** 64,
-        .three_nodes = .empty,
-    };
+    fn init(allocator: std.mem.Allocator) Node4 {
+        return Node4{ .mask = .{0} ** 64, .three_nodes = std.AutoHashMap(u32, *Node3).init(allocator) };
+    }
 };
-const Node3 = extern struct {
+const Node3 = struct {
     mask: [8]u64,
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
-    const init: Node3 = .{
-        .mask = .{0} ** 8,
-        .data = .empty,
-    };
+    fn init() Node3 {
+        return Node3{ .mask = .{0} ** 8, .data = .{0} ** 512 };
+    }
 };
 
 //NOTE: Bit index functions:
@@ -282,20 +288,21 @@ fn writeTransform(buffer: *std.ArrayList(u8), affine: [4][4]f64) void {
     writeF64(buffer, 0);
 }
 
-fn WriteGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) {
+fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //grid name (should be dynamic when doing multiple grids)
     writeName(buffer, "density");
-    
-    //grid type 
+
+    //grid type
     //  (thiswill probably always be 543 but who knows! precision should match source eventually
     writeName(buffer, "Tree_float_5_4_3_HalfFloat");
-    
+
     //Indicate no instance parent
     writeU32(buffer, 0);
-    
+
     //Grid descriptor stream position
     //WARNING: I am shaky on what this is, the first line is a direct chatGPT translation of the odin code (bad form on my part)
-    writeU64(buffer, @intCast(u64, buffer.items.len) + @sizeOf(u64) * 3);
+    writeU64(buffer, @as(u64, buffer.items.len) + @sizeOf(u64) * 3);
+
     writeU64(buffer, 0);
     writeU64(buffer, 0);
 
@@ -307,17 +314,17 @@ fn WriteGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) {
     writeTree(buffer, vdb);
 }
 
-fn WriteVDB(buffer: *std.ArrayList(u8), affine: [4][4]f64){
+fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Magic Number
-    writeSlice(buffer, &[_]{0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0});
-    
+    writeSlice(u8, &buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
+
     //File Version
     writeU32(buffer, 224);
-    
+
     //Library version (pretend OpenVDB 8.1)
     writeU32(buffer, 8);
     writeU32(buffer, 1);
-    
+
     //no grid offsets
     writeU8(buffer, 0);
 
@@ -334,10 +341,7 @@ fn WriteVDB(buffer: *std.ArrayList(u8), affine: [4][4]f64){
     writeGrid(buffer, vdb, affine);
 }
 
-
 //GPT copypasta:
-
-
 const R: u32 = 128;
 const D: u32 = R * 2;
 
@@ -350,7 +354,7 @@ pub fn main() !void {
     defer b.deinit();
 
     var vdb = try VDB.init(allocator); // assumes you have init()
-    //defer vdb.deinit(); // assumes you have deinit()
+    defer vdb.deinit(); // assumes you have deinit()
 
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
@@ -361,13 +365,19 @@ pub fn main() !void {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
-                    try setVoxel(&vdb, .{ x, y, z }, 1.0);
+                    setVoxel(&vdb, .{ @as(u32, x), @as(u32, y), @as(u32, z) }, 1.0);
                 }
             }
         }
     }
 
-    try writeVDB(&b, &vdb, MATRIX4F64_IDENTITY); // assumes compatible signature
+    const Identity4x4: [4][4]f64 = .{
+        .{ 1.0, 0.0, 0.0, 0.0 },
+        .{ 0.0, 1.0, 0.0, 0.0 },
+        .{ 0.0, 0.0, 1.0, 0.0 },
+        .{ 0.0, 0.0, 0.0, 1.0 },
+    };
+    try writeVDB(&b, &vdb, Identity4x4); // assumes compatible signature
 
     const file = try std.fs.cwd().createFile("test.vdb", .{});
     defer file.close();
@@ -376,7 +386,7 @@ pub fn main() !void {
 
 // Utility functions
 
-fn toF32(v: [3]u32) [3]f32 {
+fn toF32(v: [3]usize) [3]f32 {
     return .{
         @floatFromInt(v[0]),
         @floatFromInt(v[1]),
@@ -393,5 +403,5 @@ fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
 }
 
 fn lengthSquared(v: [3]f32) f32 {
-    return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+    return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
