@@ -66,10 +66,13 @@ fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) 
     try writeVec3i(buffer, value);
 }
 //VDB nodes
+//WARNING: these are VERY BROKEN ZIG CODE. This will not work! Check field_test.zig for an example of how to add allocators and write this properly!
 const VDB = extern struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
+    const init: VDB = .{
+        .five_node = .empty };
 };
 const Node5 = extern struct {
     mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
@@ -163,18 +166,38 @@ fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) !void {
         try writeU64(buffer, child_mask);
     }
     //Presently we don't have any values masks, so just zeroing those out
-    for (node.mask) |value_mask| {
-        try writeU64(value_mask, 0);
+    for (node.mask) |_| {
+        try writeU64(buffer, 0);
     }
     //Write uncompressed (signified by 6) node values
     try writeU8(buffer, 6);
-    var i: u8 = 0;
+    var i: usize = 0;
+    while (i <= 32768) : (i += 1) {
+        try writeU16(buffer, 0);
+    }
+}
+fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) !void {
+    //Child masks
+    for (node.mask) |child_mask| {
+        try writeU64(buffer, child_mask);
+    }
+    //No value masks atm
+    for (node.mask) |_| {
+        try writeU64(buffer, 0);
+    }
+    try writeU8(buffer, 6);
+    var i: usize = 0;
     while (i <= 4096) : (i += 1) {
         try writeU16(buffer, 0);
     }
 }
 
-fn writeTree(buffer: *[]const u8, vdb: *VDB) !void {
+const TreeError = error{
+    FourNodeNotFound,
+    ThreeNodeNotFound,
+};
+
+fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) !void {
     try writeU32(buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
     try writeU32(buffer, 0); //Root node background value
     try writeU32(buffer, 0); //number of tiles
@@ -182,16 +205,193 @@ fn writeTree(buffer: *[]const u8, vdb: *VDB) !void {
 
     const node_5 = &vdb.five_node;
 
-    try writeNode5Header(buffer, node_5);
-    //Iterate 4-nodes
-    for (node_5.mask, 0..) |mask, mask_idx| {
+    try writeNode5Header(buffer, &node_5);
+    //Write masks (I think)
+    var bit_index: u32 = 0;
+    for (node_5.mask, 0..) |five_mask, five_mask_idx| {
         //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
-        while (mask != 0) : (mask &= mask - 1) {
-            var bit_index: u32 = @as(mask_idx, u32) * 64 + @as(@ctz(mask), u32); //64 being the depth of the u64 datatype used in the mask
+        while (five_mask != 0) : (five_mask &= five_mask - 1) {
+            bit_index = @as(five_mask_idx, u32) * 64 + @as(@ctz(five_mask), u32); //64 being the depth of the u64 datatype used in the mask
             //NOTE: I don't feel like I have fully internalized the bit_index math
 
-            //stopped work here
-
+            //TODO: error handling if four node not found
+            const node_4 = node_5.four_nodes.get(bit_index);
+            writeNode4Header(buffer, &node_4);
+            //Iterate 3-nodes
+            for (node_4.mask, 0..) |four_mask, four_mask_idx| {
+                while (four_mask != 0) : (four_mask &= four_mask - 1) {
+                    bit_index = @as(four_mask_idx, u32) * 64 + @as(@ctz(four_mask), u32);
+                    const node_3 = node_4.three_nodes.get(bit_index);
+                    for (node_3.mask) |three_mask| {
+                        try writeU64(buffer, three_mask);
+                    }
+                }
+            }
         }
     }
+    //Now we write the actual data (I think)
+    for (node_5.mask, 0..) |five_mask, five_mask_idx| {
+        while (five_mask != 0) : (five_mask &= five_mask - 1) {
+            bit_index = @as(five_mask_idx, u32) * 64 + @as(@ctz(five_mask), u32);
+            //NOTE: I feel like there is potential to DRY with some comptimes
+            const node_4 = node_5.four_nodes.get(bit_index);
+            for (node_4.mask, 0..) |four_mask, four_mask_idx| {
+                while (four_mask != 0) : (four_mask &= four_mask_idx - 1) {
+                    bit_index = @as(four_mask_idx, u32) * 64 + @as(@ctz(four_mask), u32);
+                    const node_3 = node_4.three_nodes.get(bit_index);
+                    for (node_3.mask) |three_mask| {
+                        writeU64(buffer, three_mask);
+                        writeSlice(f16, buffer, node_3.data); //NOTE: probably borked!
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn writeMetadata(buffer: *std.ArrayList(u8)) void {
+    // lots of hard coded things that will by dynamic if we expand this!
+    writeU32(buffer, 4); //write number of entries
+    writeMetaString(buffer, "class", "unknown");
+    writeMetaString(buffer, "file_compression", "none");
+    writeMetaBool(buffer, "is_saved_as_half_float", true);
+    writeMetaString(buffer, "name", "density");
+}
+
+fn writeTransform(buffer: *std.ArrayList(u8), affine: [4][4]f64) void {
+    writeName(buffer, "AffineMap");
+
+    writeF64(buffer, affine[0][0]);
+    writeF64(buffer, affine[1][0]);
+    writeF64(buffer, affine[2][0]);
+    writeF64(buffer, 0);
+
+    writeF64(buffer, affine[0][1]);
+    writeF64(buffer, affine[1][1]);
+    writeF64(buffer, affine[2][1]);
+    writeF64(buffer, 0);
+
+    writeF64(buffer, affine[0][2]);
+    writeF64(buffer, affine[1][2]);
+    writeF64(buffer, affine[2][2]);
+    writeF64(buffer, 0);
+
+    writeF64(buffer, affine[0][3]);
+    writeF64(buffer, affine[1][3]);
+    writeF64(buffer, affine[2][3]);
+    writeF64(buffer, 0);
+}
+
+fn WriteGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) {
+    //grid name (should be dynamic when doing multiple grids)
+    writeName(buffer, "density");
+    
+    //grid type 
+    //  (thiswill probably always be 543 but who knows! precision should match source eventually
+    writeName(buffer, "Tree_float_5_4_3_HalfFloat");
+    
+    //Indicate no instance parent
+    writeU32(buffer, 0);
+    
+    //Grid descriptor stream position
+    //WARNING: I am shaky on what this is, the first line is a direct chatGPT translation of the odin code (bad form on my part)
+    writeU64(buffer, @intCast(u64, buffer.items.len) + @sizeOf(u64) * 3);
+    writeU64(buffer, 0);
+    writeU64(buffer, 0);
+
+    //no compression
+    writeU32(buffer, 0);
+
+    writeMetadata(buffer);
+    writeTransform(buffer, affine);
+    writeTree(buffer, vdb);
+}
+
+fn WriteVDB(buffer: *std.ArrayList(u8), affine: [4][4]f64){
+    //Magic Number
+    writeSlice(buffer, &[_]{0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0});
+    
+    //File Version
+    writeU32(buffer, 224);
+    
+    //Library version (pretend OpenVDB 8.1)
+    writeU32(buffer, 8);
+    writeU32(buffer, 1);
+    
+    //no grid offsets
+    writeU8(buffer, 0);
+
+    //Temporary UUID
+    //TODO: generate one
+    writeString(buffer, "2d46f03e-b0e9-48f1-8311-07f573dbcae2");
+
+    //No Metadata for now
+    writeU32(buffer, 0);
+
+    //One Grid
+    writeU32(buffer, 1);
+
+    writeGrid(buffer, vdb, affine);
+}
+
+
+//GPT copypasta:
+
+
+const R: u32 = 128;
+const D: u32 = R * 2;
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer _ = gpa.deinit();
+
+    var b = std.ArrayList(u8).init(allocator);
+    defer b.deinit();
+
+    var vdb = try VDB.init(allocator); // assumes you have init()
+    //defer vdb.deinit(); // assumes you have deinit()
+
+    const Rf: f32 = @floatFromInt(R);
+    const R2: f32 = Rf * Rf;
+
+    for (0..D) |z| {
+        for (0..D) |y| {
+            for (0..D) |x| {
+                const p = toF32(.{ x, y, z });
+                const diff = subVec(p, .{ Rf, Rf, Rf });
+                if (lengthSquared(diff) < R2) {
+                    try setVoxel(&vdb, .{ x, y, z }, 1.0);
+                }
+            }
+        }
+    }
+
+    try writeVDB(&b, &vdb, MATRIX4F64_IDENTITY); // assumes compatible signature
+
+    const file = try std.fs.cwd().createFile("test.vdb", .{});
+    defer file.close();
+    try file.writeAll(b.items);
+}
+
+// Utility functions
+
+fn toF32(v: [3]u32) [3]f32 {
+    return .{
+        @floatFromInt(v[0]),
+        @floatFromInt(v[1]),
+        @floatFromInt(v[2]),
+    };
+}
+
+fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
+    return .{
+        a[0] - b[0],
+        a[1] - b[1],
+        a[2] - b[2],
+    };
+}
+
+fn lengthSquared(v: [3]f32) f32 {
+    return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
 }
