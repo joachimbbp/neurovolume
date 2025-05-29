@@ -68,41 +68,37 @@ fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) 
 //VDB nodes
 //WARNING: these are VERY BROKEN ZIG CODE. This will not work! Check field_test.zig for an example of how to add allocators and write this properly!
 const VDB = struct {
-    five_node: *Node5,
+    five_node: Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
     // init: VDB = .{ .five_node = Node5.init };
-    fn init(allocator: std.mem.Allocator) !VDB {
-        const node5 = try allocator.create(Node5);
-        node5.* = Node5.init(allocator); //from chatGPT. I don't really understand this!
-        return VDB{ .five_node = node5 };
-    }
-    fn deinit(self: *VDB, allocator: std.mem.Allocator) void {
-        //chatGPT copypasta
-        self.five_node.four_nodes.deinit();
-        allocator.destroy(self.five_node);
+    pub const init: VDB = .{ .five_node = .init };
+    pub fn deinit(self: *VDB, allocator: std.mem.Allocator) void {
+        self.five_node.deinit(allocator);
+        self.* = undefined;
     }
 };
 const Node5 = struct {
     mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
-    four_nodes: std.AutoHashMap(u32, *Node4),
-    fn init(allocator: std.mem.Allocator) Node5 {
-        return Node5{ .mask = .{0} ** 512, .four_nodes = std.AutoHashMap(u32, *Node4).init(allocator) };
+    four_nodes: std.AutoHashMapUnmanaged(u32, *Node4),
+    pub const init: Node5 = .{ .mask = @splat(0), .three_nodes = .empty };
+    pub fn deinit(self: *Node5, allocator: std.mem.Allocator) void {
+        for (self.four_nodes.values()) |node| {
+            node.deinit(allocator);
+        }
+        self.four_nodes.deinit(allocator);
+        self.* = undefined;
     }
 };
 const Node4 = struct {
     mask: [64]u64,
-    three_nodes: std.AutoHashMap(u32, *Node3),
-    fn init(allocator: std.mem.Allocator) Node4 {
-        return Node4{ .mask = .{0} ** 64, .three_nodes = std.AutoHashMap(u32, *Node3).init(allocator) };
-    }
+    three_nodes: std.AutoHashMapUnmanaged(u32, *Node3),
+    pub const init: Node4 = .{ .mask = @splat(0), .three_nodes = .empty };
 };
 const Node3 = struct {
     mask: [8]u64,
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
-    fn init() Node3 {
-        return Node3{ .mask = .{0} ** 8, .data = .{0} ** 512 };
-    }
+    pub const init: Node3 = .{ .mask = @splat(0), .data = @splat(0) };
 };
 
 //NOTE: Bit index functions:
@@ -132,7 +128,8 @@ fn getBitIndex3(position: [3]u32) u32 {
 }
 fn getBitIndex0(position: [3]u32) u32 {
     const relative_position: [3]u32 = .{ position[0] & (8 - 1), position[1] & (8 - 1), position[2] & (8 - 1) };
-    const index_3d: [3]u32 = .{ relative_position[0] >> 0, relative_position[1] >> 0, relative_position[3] >> 0 };
+    //NOTE: the >>0 is just pedagogical, it doesn't do anything
+    const index_3d: [3]u32 = .{ relative_position[0] >> 0, relative_position[1] >> 0, relative_position[2] >> 0 };
     return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
 
@@ -145,7 +142,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16) void {
     const bit_index_3 = getBitIndex3(position);
     const bit_index_0 = getBitIndex0(position);
 
-    const node_5 = &vdb.*.five_node.init;
+    const node_5 = &vdb.*.five_node.init(allocator);
 
     var node_4 = node_5.nodes_4[bit_index_4];
     if (node_4 == .empty) {
@@ -314,31 +311,31 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeTree(buffer, vdb);
 }
 
-fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
+fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
     //Magic Number
-    writeSlice(u8, &buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
+    try writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
     //File Version
-    writeU32(buffer, 224);
+    try writeU32(buffer, 224);
 
     //Library version (pretend OpenVDB 8.1)
-    writeU32(buffer, 8);
-    writeU32(buffer, 1);
+    try writeU32(buffer, 8);
+    try writeU32(buffer, 1);
 
     //no grid offsets
-    writeU8(buffer, 0);
+    try writeU8(buffer, 0);
 
     //Temporary UUID
     //TODO: generate one
-    writeString(buffer, "2d46f03e-b0e9-48f1-8311-07f573dbcae2");
+    try writeString(buffer, "2d46f03e-b0e9-48f1-8311-07f573dbcae2");
 
     //No Metadata for now
-    writeU32(buffer, 0);
+    try writeU32(buffer, 0);
 
     //One Grid
-    writeU32(buffer, 1);
+    try writeU32(buffer, 1);
 
-    writeGrid(buffer, vdb, affine);
+    try writeGrid(buffer, vdb, affine);
 }
 
 //GPT copypasta:
@@ -365,7 +362,7 @@ pub fn main() !void {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
-                    setVoxel(&vdb, .{ @as(u32, x), @as(u32, y), @as(u32, z) }, 1.0);
+                    setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0);
                 }
             }
         }
