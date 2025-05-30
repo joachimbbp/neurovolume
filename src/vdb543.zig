@@ -16,20 +16,27 @@ fn writeU8(buffer: *std.ArrayList(u8), value: u8) !void {
 //Check endianness for these
 //These could probably be dryed with comptimes
 fn writeU16(buffer: *std.ArrayList(u8), value: u16) !void {
-    try writePointer(buffer, &value, @sizeOf(value));
+    try buffer.appendSlice(std.mem.asBytes(&value));
+    // try writePointer(buffer, &value, @sizeOf(value));
 }
 fn writeU32(buffer: *std.ArrayList(u8), value: u32) !void {
-    try writePointer(buffer, &value, @sizeOf(value));
+    //NOTE: Need to change this to a const u32 somehow (but efficiently!)
+
+    try buffer.appendSlice(std.mem.asBytes(&value));
+    // try writePointer(buffer, &v, @sizeOf(value));
 }
 fn writeU64(buffer: *std.ArrayList(u8), value: u64) !void {
-    try writePointer(buffer, &value, @sizeOf(value));
+    // try writePointer(buffer, &value, @sizeOf(value));
+    try buffer.appendSlice(std.mem.asBytes(&value));
 }
 fn writeU128(buffer: *std.ArrayList(u8), value: u128) !void {
-    try writePointer(buffer, &value, @sizeOf(value));
+    // try writePointer(buffer, &value, @sizeOf(value));
+    try buffer.appendSlice(std.mem.asBytes(&value));
 }
 //NOTE: another good argument for comptiming these: this vdb data value should be arbitrary:
 fn writeF64(buffer: *std.ArrayList(u8), value: f64) !void {
-    try writePointer(buffer, &value, @sizeOf(value));
+    // try writePointer(buffer, &value, @sizeOf(value));
+    try buffer.appendSlice(std.mem.asBytes(&value));
 }
 fn castInt32ToU32(value: i32) u32 {
     const result: u32 = @bitCast(value);
@@ -42,10 +49,12 @@ fn writeVec3i(buffer: *std.ArrayList(u8), value: [3]i32) !void {
 }
 
 fn writeString(buffer: *std.ArrayList(u8), string: []const u8) !void {
-    try buffer.append(string);
+    for (string) |character| {
+        try buffer.append(character);
+    }
 }
 fn writeName(buffer: *std.ArrayList(u8), name: []const u8) !void {
-    try writeU32(buffer, @as(u8, name.len));
+    try writeU32(buffer, @intCast(name.len));
     try writeString(buffer, name);
 }
 fn writeMetaString(buffer: *std.ArrayList(u8), name: []const u8, string: []const u8) !void {
@@ -72,7 +81,7 @@ const VDB = struct {
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
     // init: VDB = .{ .five_node = Node5.init };
-    pub const init: VDB = .{ .five_node = .init };
+    pub const init: VDB = .{ .five_node = Node5.init };
     pub fn deinit(self: *VDB, allocator: std.mem.Allocator) void {
         self.five_node.deinit(allocator);
         self.* = undefined;
@@ -81,7 +90,7 @@ const VDB = struct {
 const Node5 = struct {
     mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
     four_nodes: std.AutoHashMapUnmanaged(u32, *Node4),
-    pub const init: Node5 = .{ .mask = @splat(0), .three_nodes = .empty };
+    pub const init: Node5 = .{ .mask = @splat(0), .four_nodes = .empty };
     pub fn deinit(self: *Node5, allocator: std.mem.Allocator) void {
         for (self.four_nodes.values()) |node| {
             node.deinit(allocator);
@@ -142,7 +151,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16) void {
     const bit_index_3 = getBitIndex3(position);
     const bit_index_0 = getBitIndex0(position);
 
-    const node_5 = &vdb.*.five_node.init(allocator);
+    const node_5 = &vdb.*.five_node.init;
 
     var node_4 = node_5.nodes_4[bit_index_4];
     if (node_4 == .empty) {
@@ -350,7 +359,7 @@ pub fn main() !void {
     var b = std.ArrayList(u8).init(allocator);
     defer b.deinit();
 
-    var vdb = try VDB.init(allocator); // assumes you have init()
+    var vdb = VDB.init; // assumes you have init()
     defer vdb.deinit(); // assumes you have deinit()
 
     const Rf: f32 = @floatFromInt(R);
