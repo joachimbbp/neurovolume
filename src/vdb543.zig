@@ -81,17 +81,24 @@ const VDB = struct {
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
     // init: VDB = .{ .five_node = Node5.init };
-    pub const init: VDB = .{ .five_node = Node5.init };
-    pub fn deinit(self: *VDB, allocator: std.mem.Allocator) void {
+    // pub const init: VDB = .{ .five_node = Node5.init };
+    fn init(allocator: std.mem.Allocator) VDB {
+        return VDB{ .five_node = Node5.init(allocator) };
+    }
+    fn deinit(self: *VDB, allocator: std.mem.Allocator) void {
         self.five_node.deinit(allocator);
         self.* = undefined;
     }
 };
 const Node5 = struct {
     mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
-    four_nodes: std.AutoHashMapUnmanaged(u32, *Node4),
-    pub const init: Node5 = .{ .mask = @splat(0), .four_nodes = .empty };
-    pub fn deinit(self: *Node5, allocator: std.mem.Allocator) void {
+    four_nodes: std.AutoHashMap(u32, *Node4),
+    // pub const init: Node5 = .{ .mask = @splat(0), .four_nodes = .empty };
+    fn init(allocator: std.mem.Allocator) Node5 {
+        return Node5{ .mask = @splat(0), .four_nodes = std.AutoHashMap(u32, *Node4).init(allocator) };
+    }
+    //WARNING: deinit is probably off
+    fn deinit(self: *Node5, allocator: std.mem.Allocator) void {
         for (self.four_nodes.values()) |node| {
             node.deinit(allocator);
         }
@@ -101,13 +108,20 @@ const Node5 = struct {
 };
 const Node4 = struct {
     mask: [64]u64,
-    three_nodes: std.AutoHashMapUnmanaged(u32, *Node3),
-    pub const init: Node4 = .{ .mask = @splat(0), .three_nodes = .empty };
+    three_nodes: std.AutoHashMap(u32, *Node3),
+    // pub const init: Node4 = .{ .mask = @splat(0), .three_nodes = .empty };
+    fn init(allocator: std.mem.Allocator) Node4 {
+        return Node4{ .mask = @splat(0), .three_nodes = std.AutoHashMap(u32, *Node3).init(allocator) };
+    }
+    //TODO: deinit
 };
 const Node3 = struct {
     mask: [8]u64,
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
-    pub const init: Node3 = .{ .mask = @splat(0), .data = @splat(0) };
+    // pub const init: Node3 = .{ .mask = @splat(0), .data = @splat(0) };
+    fn init() Node3 {
+        return Node3{ .mask = @splat(0), .data = @splat(0) };
+    }
 };
 
 //NOTE: Bit index functions:
@@ -146,21 +160,21 @@ fn getBitIndex0(position: [3]u32) u32 {
 //- [ ] have this set voxels one 3-node at a time to reduce syscalls
 //- [ ] have the value type mirror the input data type
 
-fn setVoxel(vdb: *VDB, position: [3]u32, value: f16) void {
+fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocator) void {
     const bit_index_4 = getBitIndex4(position);
     const bit_index_3 = getBitIndex3(position);
     const bit_index_0 = getBitIndex0(position);
 
-    const node_5 = &vdb.*.five_node.init;
+    const node_5: *Node5 = &vdb.five_node;
 
-    var node_4 = node_5.nodes_4[bit_index_4];
+    var node_4: *Node4 = &node_5.four_nodes.get(bit_index_4);
     if (node_4 == .empty) {
-        node_4 = node_4.init;
+        node_4 = &node_4.init(allocator);
         node_5.four_nodes.put(bit_index_4, node_4);
     }
-    var node_3 = node_4.nodes_3[bit_index_3];
+    var node_3 = node_4.three_nodes.get(bit_index_3);
     if (node_3 == .empty) {
-        node_3 = node_3.init;
+        node_3 = node_3.init(allocator);
         node_4.three_nodes.put(bit_index_3, node_3);
     }
     node_5.mask[bit_index_4 >> 6] |= 1 << (bit_index_4 & (64 - 1));
@@ -359,7 +373,7 @@ pub fn main() !void {
     var b = std.ArrayList(u8).init(allocator);
     defer b.deinit();
 
-    var vdb = VDB.init; // assumes you have init()
+    var vdb = VDB.init(allocator); // assumes you have init()
     defer vdb.deinit(); // assumes you have deinit()
 
     const Rf: f32 = @floatFromInt(R);
@@ -371,7 +385,7 @@ pub fn main() !void {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
-                    setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0);
+                    setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
                 }
             }
         }
