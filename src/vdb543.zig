@@ -2,77 +2,78 @@
 const std = @import("std");
 
 //IO helper functions
-fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) !void {
-    try buffer.appendSlice(pointer[0..len]);
+fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) void {
+    buffer.appendSlice(pointer[0..len]) catch unreachable;
 }
-fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) !void {
+fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) void {
     const byte_data = std.mem.sliceAsBytes(slice); //@as([*]const u8, @ptrCast(slice.ptr))[0 .. slice.len * @sizeOf(T)];
-    try buffer.appendSlice(byte_data);
+    buffer.appendSlice(byte_data) catch unreachable;
 }
-fn writeU8(buffer: *std.ArrayList(u8), value: u8) !void {
-    try buffer.append(value);
+fn writeU8(buffer: *std.ArrayList(u8), value: u8) void {
+    buffer.append(value) catch unreachable;
 }
 //NOTE:
 //Check endianness for these
 //These could probably be dryed with comptimes
-fn writeU16(buffer: *std.ArrayList(u8), value: u16) !void {
-    try buffer.appendSlice(std.mem.asBytes(&value));
-    // try writePointer(buffer, &value, @sizeOf(value));
+fn writeU16(buffer: *std.ArrayList(u8), value: u16) void {
+    buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
+    //  writePointer(buffer, &value, @sizeOf(value));
 }
-fn writeU32(buffer: *std.ArrayList(u8), value: u32) !void {
-    //NOTE: Need to change this to a const u32 somehow (but efficiently!)
+fn writeU32(buffer: *std.ArrayList(u8), value: u32) void {
+    //NOTE: Need to change this to a const u32 somehow (but efficiently)
 
-    try buffer.appendSlice(std.mem.asBytes(&value));
-    // try writePointer(buffer, &v, @sizeOf(value));
+    buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
+
+    //  writePointer(buffer, &v, @sizeOf(value));
 }
-fn writeU64(buffer: *std.ArrayList(u8), value: u64) !void {
-    // try writePointer(buffer, &value, @sizeOf(value));
-    try buffer.appendSlice(std.mem.asBytes(&value));
+fn writeU64(buffer: *std.ArrayList(u8), value: u64) void {
+    //  writePointer(buffer, &value, @sizeOf(value));
+    buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 }
-fn writeU128(buffer: *std.ArrayList(u8), value: u128) !void {
-    // try writePointer(buffer, &value, @sizeOf(value));
-    try buffer.appendSlice(std.mem.asBytes(&value));
+fn writeU128(buffer: *std.ArrayList(u8), value: u128) void {
+    //  writePointer(buffer, &value, @sizeOf(value));
+    buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 }
 //NOTE: another good argument for comptiming these: this vdb data value should be arbitrary:
-fn writeF64(buffer: *std.ArrayList(u8), value: f64) !void {
-    // try writePointer(buffer, &value, @sizeOf(value));
-    try buffer.appendSlice(std.mem.asBytes(&value));
+fn writeF64(buffer: *std.ArrayList(u8), value: f64) void {
+    //  writePointer(buffer, &value, @sizeOf(value));
+    buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 }
 fn castInt32ToU32(value: i32) u32 {
     const result: u32 = @bitCast(value);
     return result;
 }
-fn writeVec3i(buffer: *std.ArrayList(u8), value: [3]i32) !void {
-    try writeU32(buffer, castInt32ToU32(value[0]));
-    try writeU32(buffer, castInt32ToU32(value[1]));
-    try writeU32(buffer, castInt32ToU32(value[2]));
+fn writeVec3i(buffer: *std.ArrayList(u8), value: [3]i32) void {
+    writeU32(buffer, castInt32ToU32(value[0]));
+    writeU32(buffer, castInt32ToU32(value[1]));
+    writeU32(buffer, castInt32ToU32(value[2]));
 }
 
-fn writeString(buffer: *std.ArrayList(u8), string: []const u8) !void {
+fn writeString(buffer: *std.ArrayList(u8), string: []const u8) void {
     for (string) |character| {
-        try buffer.append(character);
+        buffer.append(character) catch unreachable;
     }
 }
-fn writeName(buffer: *std.ArrayList(u8), name: []const u8) !void {
-    try writeU32(buffer, @intCast(name.len));
-    try writeString(buffer, name);
+fn writeName(buffer: *std.ArrayList(u8), name: []const u8) void {
+    writeU32(buffer, @intCast(name.len));
+    writeString(buffer, name);
 }
-fn writeMetaString(buffer: *std.ArrayList(u8), name: []const u8, string: []const u8) !void {
+fn writeMetaString(buffer: *std.ArrayList(u8), name: []const u8, string: []const u8) void {
     writeName(buffer, name);
     writeName(buffer, "string");
     writeName(buffer, string);
 }
-fn writeMetaBool(buffer: *std.ArrayList(u8), name: []const u8, value: bool) !void {
-    try writeName(buffer, name);
-    try writeName(buffer, "bool");
-    try writeU32(buffer, 1); //bool is stored in one whole byte
-    try writeU8(buffer, if (value) 1 else 0);
+fn writeMetaBool(buffer: *std.ArrayList(u8), name: []const u8, value: bool) void {
+    writeName(buffer, name);
+    writeName(buffer, "bool");
+    writeU32(buffer, 1); //bool is stored in one whole byte
+    writeU8(buffer, if (value) 1 else 0);
 }
-fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) !void {
-    try writeName(buffer, name);
-    try writeName(buffer, "vec3i");
-    try writeU32(buffer, 3 * @sizeOf(i32));
-    try writeVec3i(buffer, value);
+fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) void {
+    writeName(buffer, name);
+    writeName(buffer, "vec3i");
+    writeU32(buffer, 3 * @sizeOf(i32));
+    writeVec3i(buffer, value);
 }
 //VDB nodes
 //WARNING: these are VERY BROKEN ZIG CODE. This will not work! Check field_test.zig for an example of how to add allocators and write this properly!
@@ -80,8 +81,6 @@ const VDB = struct {
     five_node: Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    // init: VDB = .{ .five_node = Node5.init };
-    // pub const init: VDB = .{ .five_node = Node5.init };
     fn init(allocator: std.mem.Allocator) VDB {
         return VDB{ .five_node = Node5.init(allocator) };
     }
@@ -120,7 +119,7 @@ const Node3 = struct {
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
     // pub const init: Node3 = .{ .mask = @splat(0), .data = @splat(0) };
     fn init() Node3 {
-        return Node3{ .mask = @splat(0), .data = @splat(0) };
+        return Node3{ .mask = @splat(0), .data = @splat(@as(f16, std.math.nan(f16))) };
     }
 };
 
@@ -167,54 +166,67 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
 
     const node_5: *Node5 = &vdb.five_node;
 
-    var node_4: *Node4 = &node_5.four_nodes.get(bit_index_4);
-    if (node_4 == .empty) {
-        node_4 = &node_4.init(allocator);
-        node_5.four_nodes.put(bit_index_4, node_4);
+    var node_4: *Node4 = undefined;
+    if (node_5.four_nodes.get(bit_index_4)) |existing_node_4| {
+        node_4 = existing_node_4;
+    } else {
+        const new_node_4 = allocator.create(Node4) catch unreachable;
+        new_node_4.* = Node4.init(allocator);
+        node_5.four_nodes.put(bit_index_4, new_node_4) catch unreachable;
+        node_4 = new_node_4;
+    } //Confession: chaptGPT suggested this pattern. It is "optional unwrapping syntax"
+
+    var node_3: *Node3 = undefined;
+    if (!std.math.isNan(node_3.data[bit_index_3])) {
+        node_3 = node_4.three_nodes.get(bit_index_3).?;
+    } else {
+        const new_node_3 = allocator.create(Node3) catch unreachable;
+        new_node_3.* = Node3.init();
+        node_4.three_nodes.put(bit_index_3, new_node_3) catch unreachable;
+        node_3 = new_node_3;
     }
-    var node_3 = node_4.three_nodes.get(bit_index_3);
-    if (node_3 == .empty) {
-        node_3 = node_3.init(allocator);
-        node_4.three_nodes.put(bit_index_3, node_3);
-    }
-    node_5.mask[bit_index_4 >> 6] |= 1 << (bit_index_4 & (64 - 1));
-    node_4.mask[bit_index_3 >> 6] |= 1 << (bit_index_3 & (64 - 1));
-    node_3.mask[bit_index_0 >> 6] |= 1 << (bit_index_0 & (64 - 1));
+    // node_5.mask[bit_index_4 >> 6] |= @as(u64, 1) << @as(u6, bit_index_4 & (63));
+    // node_4.mask[bit_index_3 >> 6] |= @as(u64, 1) << @as(u6, bit_index_3 & (63));
+    // node_3.mask[bit_index_0 >> 6] |= @as(u64, 1) << @as(u6, bit_index_0 & (63));
+
+    node_5.mask[bit_index_4 >> 6] |= @as(u64, 1) << @truncate(u6, bit_index_4) & @truncate(u6, 63);
+    node_4.mask[bit_index_3 >> 6] |= @as(u64, 1) << (bit_index_3 & @as(u6, 63));
+    node_3.mask[bit_index_0 >> 6] |= @as(u64, 1) << (bit_index_0 & @as(u6, 63));
 
     node_3.data[bit_index_0] = value;
 }
 
 fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) !void {
     //origin of 5-node:
-    try writeVec3i(buffer, .{ 0, 0, 0 });
+    writeVec3i(buffer, .{ 0, 0, 0 });
     //child masks:
     for (node.mask) |child_mask| {
-        try writeU64(buffer, child_mask);
+        writeU64(buffer, child_mask);
     }
     //Presently we don't have any values masks, so just zeroing those out
     for (node.mask) |_| {
-        try writeU64(buffer, 0);
+        writeU64(buffer, 0);
     }
     //Write uncompressed (signified by 6) node values
-    try writeU8(buffer, 6);
+    writeU8(buffer, 6);
     var i: usize = 0;
     while (i <= 32768) : (i += 1) {
-        try writeU16(buffer, 0);
+        writeU16(buffer, 0);
     }
 }
 fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) !void {
     //Child masks
     for (node.mask) |child_mask| {
-        try writeU64(buffer, child_mask);
+        writeU64(buffer, child_mask);
     }
     //No value masks atm
     for (node.mask) |_| {
-        try writeU64(buffer, 0);
+        writeU64(buffer, 0);
     }
-    try writeU8(buffer, 6);
+    writeU8(buffer, 6);
     var i: usize = 0;
     while (i <= 4096) : (i += 1) {
-        try writeU16(buffer, 0);
+        writeU16(buffer, 0);
     }
 }
 
@@ -224,14 +236,14 @@ const TreeError = error{
 };
 
 fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) !void {
-    try writeU32(buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
-    try writeU32(buffer, 0); //Root node background value
-    try writeU32(buffer, 0); //number of tiles
-    try writeU32(buffer, 1); //number of 5 nodes
+    writeU32(buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
+    writeU32(buffer, 0); //Root node background value
+    writeU32(buffer, 0); //number of tiles
+    writeU32(buffer, 1); //number of 5 nodes
 
     const node_5 = &vdb.five_node;
 
-    try writeNode5Header(buffer, &node_5);
+    writeNode5Header(buffer, &node_5);
     //Write masks (I think)
     var bit_index: u32 = 0;
     for (node_5.mask, 0..) |five_mask, five_mask_idx| {
@@ -249,7 +261,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) !void {
                     bit_index = @as(four_mask_idx, u32) * 64 + @as(@ctz(four_mask), u32);
                     const node_3 = node_4.three_nodes.get(bit_index);
                     for (node_3.mask) |three_mask| {
-                        try writeU64(buffer, three_mask);
+                        writeU64(buffer, three_mask);
                     }
                 }
             }
@@ -335,46 +347,45 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 }
 
 fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
-    //Magic Number
-    try writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
+    //Magic Number (needed it spells out BDV)
+    writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
     //File Version
-    try writeU32(buffer, 224);
+    writeU32(buffer, 224);
 
     //Library version (pretend OpenVDB 8.1)
-    try writeU32(buffer, 8);
-    try writeU32(buffer, 1);
+    writeU32(buffer, 8);
+    writeU32(buffer, 1);
 
     //no grid offsets
-    try writeU8(buffer, 0);
+    writeU8(buffer, 0);
 
     //Temporary UUID
     //TODO: generate one
-    try writeString(buffer, "2d46f03e-b0e9-48f1-8311-07f573dbcae2");
+    writeString(buffer, "2d46f03e-b0e9-48f1-8311-07f573dbcae2");
 
     //No Metadata for now
-    try writeU32(buffer, 0);
+    writeU32(buffer, 0);
 
     //One Grid
-    try writeU32(buffer, 1);
+    writeU32(buffer, 1);
 
-    try writeGrid(buffer, vdb, affine);
+    writeGrid(buffer, vdb, affine);
 }
 
 //GPT copypasta:
 const R: u32 = 128;
 const D: u32 = R * 2;
 
-pub fn main() !void {
+test "sphere" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     defer _ = gpa.deinit();
 
-    var b = std.ArrayList(u8).init(allocator);
-    defer b.deinit();
-
-    var vdb = VDB.init(allocator); // assumes you have init()
-    defer vdb.deinit(); // assumes you have deinit()
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+    var vdb = VDB.init(allocator);
+    defer vdb.deinit();
 
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
@@ -397,11 +408,11 @@ pub fn main() !void {
         .{ 0.0, 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
-    try writeVDB(&b, &vdb, Identity4x4); // assumes compatible signature
+    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
 
     const file = try std.fs.cwd().createFile("test.vdb", .{});
     defer file.close();
-    try file.writeAll(b.items);
+    try file.writeAll(buffer.items);
 }
 
 // Utility functions
