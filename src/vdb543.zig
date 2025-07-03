@@ -160,32 +160,31 @@ fn getBitIndex0(position: [3]u32) u32 {
 //- [ ] have this set voxels one 3-node at a time to reduce syscalls
 //- [ ] have the value type mirror the input data type
 
-fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocator) void {
+fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocator) !void {
+    var node_5: *Node5 = &vdb.five_node;
+
     const bit_index_4 = getBitIndex4(position);
     const bit_index_3 = getBitIndex3(position);
     const bit_index_0 = getBitIndex0(position);
 
-    var node_5: *Node5 = &vdb.five_node;
-
     var node_4: *Node4 = undefined;
-    if (node_5.four_nodes.get(bit_index_4)) |existing_node_4| {
-        node_4 = existing_node_4;
+    const node_4_or_null = node_5.four_nodes.get(bit_index_4);
+    if (node_4_or_null == null) {
+        node_4 = try allocator.create(Node4);
+        node_4.* = Node4.init(allocator);
+        try node_5.four_nodes.put(bit_index_4, node_4);
     } else {
-        const new_node_4 = allocator.create(Node4) catch unreachable;
-        new_node_4.* = Node4.init(allocator);
-        node_5.four_nodes.put(bit_index_4, new_node_4) catch unreachable;
-        node_4 = new_node_4;
-    } //Confession: chaptGPT suggested this pattern. It is "optional unwrapping syntax"
-
-    var node_3: *Node3 = undefined; //BORKED around here
-    if (!std.math.isNan(node_3.data[bit_index_3])) {
-        node_3 = node_4.three_nodes.get(bit_index_3).?;
-    } else {
-        const new_node_3 = allocator.create(Node3) catch unreachable;
-        new_node_3.* = Node3.init();
-        node_4.three_nodes.put(bit_index_3, new_node_3) catch unreachable;
-        node_3 = new_node_3;
+        node_4 = node_4_or_null.?;
     }
+    //
+    // var node_3 = &Node3.init();
+    // if (!std.math.isNan(node_3.data[bit_index_3])) {
+    //     node_3 = node_4.three_nodes.get(bit_index_3).?;
+    // } else {
+    //     var new_node_3 = Node3.init();
+    //     node_4.three_nodes.put(bit_index_3, &new_node_3) catch unreachable;
+    //     node_3 = new_node_3;
+    // }
 
     const one: u64 = 1;
     node_5.mask[bit_index_4 >> 6] |= one << @intCast(bit_index_4 & 63);
@@ -399,7 +398,7 @@ test "sphere" {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
-                    setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+                    try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
                 }
             }
         }
