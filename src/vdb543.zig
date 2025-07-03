@@ -176,15 +176,16 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     } else {
         node_4 = node_4_or_null.?;
     }
-    //
-    // var node_3 = &Node3.init();
-    // if (!std.math.isNan(node_3.data[bit_index_3])) {
-    //     node_3 = node_4.three_nodes.get(bit_index_3).?;
-    // } else {
-    //     var new_node_3 = Node3.init();
-    //     node_4.three_nodes.put(bit_index_3, &new_node_3) catch unreachable;
-    //     node_3 = new_node_3;
-    // }
+
+    var node_3: *Node3 = undefined;
+    const node_3_or_null = node_4.three_nodes.get(bit_index_3);
+    if (node_3_or_null == null) {
+        node_3 = try allocator.create(Node3);
+        node_3.* = Node3.init();
+        try node_4.three_nodes.put(bit_index_3, node_3);
+    } else {
+        node_3 = node_3_or_null.?;
+    }
 
     const one: u64 = 1;
     node_5.mask[bit_index_4 >> 6] |= one << @intCast(bit_index_4 & 63);
