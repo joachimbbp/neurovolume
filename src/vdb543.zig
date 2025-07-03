@@ -165,7 +165,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     const bit_index_3 = getBitIndex3(position);
     const bit_index_0 = getBitIndex0(position);
 
-    const node_5: *Node5 = &vdb.five_node;
+    var node_5: *Node5 = &vdb.five_node;
 
     var node_4: *Node4 = undefined;
     if (node_5.four_nodes.get(bit_index_4)) |existing_node_4| {
@@ -177,7 +177,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
         node_4 = new_node_4;
     } //Confession: chaptGPT suggested this pattern. It is "optional unwrapping syntax"
 
-    var node_3: *Node3 = undefined;
+    var node_3: *Node3 = undefined; //BORKED around here
     if (!std.math.isNan(node_3.data[bit_index_3])) {
         node_3 = node_4.three_nodes.get(bit_index_3).?;
     } else {
