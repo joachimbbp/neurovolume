@@ -185,13 +185,11 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
         node_4.three_nodes.put(bit_index_3, new_node_3) catch unreachable;
         node_3 = new_node_3;
     }
-    // node_5.mask[bit_index_4 >> 6] |= @as(u64, 1) << @as(u6, bit_index_4 & (63));
-    // node_4.mask[bit_index_3 >> 6] |= @as(u64, 1) << @as(u6, bit_index_3 & (63));
-    // node_3.mask[bit_index_0 >> 6] |= @as(u64, 1) << @as(u6, bit_index_0 & (63));
 
-    node_5.mask[bit_index_4 >> 6] |= @as(u64, 1) << @truncate(u6, bit_index_4) & @truncate(u6, 63);
-    node_4.mask[bit_index_3 >> 6] |= @as(u64, 1) << (bit_index_3 & @as(u6, 63));
-    node_3.mask[bit_index_0 >> 6] |= @as(u64, 1) << (bit_index_0 & @as(u6, 63));
+    const one: u64 = 1;
+    node_5.mask[bit_index_4 >> 6] |= one << @intCast(bit_index_4 & 63);
+    node_4.mask[bit_index_3 >> 6] |= one << @intCast(bit_index_3 & 63);
+    node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & 63);
 
     node_3.data[bit_index_0] = value;
 }
