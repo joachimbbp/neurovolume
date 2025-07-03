@@ -96,13 +96,14 @@ const Node5 = struct {
     fn init(allocator: std.mem.Allocator) Node5 {
         return Node5{ .mask = @splat(0), .four_nodes = std.AutoHashMap(u32, *Node4).init(allocator) };
     }
-    //WARNING: deinit is probably off
     fn deinit(self: *Node5, allocator: std.mem.Allocator) void {
-        for (self.four_nodes.values()) |node| {
-            node.deinit(allocator);
-        }
-        self.four_nodes.deinit(allocator);
-        self.* = undefined;
+        std.debug.print("deinit not implemented yet", .{});
+        std.debug.print("vdb: {}\n allocator:{}", .{ self, allocator });
+        // for (self.four_nodes.valueIterator()|node|{
+        //     node.deinit(allocator);
+        // };
+        // self.four_nodes.deinit(allocator);
+        // self.* = undefined;
     }
 };
 const Node4 = struct {
@@ -194,7 +195,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     node_3.data[bit_index_0] = value;
 }
 
-fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) !void {
+fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
     //origin of 5-node:
     writeVec3i(buffer, .{ 0, 0, 0 });
     //child masks:
@@ -212,7 +213,7 @@ fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) !void {
         writeU16(buffer, 0);
     }
 }
-fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) !void {
+fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) void {
     //Child masks
     for (node.mask) |child_mask| {
         writeU64(buffer, child_mask);
@@ -233,7 +234,7 @@ const TreeError = error{
     ThreeNodeNotFound,
 };
 
-fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) !void {
+fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     writeU32(buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
     writeU32(buffer, 0); //Root node background value
     writeU32(buffer, 0); //number of tiles
@@ -241,23 +242,24 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) !void {
 
     const node_5 = &vdb.five_node;
 
-    writeNode5Header(buffer, &node_5);
-    //Write masks (I think)
+    writeNode5Header(buffer, node_5);
+
     var bit_index: u32 = 0;
-    for (node_5.mask, 0..) |five_mask, five_mask_idx| {
+    for (node_5.mask, 0..) |five_mask_og, five_mask_idx| {
         //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
+        var five_mask = five_mask_og;
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            bit_index = @as(five_mask_idx, u32) * 64 + @as(@ctz(five_mask), u32); //64 being the depth of the u64 datatype used in the mask
-            //NOTE: I don't feel like I have fully internalized the bit_index math
+            bit_index = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @intCast(five_mask));
 
             //TODO: error handling if four node not found
-            const node_4 = node_5.four_nodes.get(bit_index);
-            writeNode4Header(buffer, &node_4);
+            const node_4 = node_5.four_nodes.get(bit_index).?;
+            writeNode4Header(buffer, node_4);
             //Iterate 3-nodes
-            for (node_4.mask, 0..) |four_mask, four_mask_idx| {
+            for (node_4.mask, 0..) |four_mask_og, four_mask_idx| {
+                var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
-                    bit_index = @as(four_mask_idx, u32) * 64 + @as(@ctz(four_mask), u32);
-                    const node_3 = node_4.three_nodes.get(bit_index);
+                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(four_mask));
+                    const node_3 = node_4.three_nodes.get(bit_index).?;
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
                     }
@@ -266,18 +268,21 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) !void {
         }
     }
     //Now we write the actual data (I think)
-    for (node_5.mask, 0..) |five_mask, five_mask_idx| {
+    for (node_5.mask, 0..) |five_mask_og, five_mask_idx| {
+        var five_mask = five_mask_og;
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            bit_index = @as(five_mask_idx, u32) * 64 + @as(@ctz(five_mask), u32);
+            bit_index = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
             //NOTE: I feel like there is potential to DRY with some comptimes
-            const node_4 = node_5.four_nodes.get(bit_index);
-            for (node_4.mask, 0..) |four_mask, four_mask_idx| {
+            const node_4 = node_5.four_nodes.get(bit_index).?;
+
+            for (node_4.mask, 0..) |four_mask_og, four_mask_idx| {
+                var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask_idx - 1) {
-                    bit_index = @as(four_mask_idx, u32) * 64 + @as(@ctz(four_mask), u32);
-                    const node_3 = node_4.three_nodes.get(bit_index);
+                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
+                    const node_3 = node_4.three_nodes.get(bit_index).?;
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
-                        writeSlice(f16, buffer, node_3.data); //NOTE: probably borked!
+                        writeSlice(f16, buffer, &node_3.data);
                     }
                 }
             }
@@ -344,7 +349,7 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeTree(buffer, vdb);
 }
 
-fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
+fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Magic Number (needed it spells out BDV)
     writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
@@ -383,7 +388,7 @@ test "sphere" {
     var buffer = std.ArrayList(u8).init(allocator);
     defer buffer.deinit();
     var vdb = VDB.init(allocator);
-    defer vdb.deinit();
+    defer vdb.deinit(allocator);
 
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
