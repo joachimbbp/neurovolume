@@ -249,7 +249,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
         //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
         var five_mask = five_mask_og;
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            bit_index = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @intCast(five_mask));
+            bit_index = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @truncate(five_mask));
 
             //TODO: error handling if four node not found
             const node_4 = node_5.four_nodes.get(bit_index).?;
@@ -258,7 +258,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
             for (node_4.mask, 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
-                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(four_mask));
+                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @truncate(four_mask));
                     const node_3 = node_4.three_nodes.get(bit_index).?;
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
