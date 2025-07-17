@@ -76,7 +76,6 @@ fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) 
     writeVec3i(buffer, value);
 }
 //VDB nodes
-//WARNING: these are VERY BROKEN ZIG CODE. This will not work! Check field_test.zig for an example of how to add allocators and write this properly!
 const VDB = struct {
     five_node: Node5,
     //NOTE:  to make this arbitrarily large:
@@ -249,16 +248,17 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
         //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
         var five_mask = five_mask_og;
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            bit_index = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @truncate(five_mask));
-
-            //TODO: error handling if four node not found
+            bit_index = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
+            std.debug.print("bit index: {}\n", .{bit_index});
+            std.debug.print("\nfour nodes at bit index {}\n", .{node_5.four_nodes.get(bit_index).?});
             const node_4 = node_5.four_nodes.get(bit_index).?;
+
             writeNode4Header(buffer, node_4);
             //Iterate 3-nodes
             for (node_4.mask, 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
-                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @truncate(four_mask));
+                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @ctz(four_mask));
                     const node_3 = node_4.three_nodes.get(bit_index).?;
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
