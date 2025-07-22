@@ -244,18 +244,25 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     writeNode5Header(buffer, node_5);
 
     var bit_index: u32 = 0;
-    for (node_5.mask, 0..) |five_mask_og, five_mask_idx| {
+    // std.debug.print("test loop len: {d}\n", .{node_5.mask.len});
+    // for (node_5.mask[0..], 0..) |c, i| {
+    //     //std.debug.print("test loop idx: {d}\n", .{i});
+    //     _ = c;
+    //     std.debug.print("index: {d}\n", .{i});
+    // }
+    // std.debug.print("test loop completed\n", .{});
+    for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
         //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
         var five_mask = five_mask_og;
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
             bit_index = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
-            std.debug.print("bit index: {}\n", .{bit_index});
-            std.debug.print("\nfour nodes at bit index {}\n", .{node_5.four_nodes.get(bit_index).?});
+            std.debug.print("mask found at bit index: {}\n", .{bit_index});
             const node_4 = node_5.four_nodes.get(bit_index).?;
 
             writeNode4Header(buffer, node_4);
             //Iterate 3-nodes
-            for (node_4.mask, 0..) |four_mask_og, four_mask_idx| {
+            std.debug.print("iterating 3 nodes\n", .{});
+            for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
                     bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @ctz(four_mask));
@@ -268,19 +275,25 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
         }
     }
     //Now we write the actual data (I think)
-    for (node_5.mask, 0..) |five_mask_og, five_mask_idx| {
+
+    std.debug.print("writing data\n", .{});
+    for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
+        std.debug.print("   at five mask idx {d}\n", .{five_mask_idx});
+        std.debug.print("   five mask og: {d}", .{five_mask_og});
         var five_mask = five_mask_og;
+        std.debug.print("   five mask: {d}", .{five_mask});
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
             bit_index = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
             //NOTE: I feel like there is potential to DRY with some comptimes
             const node_4 = node_5.four_nodes.get(bit_index).?;
-
-            for (node_4.mask, 0..) |four_mask_og, four_mask_idx| {
+            std.debug.print("node for gotten at bit index: {d}", .{bit_index});
+            for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
-                while (four_mask != 0) : (four_mask &= four_mask_idx - 1) {
+                while (four_mask != 0) : (four_mask &= four_mask - 1) {
                     bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
                     const node_3 = node_4.three_nodes.get(bit_index).?;
                     for (node_3.mask) |three_mask| {
+                        //std.debug.print("       writing slice at three mask\n", .{});
                         writeU64(buffer, three_mask);
                         writeSlice(f16, buffer, &node_3.data);
                     }
@@ -288,6 +301,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
             }
         }
     }
+    std.debug.print("end of tree writing function", .{});
 }
 
 fn writeMetadata(buffer: *std.ArrayList(u8)) void {
