@@ -77,49 +77,45 @@ fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) 
 }
 //VDB nodes
 const VDB = struct {
-    five_node: Node5,
+    five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    fn init(allocator: std.mem.Allocator) VDB {
-        return VDB{ .five_node = Node5.init(allocator) };
-    }
-    fn deinit(self: *VDB, allocator: std.mem.Allocator) void {
-        self.five_node.deinit(allocator);
-        self.* = undefined;
+    fn build(allocator: std.mem.Allocator) !VDB {
+        const five_node = try allocator.create(Node5);
+        five_node.* = Node5.build(allocator);
+        return VDB{ .five_node = five_node };
+        //const five_node = Node5.build(allocator);
+        //return VDB{ .five_node = &five_node };
     }
 };
 const Node5 = struct {
     mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
     four_nodes: std.AutoHashMap(u32, *Node4),
-    // pub const init: Node5 = .{ .mask = @splat(0), .four_nodes = .empty };
-    fn init(allocator: std.mem.Allocator) Node5 {
-        return Node5{ .mask = @splat(0), .four_nodes = std.AutoHashMap(u32, *Node4).init(allocator) };
-    }
-    fn deinit(self: *Node5, allocator: std.mem.Allocator) void {
-        std.debug.print("deinit not implemented yet", .{});
-        std.debug.print("vdb: {}\n allocator:{}", .{ self, allocator });
-        // for (self.four_nodes.valueIterator()|node|{
-        //     node.deinit(allocator);
-        // };
-        // self.four_nodes.deinit(allocator);
-        // self.* = undefined;
+    fn build(allocator: std.mem.Allocator) Node5 {
+        const four_nodes = std.AutoHashMap(u32, *Node4).init(allocator);
+        return Node5{ .mask = @splat(0), .four_nodes = four_nodes };
     }
 };
 const Node4 = struct {
     mask: [64]u64,
     three_nodes: std.AutoHashMap(u32, *Node3),
-    // pub const init: Node4 = .{ .mask = @splat(0), .three_nodes = .empty };
-    fn init(allocator: std.mem.Allocator) Node4 {
-        return Node4{ .mask = @splat(0), .three_nodes = std.AutoHashMap(u32, *Node3).init(allocator) };
+    fn build(allocator: std.mem.Allocator) !*Node4 {
+        const three_nodes = std.AutoHashMap(u32, *Node3).init(allocator);
+
+        const node4 = try allocator.create(Node4);
+        node4.* = Node4{ .mask = @splat(0), .three_nodes = three_nodes };
+
+        return node4;
     }
-    //TODO: deinit
 };
+
 const Node3 = struct {
     mask: [8]u64,
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
-    // pub const init: Node3 = .{ .mask = @splat(0), .data = @splat(0) };
-    fn init() Node3 {
-        return Node3{ .mask = @splat(0), .data = @splat(@as(f16, std.math.nan(f16))) };
+    fn build(allocator: std.mem.Allocator) !*Node3 {
+        const node3 = try allocator.create(Node3);
+        node3.* = Node3{ .mask = @splat(0), .data = @splat(@as(f16, std.math.nan(f16))) };
+        return node3;
     }
 };
 
@@ -160,28 +156,27 @@ fn getBitIndex0(position: [3]u32) u32 {
 //- [ ] have the value type mirror the input data type
 
 fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocator) !void {
-    var node_5: *Node5 = &vdb.five_node;
+    var node_5: *Node5 = vdb.five_node;
 
     const bit_index_4 = getBitIndex4(position);
     const bit_index_3 = getBitIndex3(position);
     const bit_index_0 = getBitIndex0(position);
+    std.debug.print("initializing node 4\n", .{});
 
     var node_4: *Node4 = undefined;
     const node_4_or_null = node_5.four_nodes.get(bit_index_4);
     if (node_4_or_null == null) {
-        node_4 = try allocator.create(Node4);
-        node_4.* = Node4.init(allocator);
+        node_4 = try Node4.build(allocator);
         try node_5.four_nodes.put(bit_index_4, node_4);
     } else {
         node_4 = node_4_or_null.?;
     }
 
     var node_3: *Node3 = undefined;
+
     const node_3_or_null = node_4.three_nodes.get(bit_index_3);
     if (node_3_or_null == null) {
-        node_3 = try allocator.create(Node3);
-        node_3.* = Node3.init();
-        try node_4.three_nodes.put(bit_index_3, node_3);
+        node_3 = try Node3.build(allocator);
     } else {
         node_3 = node_3_or_null.?;
     }
@@ -244,13 +239,6 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     writeNode5Header(buffer, node_5);
 
     var bit_index: u32 = 0;
-    // std.debug.print("test loop len: {d}\n", .{node_5.mask.len});
-    // for (node_5.mask[0..], 0..) |c, i| {
-    //     //std.debug.print("test loop idx: {d}\n", .{i});
-    //     _ = c;
-    //     std.debug.print("index: {d}\n", .{i});
-    // }
-    // std.debug.print("test loop completed\n", .{});
     for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
         //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
         var five_mask = five_mask_og;
@@ -401,12 +389,13 @@ test "sphere" {
 
     var buffer = std.ArrayList(u8).init(allocator);
     defer buffer.deinit();
-    var vdb = VDB.init(allocator);
-    defer vdb.deinit(allocator);
+
+    var vdb = try VDB.build(allocator);
+    std.debug.print("vdb type: {s}\n", .{@typeName(@TypeOf(vdb))});
 
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
-
+    std.debug.print("setting voxels\n", .{});
     for (0..D) |z| {
         for (0..D) |y| {
             for (0..D) |x| {
@@ -419,17 +408,18 @@ test "sphere" {
         }
     }
 
-    const Identity4x4: [4][4]f64 = .{
-        .{ 1.0, 0.0, 0.0, 0.0 },
-        .{ 0.0, 1.0, 0.0, 0.0 },
-        .{ 0.0, 0.0, 1.0, 0.0 },
-        .{ 0.0, 0.0, 0.0, 1.0 },
-    };
-    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-
-    const file = try std.fs.cwd().createFile("test.vdb", .{});
-    defer file.close();
-    try file.writeAll(buffer.items);
+    // const Identity4x4: [4][4]f64 = .{
+    //     .{ 1.0, 0.0, 0.0, 0.0 },
+    //     .{ 0.0, 1.0, 0.0, 0.0 },
+    //     .{ 0.0, 0.0, 1.0, 0.0 },
+    //     .{ 0.0, 0.0, 0.0, 1.0 },
+    // };
+    // writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+    //
+    // const file = try std.fs.cwd().createFile("test.vdb", .{});
+    // defer file.close();
+    // try file.writeAll(buffer.items);
+    //
 }
 
 // Utility functions
