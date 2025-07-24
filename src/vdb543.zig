@@ -175,6 +175,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     const node_3_or_null = node_4.three_nodes.get(bit_index_3);
     if (node_3_or_null == null) {
         node_3 = try Node3.build(allocator);
+        try node_4.three_nodes.put(bit_index_3, node_3);
     } else {
         node_3 = node_3_or_null.?;
     }
@@ -232,27 +233,35 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     writeU32(buffer, 0); //number of tiles
     writeU32(buffer, 1); //number of 5 nodes
 
-    const node_5 = &vdb.five_node;
+    const node_5 = vdb.five_node;
 
     writeNode5Header(buffer, node_5);
 
-    var bit_index: u32 = 0;
+    //var bit_index: u32 = 0;
     for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
         //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
         var five_mask = five_mask_og;
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            bit_index = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
-            std.debug.print("mask found at bit index: {}\n", .{bit_index});
-            const node_4 = node_5.four_nodes.get(bit_index).?;
+            const bit_index_4n = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
+            const node_4 = node_5.four_nodes.get(bit_index_4n).?;
+
+            std.debug.print("mask found at four node bit index bit index: {}\n", .{bit_index_4n});
 
             writeNode4Header(buffer, node_4);
+
             //Iterate 3-nodes
             std.debug.print("iterating 3 nodes\n", .{});
             for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
-                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @ctz(four_mask));
-                    const node_3 = node_4.three_nodes.get(bit_index).?;
+                    const bit_index_3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @ctz(four_mask));
+
+                    std.debug.print("three node bit index: {d}\nthere are {d} three nodes\n", .{ bit_index_3n, node_4.three_nodes.count() });
+                    // for (node_4.three_nodes.len, 0..) |_, idx| {
+                    //     std.debug.print("key: {d} val: {}", .{ idx, node_4.three_nodes.get(idx) });
+                    // }
+                    //
+                    const node_3 = node_4.three_nodes.get(bit_index_3n).?;
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
                     }
@@ -260,8 +269,8 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
             }
         }
     }
-    //Now we write the actual data (I think)
 
+    //Now we write the actual data (I think)
     std.debug.print("writing data\n", .{});
     for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
         std.debug.print("   at five mask idx {d}\n", .{five_mask_idx});
@@ -269,15 +278,15 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
         var five_mask = five_mask_og;
         std.debug.print("   five mask: {d}", .{five_mask});
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            bit_index = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
+            const bit_index_w4n = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
             //NOTE: I feel like there is potential to DRY with some comptimes
-            const node_4 = node_5.four_nodes.get(bit_index).?;
-            std.debug.print("node for gotten at bit index: {d}", .{bit_index});
+            const node_4 = node_5.four_nodes.get(bit_index_w4n).?;
+            std.debug.print("node for gotten at bit index: {d}", .{bit_index_w4n});
             for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
-                    bit_index = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
-                    const node_3 = node_4.three_nodes.get(bit_index).?;
+                    const bit_index_w3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
+                    const node_3 = node_4.three_nodes.get(bit_index_w3n).?;
                     for (node_3.mask) |three_mask| {
                         //std.debug.print("       writing slice at three mask\n", .{});
                         writeU64(buffer, three_mask);
@@ -411,18 +420,20 @@ test "sphere" {
         }
     }
 
-    // const Identity4x4: [4][4]f64 = .{
-    //     .{ 1.0, 0.0, 0.0, 0.0 },
-    //     .{ 0.0, 1.0, 0.0, 0.0 },
-    //     .{ 0.0, 0.0, 1.0, 0.0 },
-    //     .{ 0.0, 0.0, 0.0, 1.0 },
-    // };
-    // writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-    //
-    // const file = try std.fs.cwd().createFile("test.vdb", .{});
-    // defer file.close();
-    // try file.writeAll(buffer.items);
-    //
+    //SANITY CHECK:
+    std.debug.print("Number of Nodes in the VDB:\n4N: {d}\n3N: {d}\n", .{ vdb.five_node.four_nodes.count(), "h" });
+
+    const Identity4x4: [4][4]f64 = .{
+        .{ 1.0, 0.0, 0.0, 0.0 },
+        .{ 0.0, 1.0, 0.0, 0.0 },
+        .{ 0.0, 0.0, 1.0, 0.0 },
+        .{ 0.0, 0.0, 0.0, 1.0 },
+    };
+    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+
+    const file = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/test_zig.vdb", .{});
+    defer file.close();
+    try file.writeAll(buffer.items);
 }
 
 // Utility functions
