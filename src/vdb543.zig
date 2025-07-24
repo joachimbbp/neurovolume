@@ -381,6 +381,20 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeGrid(buffer, vdb, affine);
 }
 
+fn printVDB(vdb: VDB) void {
+    const p = std.debug.print;
+    p("vdb type: {s}\n", .{@typeName(@TypeOf(vdb))});
+    const num_four_nodes = vdb.five_node.four_nodes.count();
+
+    p("{d} Four nodes in VDB\n", .{num_four_nodes});
+    for (0..num_four_nodes) |n| {
+        p("\nFour Node {d}\n", .{n});
+        const four_node = vdb.five_node.four_nodes.get(@as(u32, @intCast(n))).?;
+        p("     mask: {any}\n", .{four_node.mask});
+        p("     Number of three nodes: {d}\n", .{four_node.three_nodes.count()});
+    }
+}
+
 //GPT copypasta:
 const R: u32 = 128;
 const D: u32 = R * 2;
@@ -398,7 +412,6 @@ test "sphere" {
     defer buffer.deinit();
 
     var vdb = try VDB.build(allocator);
-    std.debug.print("vdb type: {s}\n", .{@typeName(@TypeOf(vdb))});
 
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
@@ -417,8 +430,7 @@ test "sphere" {
     }
 
     //SANITY CHECK:
-    std.debug.print("Number of Nodes in the VDB:\n4N: {d}\n", .{vdb.five_node.four_nodes.count()});
-
+    printVDB(vdb);
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
         .{ 0.0, 1.0, 0.0, 0.0 },
