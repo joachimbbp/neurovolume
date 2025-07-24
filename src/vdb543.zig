@@ -81,19 +81,18 @@ const VDB = struct {
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
     fn build(allocator: std.mem.Allocator) !VDB {
-        const five_node = try allocator.create(Node5);
-        five_node.* = Node5.build(allocator);
+        const five_node = try Node5.build(allocator);
         return VDB{ .five_node = five_node };
-        //const five_node = Node5.build(allocator);
-        //return VDB{ .five_node = &five_node };
     }
 };
 const Node5 = struct {
     mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
     four_nodes: std.AutoHashMap(u32, *Node4),
-    fn build(allocator: std.mem.Allocator) Node5 {
+    fn build(allocator: std.mem.Allocator) !*Node5 {
         const four_nodes = std.AutoHashMap(u32, *Node4).init(allocator);
-        return Node5{ .mask = @splat(0), .four_nodes = four_nodes };
+        const node5 = try allocator.create(Node5);
+        node5.* = Node5{ .mask = @splat(0), .four_nodes = four_nodes };
+        return node5;
     }
 };
 const Node4 = struct {
@@ -161,7 +160,6 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     const bit_index_4 = getBitIndex4(position);
     const bit_index_3 = getBitIndex3(position);
     const bit_index_0 = getBitIndex0(position);
-    std.debug.print("initializing node 4\n", .{});
 
     var node_4: *Node4 = undefined;
     const node_4_or_null = node_5.four_nodes.get(bit_index_4);
@@ -379,13 +377,17 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 }
 
 //GPT copypasta:
-const R: u32 = 128;
+const R: u32 = 3; //128;
 const D: u32 = R * 2;
 
 test "sphere" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
+    const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
+
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     var buffer = std.ArrayList(u8).init(allocator);
     defer buffer.deinit();
@@ -402,6 +404,7 @@ test "sphere" {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
+                    std.debug.print("loop is at {}{}{}\n", .{ z, x, y });
                     try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
                 }
             }
