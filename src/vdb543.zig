@@ -389,9 +389,20 @@ fn printVDB(vdb: VDB) void {
     p("{d} Four nodes in VDB\n", .{num_four_nodes});
     for (0..num_four_nodes) |n| {
         p("\nFour Node {d}\n", .{n});
-        const four_node = vdb.five_node.four_nodes.get(@as(u32, @intCast(n))).?;
-        p("     mask: {any}\n", .{four_node.mask});
-        p("     Number of three nodes: {d}\n", .{four_node.three_nodes.count()});
+        const four_node_opt = vdb.five_node.four_nodes.get(@as(u32, @intCast(n)));
+        if (four_node_opt != null) {
+            const four_node = four_node_opt.?;
+            //p("     mask: {any}\n", .{four_node.mask});
+            const num_three_nodes = four_node.three_nodes.count();
+            p("     Number of three nodes: {d}\n", .{num_three_nodes});
+            //TODO: Fix this:
+            //            for (0..num_three_nodes) |m| {
+            //                p("             Number of leafs: {d}\n", .{four_node.three_nodes.get(@as(u32, @intCast(m))).data});
+            //           }
+
+        } else {
+            p("     Four node is null\n", .{});
+        }
     }
 }
 
