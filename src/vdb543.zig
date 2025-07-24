@@ -255,16 +255,12 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
                     const bit_index_3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @ctz(four_mask));
-
-                    std.debug.print("three node bit index: {d}\nthere are {d} three nodes\n", .{ bit_index_3n, node_4.three_nodes.count() });
-                    // for (node_4.three_nodes.len, 0..) |_, idx| {
-                    //     std.debug.print("key: {d} val: {}", .{ idx, node_4.three_nodes.get(idx) });
-                    // }
-                    //
                     const node_3 = node_4.three_nodes.get(bit_index_3n).?;
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
                     }
+                    writeU8(buffer, 6); //no compression
+                    writeSlice(f16, buffer, &node_3.data);
                 }
             }
         }
@@ -273,15 +269,15 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     //Now we write the actual data (I think)
     std.debug.print("writing data\n", .{});
     for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
-        std.debug.print("   at five mask idx {d}\n", .{five_mask_idx});
-        std.debug.print("   five mask og: {d}", .{five_mask_og});
+        // std.debug.print("   at five mask idx {d}\n", .{five_mask_idx});
+        // std.debug.print("   five mask og: {d}", .{five_mask_og});
         var five_mask = five_mask_og;
-        std.debug.print("   five mask: {d}", .{five_mask});
+        //std.debug.print("   five mask: {d}", .{five_mask});
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
             const bit_index_w4n = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
             //NOTE: I feel like there is potential to DRY with some comptimes
             const node_4 = node_5.four_nodes.get(bit_index_w4n).?;
-            std.debug.print("node for gotten at bit index: {d}", .{bit_index_w4n});
+            //std.debug.print("node for gotten at bit index: {d}", .{bit_index_w4n});
             for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
@@ -374,7 +370,7 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 
     //Temporary UUID
     //TODO: generate one
-    writeString(buffer, "2d46f03e-b0e9-48f1-8311-07f573dbcae2");
+    writeString(buffer, "7a0f79c6-c47a-4954-8af8-8a9dcc384448");
 
     //No Metadata for now
     writeU32(buffer, 0);
@@ -386,7 +382,7 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 }
 
 //GPT copypasta:
-const R: u32 = 3; //128;
+const R: u32 = 128;
 const D: u32 = R * 2;
 
 test "sphere" {
@@ -413,7 +409,7 @@ test "sphere" {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
-                    std.debug.print("loop is at {}{}{}\n", .{ z, x, y });
+                    //                    std.debug.print("loop is at {}{}{}\n", .{ z, x, y });
                     try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
                 }
             }
@@ -421,7 +417,7 @@ test "sphere" {
     }
 
     //SANITY CHECK:
-    std.debug.print("Number of Nodes in the VDB:\n4N: {d}\n3N: {d}\n", .{ vdb.five_node.four_nodes.count(), "h" });
+    std.debug.print("Number of Nodes in the VDB:\n4N: {d}\n", .{vdb.five_node.four_nodes.count()});
 
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
