@@ -245,12 +245,12 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
             const bit_index_4n = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
             const node_4 = node_5.four_nodes.get(bit_index_4n).?;
 
-            std.debug.print("mask found at four node bit index bit index: {}\n", .{bit_index_4n});
+            //            std.debug.print("mask found at four node bit index bit index: {}\n", .{bit_index_4n});
 
             writeNode4Header(buffer, node_4);
 
             //Iterate 3-nodes
-            std.debug.print("iterating 3 nodes\n", .{});
+            //            std.debug.print("iterating 3 nodes\n", .{});
             for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
@@ -325,7 +325,7 @@ fn writeTransform(buffer: *std.ArrayList(u8), affine: [4][4]f64) void {
     writeF64(buffer, affine[0][3]);
     writeF64(buffer, affine[1][3]);
     writeF64(buffer, affine[2][3]);
-    writeF64(buffer, 0);
+    writeF64(buffer, 1);
 }
 
 fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
@@ -342,7 +342,6 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Grid descriptor stream position
     //WARNING: I am shaky on what this is, the first line is a direct chatGPT translation of the odin code (bad form on my part)
     writeU64(buffer, @as(u64, buffer.items.len) + @sizeOf(u64) * 3);
-
     writeU64(buffer, 0);
     writeU64(buffer, 0);
 
@@ -352,7 +351,31 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeMetadata(buffer);
     writeTransform(buffer, affine);
     writeTree(buffer, vdb);
+    //WARNING: GPT suggestion:
+    //basically the Odin code seems to erraneously
+    //include this, but it is needed for the
+    //vdb to load in blender (WEIRD!)
+    writeU8(buffer, 0x42);
+    writeU64(buffer, 1);
 }
+
+const file = struct {
+    //should have the data
+    //then each function operates on a switch with the type
+    magic: std.ArrayList(u8),
+    file_version: u32,
+    library_version_major: u32,
+    library_version_minor: u32,
+    grid_offset: u8,
+    uuID: [36]u8,
+    metadata: u32,
+    num_grids: u32,
+
+    //needs an init too!
+    //Okay but the most important thing is the order
+    //which needs to be preserved for read and write
+    //so this is actually kind of a weird pattern ngl...
+};
 
 fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Magic Number (needed it spells out BDV)
@@ -381,8 +404,10 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeGrid(buffer, vdb, affine);
 }
 
-fn printVDB(vdb: VDB) void {
+fn printTree(vdb: VDB) void {
     const p = std.debug.print;
+    p("-----------------------------------\n", .{});
+    p("------------VDB NODES--------------\n", .{});
     p("vdb type: {s}\n", .{@typeName(@TypeOf(vdb))});
     const num_four_nodes = vdb.five_node.four_nodes.count();
 
@@ -392,20 +417,30 @@ fn printVDB(vdb: VDB) void {
         const four_node_opt = vdb.five_node.four_nodes.get(@as(u32, @intCast(n)));
         if (four_node_opt != null) {
             const four_node = four_node_opt.?;
-            //p("     mask: {any}\n", .{four_node.mask});
+            //p("     mask: {any}\n", .{eour_node.mask});
             const num_three_nodes = four_node.three_nodes.count();
             p("     Number of three nodes: {d}\n", .{num_three_nodes});
-            //TODO: Fix this:
-            //            for (0..num_three_nodes) |m| {
-            //                p("             Number of leafs: {d}\n", .{four_node.three_nodes.get(@as(u32, @intCast(m))).data});
-            //           }
-
+            for (0..num_three_nodes) |m| {
+                const three_node_opt = four_node.three_nodes.get(@as(u32, @intCast(m))); //three_nodes.get(@as(u32, @intCast(m))); //.data.?;
+                if (three_node_opt != null) {
+                    const three_node = three_node_opt.?; //WARNING: type hints are wrong here! is is indeed a *Node3
+                    //verify masked data:
+                    //var combined_mask = ""
+                    //inline for (masks) |mask| combined_mask += "{b}"
+                    p("             masks: {b}\n", .{three_node.mask});
+                    p("     data: {d}\n", .{three_node.data});
+                }
+            }
         } else {
             p("     Four node is null\n", .{});
         }
     }
+    p("-----------------------------------\n", .{});
 }
-
+// fn printBuffer(buffer: *std.ArrayList(u8)) void {
+//     const p = std.debug.print;
+//     p("Buffer:\n{d}\n", .{buffer.*[0..5]});
+// }
 //GPT copypasta:
 const R: u32 = 128;
 const D: u32 = R * 2;
@@ -441,7 +476,7 @@ test "sphere" {
     }
 
     //SANITY CHECK:
-    printVDB(vdb);
+    printTree(vdb);
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
         .{ 0.0, 1.0, 0.0, 0.0 },
@@ -449,10 +484,10 @@ test "sphere" {
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-
-    const file = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/test_zig.vdb", .{});
-    defer file.close();
-    try file.writeAll(buffer.items);
+    //printBuffer(&buffer);
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/test_zig.vdb", .{});
+    defer file0.close();
+    try file0.writeAll(buffer.items);
 }
 
 // Utility functions
