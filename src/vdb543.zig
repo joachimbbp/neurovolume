@@ -1,4 +1,3 @@
-//Minimal 543 vdb writer based off the JengaFX repo
 const std = @import("std");
 
 //IO helper functions
@@ -141,11 +140,10 @@ fn getBitIndex3(position: [3]u32) u32 {
         relative_position[1] >> 3,
         relative_position[2] >> 3,
     };
-    return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
+    return index_3d[2] | (index_3d[1] << 4) | (index_3d[0] << 8);
 }
 fn getBitIndex0(position: [3]u32) u32 {
     const relative_position: [3]u32 = .{ position[0] & (8 - 1), position[1] & (8 - 1), position[2] & (8 - 1) };
-    //NOTE: the >>0 is just pedagogical, it doesn't do anything
     const index_3d: [3]u32 = .{ relative_position[0] >> 0, relative_position[1] >> 0, relative_position[2] >> 0 };
     return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
@@ -186,6 +184,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & 63);
 
     node_3.data[bit_index_0] = value;
+    //    std.debug.print("Voxel set: [{}] = {}\n", .{ bit_index_0, value });
 }
 
 fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
@@ -255,8 +254,6 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
                     }
-                    //writeU8(buffer, 6); //no compression
-                    //writeSlice(f16, buffer, &node_3.data);
                 }
             }
         }
@@ -273,10 +270,11 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
                     const bit_index_w3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
                     const node_3 = node_4.three_nodes.get(bit_index_w3n).?;
-                    for (node_3.mask) |three_mask| {
-                        writeU64(buffer, three_mask);
-                        writeSlice(f16, buffer, &node_3.data);
-                    }
+                    // for (node_3.mask) |three_mask| {
+                    //     writeU64(buffer, three_mask); //we must re-write the masks for some reason
+                    // }
+                    writeU8(buffer, 6); //6 means no compression
+                    writeSlice(f16, buffer, &node_3.data);
                 }
             }
         }
@@ -352,7 +350,7 @@ const file = struct {
     //should have the data
     //then each function operates on a switch with the type
     magic: std.ArrayList(u8),
-    file_version: u32,
+    // file_version: u32,
     library_version_major: u32,
     library_version_minor: u32,
     grid_offset: u8,
@@ -426,15 +424,13 @@ fn printTree(vdb: VDB) void {
     }
     p("-----------------------------------\n", .{});
 }
-// fn printBuffer(buffer: *std.ArrayList(u8)) void {
-//     const p = std.debug.print;
-//     p("Buffer:\n{d}\n", .{buffer.*[0..5]});
-// }
 //GPT copypasta:
-const R: u32 = 128;
+
+const R: u32 = 128; //5;
 const D: u32 = R * 2;
 
 test "sphere" {
+    const cube = false;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -448,23 +444,28 @@ test "sphere" {
 
     var vdb = try VDB.build(allocator);
 
-    //   const Rf: f32 = @floatFromInt(R);
-    //    const R2: f32 = Rf * Rf;
+    const Rf: f32 = @floatFromInt(R);
+    const R2: f32 = Rf * Rf;
     std.debug.print("setting voxels\n", .{});
     for (0..D) |z| {
         for (0..D) |y| {
             for (0..D) |x| {
-                //              const p = toF32(.{ x, y, z });
-                //const diff = subVec(p, .{ Rf, Rf, Rf });
-                //if (lengthSquared(diff) < R2) {
-                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-                //}
+                const p = toF32(.{ x, y, z });
+                const diff = subVec(p, .{ Rf, Rf, Rf });
+                if (cube == true) {
+                    try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+                }
+                if (cube == false) {
+                    if (lengthSquared(diff) < R2) {
+                        try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+                    }
+                }
             }
         }
     }
 
     //SANITY CHECK:
-    printTree(vdb);
+    //printTree(vdb);
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
         .{ 0.0, 1.0, 0.0, 0.0 },
@@ -476,6 +477,9 @@ test "sphere" {
     const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/test_zig.vdb", .{});
     defer file0.close();
     try file0.writeAll(buffer.items);
+    if (cube == true) {
+        std.debug.print("\ncubin\n", .{});
+    }
 }
 
 // Utility functions
