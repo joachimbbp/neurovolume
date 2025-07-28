@@ -237,20 +237,16 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
 
     writeNode5Header(buffer, node_5);
 
-    //var bit_index: u32 = 0;
+    //CREATE TOPOLOGY:
     for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
-        //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
         var five_mask = five_mask_og;
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
             const bit_index_4n = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
             const node_4 = node_5.four_nodes.get(bit_index_4n).?;
 
-            //            std.debug.print("mask found at four node bit index bit index: {}\n", .{bit_index_4n});
-
             writeNode4Header(buffer, node_4);
 
             //Iterate 3-nodes
-            //            std.debug.print("iterating 3 nodes\n", .{});
             for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
@@ -259,32 +255,25 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
                     for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
                     }
-                    writeU8(buffer, 6); //no compression
-                    writeSlice(f16, buffer, &node_3.data);
+                    //writeU8(buffer, 6); //no compression
+                    //writeSlice(f16, buffer, &node_3.data);
                 }
             }
         }
     }
 
-    //Now we write the actual data (I think)
-    std.debug.print("writing data\n", .{});
+    //WRITE DATA
     for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
-        // std.debug.print("   at five mask idx {d}\n", .{five_mask_idx});
-        // std.debug.print("   five mask og: {d}", .{five_mask_og});
         var five_mask = five_mask_og;
-        //std.debug.print("   five mask: {d}", .{five_mask});
         while (five_mask != 0) : (five_mask &= five_mask - 1) {
             const bit_index_w4n = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
-            //NOTE: I feel like there is potential to DRY with some comptimes
             const node_4 = node_5.four_nodes.get(bit_index_w4n).?;
-            //std.debug.print("node for gotten at bit index: {d}", .{bit_index_w4n});
             for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
                 var four_mask = four_mask_og;
                 while (four_mask != 0) : (four_mask &= four_mask - 1) {
                     const bit_index_w3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
                     const node_3 = node_4.three_nodes.get(bit_index_w3n).?;
                     for (node_3.mask) |three_mask| {
-                        //std.debug.print("       writing slice at three mask\n", .{});
                         writeU64(buffer, three_mask);
                         writeSlice(f16, buffer, &node_3.data);
                     }
@@ -459,18 +448,17 @@ test "sphere" {
 
     var vdb = try VDB.build(allocator);
 
-    const Rf: f32 = @floatFromInt(R);
-    const R2: f32 = Rf * Rf;
+    //   const Rf: f32 = @floatFromInt(R);
+    //    const R2: f32 = Rf * Rf;
     std.debug.print("setting voxels\n", .{});
     for (0..D) |z| {
         for (0..D) |y| {
             for (0..D) |x| {
-                const p = toF32(.{ x, y, z });
-                const diff = subVec(p, .{ Rf, Rf, Rf });
-                if (lengthSquared(diff) < R2) {
-                    //                    std.debug.print("loop is at {}{}{}\n", .{ z, x, y });
-                    try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-                }
+                //              const p = toF32(.{ x, y, z });
+                //const diff = subVec(p, .{ Rf, Rf, Rf });
+                //if (lengthSquared(diff) < R2) {
+                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+                //}
             }
         }
     }
