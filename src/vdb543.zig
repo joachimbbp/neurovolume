@@ -169,7 +169,6 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     }
 
     var node_3: *Node3 = undefined;
-
     const node_3_or_null = node_4.three_nodes.get(bit_index_3);
     if (node_3_or_null == null) {
         node_3 = try Node3.build(allocator);
@@ -184,7 +183,6 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & 63);
 
     node_3.data[bit_index_0] = value;
-    //    std.debug.print("Voxel set: [{}] = {}\n", .{ bit_index_0, value });
 }
 
 fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
@@ -201,7 +199,7 @@ fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
     //Write uncompressed (signified by 6) node values
     writeU8(buffer, 6);
     var i: usize = 0;
-    while (i <= 32768) : (i += 1) {
+    while (i < 32768) : (i += 1) {
         writeU16(buffer, 0);
     }
 }
@@ -216,7 +214,7 @@ fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) void {
     }
     writeU8(buffer, 6);
     var i: usize = 0;
-    while (i <= 4096) : (i += 1) {
+    while (i < 4096) : (i += 1) {
         writeU16(buffer, 0);
     }
 }
@@ -237,21 +235,21 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     writeNode5Header(buffer, node_5);
 
     //CREATE TOPOLOGY:
-    for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
-        var five_mask = five_mask_og;
-        while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            const bit_index_4n = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
+    for (node_5.mask[0..], 0..) |five_mask_og_t, five_mask_idx_t| {
+        var five_mask_t = five_mask_og_t;
+        while (five_mask_t != 0) : (five_mask_t &= five_mask_t - 1) {
+            const bit_index_4n = @as(u32, @intCast(five_mask_idx_t)) * 64 + @as(u32, @ctz(five_mask_t));
             const node_4 = node_5.four_nodes.get(bit_index_4n).?;
 
             writeNode4Header(buffer, node_4);
 
             //Iterate 3-nodes
-            for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
-                var four_mask = four_mask_og;
-                while (four_mask != 0) : (four_mask &= four_mask - 1) {
-                    const bit_index_3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @ctz(four_mask));
-                    const node_3 = node_4.three_nodes.get(bit_index_3n).?;
-                    for (node_3.mask) |three_mask| {
+            for (node_4.mask[0..], 0..) |four_mask_og_t, four_mask_idx_t| {
+                var four_mask_t = four_mask_og_t;
+                while (four_mask_t != 0) : (four_mask_t &= four_mask_t - 1) {
+                    const bit_index_3n_t = @as(u32, @intCast(four_mask_idx_t)) * 64 + @as(u32, @ctz(four_mask_t));
+                    const node_3_t = node_4.three_nodes.get(bit_index_3n_t).?;
+                    for (node_3_t.mask) |three_mask| {
                         writeU64(buffer, three_mask);
                     }
                 }
@@ -260,21 +258,21 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     }
 
     //WRITE DATA
-    for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
-        var five_mask = five_mask_og;
-        while (five_mask != 0) : (five_mask &= five_mask - 1) {
-            const bit_index_w4n = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
-            const node_4 = node_5.four_nodes.get(bit_index_w4n).?;
-            for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
-                var four_mask = four_mask_og;
-                while (four_mask != 0) : (four_mask &= four_mask - 1) {
-                    const bit_index_w3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
-                    const node_3 = node_4.three_nodes.get(bit_index_w3n).?;
-                    // for (node_3.mask) |three_mask| {
-                    //     writeU64(buffer, three_mask); //we must re-write the masks for some reason
-                    // }
+    for (node_5.mask[0..], 0..) |five_mask_og_d, five_mask_idx_d| {
+        var five_mask_d = five_mask_og_d;
+        while (five_mask_d != 0) : (five_mask_d &= five_mask_d - 1) {
+            const bit_index_4_d = @as(u32, @intCast(five_mask_idx_d)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask_d)));
+            const node_4_t = node_5.four_nodes.get(bit_index_4_d).?;
+            for (node_4_t.mask[0..], 0..) |four_mask_og_d, four_mask_idx_d| {
+                var four_mask_d = four_mask_og_d;
+                while (four_mask_d != 0) : (four_mask_d &= four_mask_d - 1) {
+                    const bit_index_3_d = @as(u32, @intCast(four_mask_idx_d)) * 64 + @as(u32, @intCast(@ctz(four_mask_d)));
+                    const node_3_d = node_4_t.three_nodes.get(bit_index_3_d).?;
+                    for (node_3_d.mask) |three_mask| {
+                        writeU64(buffer, three_mask); //we must re-write the masks for some reason
+                    }
                     writeU8(buffer, 6); //6 means no compression
-                    writeSlice(f16, buffer, &node_3.data);
+                    writeSlice(f16, buffer, &node_3_d.data);
                 }
             }
         }
@@ -327,7 +325,6 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeU32(buffer, 0);
 
     //Grid descriptor stream position
-    //WARNING: I am shaky on what this is, the first line is a direct chatGPT translation of the odin code (bad form on my part)
     writeU64(buffer, @as(u64, buffer.items.len) + @sizeOf(u64) * 3);
     writeU64(buffer, 0);
     writeU64(buffer, 0);
@@ -338,12 +335,6 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeMetadata(buffer);
     writeTransform(buffer, affine);
     writeTree(buffer, vdb);
-    //WARNING: GPT suggestion:
-    //basically the Odin code seems to erraneously
-    //include this, but it is needed for the
-    //vdb to load in blender (WEIRD!)
-    writeU8(buffer, 0x42);
-    writeU64(buffer, 1);
 }
 
 const file = struct {
@@ -426,7 +417,7 @@ fn printTree(vdb: VDB) void {
 }
 //GPT copypasta:
 
-const R: u32 = 128; //5;
+const R: u32 = 128;
 const D: u32 = R * 2;
 
 test "sphere" {
@@ -464,7 +455,6 @@ test "sphere" {
         }
     }
 
-    //SANITY CHECK:
     //printTree(vdb);
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
@@ -474,7 +464,7 @@ test "sphere" {
     };
     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/test_zig.vdb", .{});
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/hdr_fix_big_zig.vdb", .{});
     defer file0.close();
     try file0.writeAll(buffer.items);
     if (cube == true) {
