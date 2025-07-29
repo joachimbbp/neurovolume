@@ -5,7 +5,7 @@ fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) void
     buffer.appendSlice(pointer[0..len]) catch unreachable;
 }
 fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) void {
-    const byte_data = std.mem.sliceAsBytes(slice); //@as([*]const u8, @ptrCast(slice.ptr))[0 .. slice.len * @sizeOf(T)];
+    const byte_data = std.mem.sliceAsBytes(slice);
     buffer.appendSlice(byte_data) catch unreachable;
 }
 fn writeU8(buffer: *std.ArrayList(u8), value: u8) void {
@@ -263,6 +263,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
         while (five_mask_d != 0) : (five_mask_d &= five_mask_d - 1) {
             const bit_index_4_d = @as(u32, @intCast(five_mask_idx_d)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask_d)));
             const node_4_t = node_5.four_nodes.get(bit_index_4_d).?;
+
             for (node_4_t.mask[0..], 0..) |four_mask_og_d, four_mask_idx_d| {
                 var four_mask_d = four_mask_og_d;
                 while (four_mask_d != 0) : (four_mask_d &= four_mask_d - 1) {
@@ -325,7 +326,7 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeU32(buffer, 0);
 
     //Grid descriptor stream position
-    writeU64(buffer, @as(u64, buffer.items.len) + @sizeOf(u64) * 3);
+    writeU64(buffer, @as(u64, @intCast(buffer.items.len)) + @sizeOf(u64) * 3);
     writeU64(buffer, 0);
     writeU64(buffer, 0);
 
@@ -421,7 +422,7 @@ const R: u32 = 128;
 const D: u32 = R * 2;
 
 test "sphere" {
-    const cube = false;
+    const cube = true;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -438,9 +439,9 @@ test "sphere" {
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
     std.debug.print("setting voxels\n", .{});
-    for (0..D) |z| {
-        for (0..D) |y| {
-            for (0..D) |x| {
+    for (0..D - 1) |z| {
+        for (0..D - 1) |y| {
+            for (0..D - 1) |x| {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (cube == true) {
@@ -464,7 +465,7 @@ test "sphere" {
     };
     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/hdr_fix_big_zig.vdb", .{});
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/cube_zig.vdb", .{});
     defer file0.close();
     try file0.writeAll(buffer.items);
     if (cube == true) {
