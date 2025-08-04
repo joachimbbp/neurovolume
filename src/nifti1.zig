@@ -1,5 +1,9 @@
 const std = @import("std");
 
+const AccessError = error{
+    UnsupportedByteNumber,
+};
+
 pub const Header = extern struct {
     sizeofHdr: i32, //Must be 348
     dataType: [10]u8,
@@ -51,34 +55,34 @@ pub const Header = extern struct {
 
     magic: [4]u8,
 };
-
 pub const Image = struct { //not sure why this was originally an extern struct?
     header: *const Header,
     data: []const u8,
     allocator: *const std.mem.Allocator,
     data_type: []const u8,
+    bytes_per_voxel: i16,
 
-    const Errors = error{
-        UnsupportedBitPix,
-    };
-    const Bytes = enum(i16) {
-        one = 8,
-        two = 16,
-        four = 32,
-        eight = 64,
-    };
+    pub fn getAt4D(self: *const Image, pos: [4]usize) !f32 {
+        const nx: usize = @intCast(self.header.dim[1]);
+        const ny: usize = @intCast(self.header.dim[2]);
+        const nz: usize = @intCast(self.header.dim[3]);
 
-    fn btf(comptime bytes: Bytes, b: *const [@intFromEnum(bytes)]u8) f32 {
-        const Int = @Type(.{ .int = .{ .bits = @intFromEnum(bytes), .signedness = .signed } });
-        const signed = std.mem.readInt(Int, b, .little);
-        return @floatFromInt(signed);
-    }
-    pub fn bytesToFloat(self: *const Image, bytes: []const u8) !f32 {
-        const num_bytes = std.meta.intToEnum(Bytes, self.header.bitpix) catch return error.UnsupportedBitPix;
-        switch (num_bytes) {
-            inline else => |b| return btf(b, bytes[0..@intFromEnum(b)]),
+        const index: usize = pos[3] * nx * ny * nz + pos[2] * nx * ny + pos[1] * nx + pos[0];
+        const bit_start: usize = index * @as(usize, @intCast(self.bytes_per_voxel));
+        const bit_end: usize = (index + 1) * @as(usize, @intCast(self.bytes_per_voxel));
+
+        const raw_value = switch (self.bytes_per_voxel) {
+            2 => btf2(self.data[bit_start..bit_end]),
+            //TODO: all of the other byte to float functions!
+            else => return AccessError.UnsupportedByteNumber,
+        };
+        if (self.header.sclSlope != 0) {
+            return self.header.sclSlope * raw_value + self.header.sclInter;
+        } else {
+            return raw_value;
         }
     }
+
     pub fn printHeader(self: *const Image) void {
         std.debug.print("{any}", .{self.header});
     }
@@ -125,24 +129,40 @@ pub const Image = struct { //not sure why this was originally an extern struct?
             2304 => "rgba",
             else => "unknown",
         };
-
-        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .data_type = data_type };
+        const bytes_per_voxel = @divTrunc(header_ptr.*.bitpix, 8);
+        return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .data_type = data_type, .bytes_per_voxel = bytes_per_voxel };
     }
 
     pub fn deinit(self: *const Image) void {
-        //TODO everything else
+        //TODO: everything else
+        //why did robbie put this as destroy for one and free for the other?
         self.allocator.destroy(self.header);
         self.allocator.free(self.data);
     }
 };
 
+//Byte to float functions
+fn btf2(bytes: []const u8) f32 {
+    //This was GPT suggested *but* I checked through the docs and it *seems* correct
+    const value = std.mem.readInt(u16, bytes[0..2], .little);
+    return @floatFromInt(value); //@as(f32, @floatCast(value));
+}
+
 test "open" {
     const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
     const img = try Image.init(static);
+    defer img.deinit();
     (&img).printHeader();
     std.debug.print("\ndatatype: {s}\n", .{img.data_type});
 
-    img.deinit();
+    const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
+    const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
+    const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
+    const mid_t: usize = @divFloor(@as(usize, @intCast(img.header.dim[4])), 2);
+
+    const mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t });
+
+    std.debug.print("middle value: {d}\n", .{mid_value});
 }
 
 //convention:

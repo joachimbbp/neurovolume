@@ -183,6 +183,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & 63);
 
     node_3.data[bit_index_0] = value;
+    //    std.debug.print("bit_index_4: {d}  mask slot: {d}\n", .{ bit_index_4, bit_index_4 >> 6 });
 }
 
 fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
@@ -212,6 +213,7 @@ fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) void {
     for (node.mask) |_| {
         writeU64(buffer, 0);
     }
+
     writeU8(buffer, 6);
     var i: usize = 0;
     while (i < 4096) : (i += 1) {
@@ -238,7 +240,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     for (node_5.mask[0..], 0..) |five_mask_og_t, five_mask_idx_t| {
         var five_mask_t = five_mask_og_t;
         while (five_mask_t != 0) : (five_mask_t &= five_mask_t - 1) {
-            const bit_index_4n = @as(u32, @intCast(five_mask_idx_t)) * 64 + @as(u32, @ctz(five_mask_t));
+            const bit_index_4n = @as(u32, @intCast(five_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(five_mask_t));
             const node_4 = node_5.four_nodes.get(bit_index_4n).?;
 
             writeNode4Header(buffer, node_4);
@@ -247,7 +249,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
             for (node_4.mask[0..], 0..) |four_mask_og_t, four_mask_idx_t| {
                 var four_mask_t = four_mask_og_t;
                 while (four_mask_t != 0) : (four_mask_t &= four_mask_t - 1) {
-                    const bit_index_3n_t = @as(u32, @intCast(four_mask_idx_t)) * 64 + @as(u32, @ctz(four_mask_t));
+                    const bit_index_3n_t = @as(u32, @intCast(four_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(four_mask_t));
                     const node_3_t = node_4.three_nodes.get(bit_index_3n_t).?;
                     for (node_3_t.mask) |three_mask| {
                         writeU64(buffer, three_mask);
@@ -278,7 +280,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
             }
         }
     }
-    std.debug.print("end of tree writing function", .{});
+    std.debug.print("end of tree writing function\n", .{});
 }
 
 fn writeMetadata(buffer: *std.ArrayList(u8)) void {
@@ -338,24 +340,6 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeTree(buffer, vdb);
 }
 
-const file = struct {
-    //should have the data
-    //then each function operates on a switch with the type
-    magic: std.ArrayList(u8),
-    // file_version: u32,
-    library_version_major: u32,
-    library_version_minor: u32,
-    grid_offset: u8,
-    uuID: [36]u8,
-    metadata: u32,
-    num_grids: u32,
-
-    //needs an init too!
-    //Okay but the most important thing is the order
-    //which needs to be preserved for read and write
-    //so this is actually kind of a weird pattern ngl...
-};
-
 fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Magic Number (needed it spells out BDV)
     writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
@@ -383,46 +367,11 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeGrid(buffer, vdb, affine);
 }
 
-fn printTree(vdb: VDB) void {
-    const p = std.debug.print;
-    p("-----------------------------------\n", .{});
-    p("------------VDB NODES--------------\n", .{});
-    p("vdb type: {s}\n", .{@typeName(@TypeOf(vdb))});
-    const num_four_nodes = vdb.five_node.four_nodes.count();
-
-    p("{d} Four nodes in VDB\n", .{num_four_nodes});
-    for (0..num_four_nodes) |n| {
-        p("\nFour Node {d}\n", .{n});
-        const four_node_opt = vdb.five_node.four_nodes.get(@as(u32, @intCast(n)));
-        if (four_node_opt != null) {
-            const four_node = four_node_opt.?;
-            //p("     mask: {any}\n", .{eour_node.mask});
-            const num_three_nodes = four_node.three_nodes.count();
-            p("     Number of three nodes: {d}\n", .{num_three_nodes});
-            for (0..num_three_nodes) |m| {
-                const three_node_opt = four_node.three_nodes.get(@as(u32, @intCast(m))); //three_nodes.get(@as(u32, @intCast(m))); //.data.?;
-                if (three_node_opt != null) {
-                    const three_node = three_node_opt.?; //WARNING: type hints are wrong here! is is indeed a *Node3
-                    //verify masked data:
-                    //var combined_mask = ""
-                    //inline for (masks) |mask| combined_mask += "{b}"
-                    p("             masks: {b}\n", .{three_node.mask});
-                    p("     data: {d}\n", .{three_node.data});
-                }
-            }
-        } else {
-            p("     Four node is null\n", .{});
-        }
-    }
-    p("-----------------------------------\n", .{});
-}
-//GPT copypasta:
-
 const R: u32 = 128;
 const D: u32 = R * 2;
 
-test "sphere" {
-    const cube = true;
+test "shape" {
+    const cube = false;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -465,12 +414,42 @@ test "sphere" {
     };
     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/cube_zig.vdb", .{});
+
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/1916_zig.vdb", .{});
     defer file0.close();
     try file0.writeAll(buffer.items);
     if (cube == true) {
         std.debug.print("\ncubin\n", .{});
     }
+}
+
+const nifti1 = @import("nifti1.zig");
+test "file" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    const img = try nifti1.Image.init(path);
+    defer img.deinit();
+    (&img).printHeader();
+    const dims = img.header.dim;
+    std.debug.print("\nDimensions: {d}\n", .{dims});
+    //check to make sure it's a static 3D image:
+    if (dims[0] != 3) {
+        std.debug.print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
+    }
+   for (0..dims[3]) |z|{
+        for (0..dims[2]) |x| {
+            for (0..dims[3]) |y| {
+                std.debug.print("Voxel {d}, {d}, {d} is {d}\n", .{x, y, z,}
+    //    var vdb = try VDB.build(allocator);
 }
 
 // Utility functions
