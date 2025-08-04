@@ -1,11 +1,12 @@
+//Minimal 543 vdb writer based off the JengaFX repo
 const std = @import("std");
-const print = std.debug.print;
+
 //IO helper functions
 fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) void {
     buffer.appendSlice(pointer[0..len]) catch unreachable;
 }
 fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) void {
-    const byte_data = std.mem.sliceAsBytes(slice);
+    const byte_data = std.mem.sliceAsBytes(slice); //@as([*]const u8, @ptrCast(slice.ptr))[0 .. slice.len * @sizeOf(T)];
     buffer.appendSlice(byte_data) catch unreachable;
 }
 fn writeU8(buffer: *std.ArrayList(u8), value: u8) void {
@@ -140,10 +141,11 @@ fn getBitIndex3(position: [3]u32) u32 {
         relative_position[1] >> 3,
         relative_position[2] >> 3,
     };
-    return index_3d[2] | (index_3d[1] << 4) | (index_3d[0] << 8);
+    return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
 fn getBitIndex0(position: [3]u32) u32 {
     const relative_position: [3]u32 = .{ position[0] & (8 - 1), position[1] & (8 - 1), position[2] & (8 - 1) };
+    //NOTE: the >>0 is just pedagogical, it doesn't do anything
     const index_3d: [3]u32 = .{ relative_position[0] >> 0, relative_position[1] >> 0, relative_position[2] >> 0 };
     return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
@@ -169,6 +171,7 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     }
 
     var node_3: *Node3 = undefined;
+
     const node_3_or_null = node_4.three_nodes.get(bit_index_3);
     if (node_3_or_null == null) {
         node_3 = try Node3.build(allocator);
@@ -183,7 +186,6 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & 63);
 
     node_3.data[bit_index_0] = value;
-    //    std.debug.print("bit_index_4: {d}  mask slot: {d}\n", .{ bit_index_4, bit_index_4 >> 6 });
 }
 
 fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
@@ -200,7 +202,7 @@ fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
     //Write uncompressed (signified by 6) node values
     writeU8(buffer, 6);
     var i: usize = 0;
-    while (i < 32768) : (i += 1) {
+    while (i <= 32768) : (i += 1) {
         writeU16(buffer, 0);
     }
 }
@@ -213,10 +215,9 @@ fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) void {
     for (node.mask) |_| {
         writeU64(buffer, 0);
     }
-
     writeU8(buffer, 6);
     var i: usize = 0;
-    while (i < 4096) : (i += 1) {
+    while (i <= 4096) : (i += 1) {
         writeU16(buffer, 0);
     }
 }
@@ -236,51 +237,62 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
 
     writeNode5Header(buffer, node_5);
 
-    //CREATE TOPOLOGY:
-    for (node_5.mask[0..], 0..) |five_mask_og_t, five_mask_idx_t| {
-        var five_mask_t = five_mask_og_t;
-        while (five_mask_t != 0) : (five_mask_t &= five_mask_t - 1) {
-            const bit_index_4n = @as(u32, @intCast(five_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(five_mask_t));
+    //var bit_index: u32 = 0;
+    for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
+        //Use Kerningham's algorithm to count only the "active" binary spaces in the mask:
+        var five_mask = five_mask_og;
+        while (five_mask != 0) : (five_mask &= five_mask - 1) {
+            const bit_index_4n = @as(u32, @intCast(five_mask_idx)) * 64 + @as(u32, @ctz(five_mask));
             const node_4 = node_5.four_nodes.get(bit_index_4n).?;
+
+            //            std.debug.print("mask found at four node bit index bit index: {}\n", .{bit_index_4n});
 
             writeNode4Header(buffer, node_4);
 
             //Iterate 3-nodes
-            for (node_4.mask[0..], 0..) |four_mask_og_t, four_mask_idx_t| {
-                var four_mask_t = four_mask_og_t;
-                while (four_mask_t != 0) : (four_mask_t &= four_mask_t - 1) {
-                    const bit_index_3n_t = @as(u32, @intCast(four_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(four_mask_t));
-                    const node_3_t = node_4.three_nodes.get(bit_index_3n_t).?;
-                    for (node_3_t.mask) |three_mask| {
+            //            std.debug.print("iterating 3 nodes\n", .{});
+            for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
+                var four_mask = four_mask_og;
+                while (four_mask != 0) : (four_mask &= four_mask - 1) {
+                    const bit_index_3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @ctz(four_mask));
+                    const node_3 = node_4.three_nodes.get(bit_index_3n).?;
+                    for (node_3.mask) |three_mask| {
                         writeU64(buffer, three_mask);
                     }
+                    writeU8(buffer, 6); //no compression
+                    writeSlice(f16, buffer, &node_3.data);
                 }
             }
         }
     }
 
-    //WRITE DATA
-    for (node_5.mask[0..], 0..) |five_mask_og_d, five_mask_idx_d| {
-        var five_mask_d = five_mask_og_d;
-        while (five_mask_d != 0) : (five_mask_d &= five_mask_d - 1) {
-            const bit_index_4_d = @as(u32, @intCast(five_mask_idx_d)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask_d)));
-            const node_4_t = node_5.four_nodes.get(bit_index_4_d).?;
-
-            for (node_4_t.mask[0..], 0..) |four_mask_og_d, four_mask_idx_d| {
-                var four_mask_d = four_mask_og_d;
-                while (four_mask_d != 0) : (four_mask_d &= four_mask_d - 1) {
-                    const bit_index_3_d = @as(u32, @intCast(four_mask_idx_d)) * 64 + @as(u32, @intCast(@ctz(four_mask_d)));
-                    const node_3_d = node_4_t.three_nodes.get(bit_index_3_d).?;
-                    for (node_3_d.mask) |three_mask| {
-                        writeU64(buffer, three_mask); //we must re-write the masks for some reason
+    //Now we write the actual data (I think)
+    std.debug.print("writing data\n", .{});
+    for (node_5.mask[0..], 0..) |five_mask_og, five_mask_idx| {
+        // std.debug.print("   at five mask idx {d}\n", .{five_mask_idx});
+        // std.debug.print("   five mask og: {d}", .{five_mask_og});
+        var five_mask = five_mask_og;
+        //std.debug.print("   five mask: {d}", .{five_mask});
+        while (five_mask != 0) : (five_mask &= five_mask - 1) {
+            const bit_index_w4n = @as(u32, @intCast(five_mask_idx)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask)));
+            //NOTE: I feel like there is potential to DRY with some comptimes
+            const node_4 = node_5.four_nodes.get(bit_index_w4n).?;
+            //std.debug.print("node for gotten at bit index: {d}", .{bit_index_w4n});
+            for (node_4.mask[0..], 0..) |four_mask_og, four_mask_idx| {
+                var four_mask = four_mask_og;
+                while (four_mask != 0) : (four_mask &= four_mask - 1) {
+                    const bit_index_w3n = @as(u32, @intCast(four_mask_idx)) * 64 + @as(u32, @intCast(@ctz(four_mask)));
+                    const node_3 = node_4.three_nodes.get(bit_index_w3n).?;
+                    for (node_3.mask) |three_mask| {
+                        //std.debug.print("       writing slice at three mask\n", .{});
+                        writeU64(buffer, three_mask);
+                        writeSlice(f16, buffer, &node_3.data);
                     }
-                    writeU8(buffer, 6); //6 means no compression
-                    writeSlice(f16, buffer, &node_3_d.data);
                 }
             }
         }
     }
-    print("end of tree writing function\n", .{});
+    std.debug.print("end of tree writing function", .{});
 }
 
 fn writeMetadata(buffer: *std.ArrayList(u8)) void {
@@ -313,7 +325,7 @@ fn writeTransform(buffer: *std.ArrayList(u8), affine: [4][4]f64) void {
     writeF64(buffer, affine[0][3]);
     writeF64(buffer, affine[1][3]);
     writeF64(buffer, affine[2][3]);
-    writeF64(buffer, 1);
+    writeF64(buffer, 0);
 }
 
 fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
@@ -328,7 +340,9 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeU32(buffer, 0);
 
     //Grid descriptor stream position
-    writeU64(buffer, @as(u64, @intCast(buffer.items.len)) + @sizeOf(u64) * 3);
+    //WARNING: I am shaky on what this is, the first line is a direct chatGPT translation of the odin code (bad form on my part)
+    writeU64(buffer, @as(u64, buffer.items.len) + @sizeOf(u64) * 3);
+
     writeU64(buffer, 0);
     writeU64(buffer, 0);
 
@@ -339,6 +353,24 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeTransform(buffer, affine);
     writeTree(buffer, vdb);
 }
+
+const file = struct {
+    //should have the data
+    //then each function operates on a switch with the type
+    magic: std.ArrayList(u8),
+    file_version: u32,
+    library_version_major: u32,
+    library_version_minor: u32,
+    grid_offset: u8,
+    uuID: [36]u8,
+    metadata: u32,
+    num_grids: u32,
+
+    //needs an init too!
+    //Okay but the most important thing is the order
+    //which needs to be preserved for read and write
+    //so this is actually kind of a weird pattern ngl...
+};
 
 fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Magic Number (needed it spells out BDV)
@@ -367,11 +399,48 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeGrid(buffer, vdb, affine);
 }
 
+fn printTree(vdb: VDB) void {
+    const p = std.debug.print;
+    p("-----------------------------------\n", .{});
+    p("------------VDB NODES--------------\n", .{});
+    p("vdb type: {s}\n", .{@typeName(@TypeOf(vdb))});
+    const num_four_nodes = vdb.five_node.four_nodes.count();
+
+    p("{d} Four nodes in VDB\n", .{num_four_nodes});
+    for (0..num_four_nodes) |n| {
+        p("\nFour Node {d}\n", .{n});
+        const four_node_opt = vdb.five_node.four_nodes.get(@as(u32, @intCast(n)));
+        if (four_node_opt != null) {
+            const four_node = four_node_opt.?;
+            //p("     mask: {any}\n", .{eour_node.mask});
+            const num_three_nodes = four_node.three_nodes.count();
+            p("     Number of three nodes: {d}\n", .{num_three_nodes});
+            for (0..num_three_nodes) |m| {
+                const three_node_opt = four_node.three_nodes.get(@as(u32, @intCast(m))); //three_nodes.get(@as(u32, @intCast(m))); //.data.?;
+                if (three_node_opt != null) {
+                    const three_node = three_node_opt.?; //WARNING: type hints are wrong here! is is indeed a *Node3
+                    //verify masked data:
+                    //var combined_mask = ""
+                    //inline for (masks) |mask| combined_mask += "{b}"
+                    p("             masks: {b}\n", .{three_node.mask});
+                    p("     data: {d}\n", .{three_node.data});
+                }
+            }
+        } else {
+            p("     Four node is null\n", .{});
+        }
+    }
+    p("-----------------------------------\n", .{});
+}
+// fn printBuffer(buffer: *std.ArrayList(u8)) void {
+//     const p = std.debug.print;
+//     p("Buffer:\n{d}\n", .{buffer.*[0..5]});
+// }
+//GPT copypasta:
 const R: u32 = 128;
 const D: u32 = R * 2;
 
-test "shape" {
-    const cube = false;
+test "sphere" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -387,25 +456,22 @@ test "shape" {
 
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
-    print("setting voxels\n", .{});
-    for (0..D - 1) |z| {
-        for (0..D - 1) |y| {
-            for (0..D - 1) |x| {
+    std.debug.print("setting voxels\n", .{});
+    for (0..D) |z| {
+        for (0..D) |y| {
+            for (0..D) |x| {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
-                if (cube == true) {
+                if (lengthSquared(diff) < R2) {
+                    //                    std.debug.print("loop is at {}{}{}\n", .{ z, x, y });
                     try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-                }
-                if (cube == false) {
-                    if (lengthSquared(diff) < R2) {
-                        try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-                    }
                 }
             }
         }
     }
 
-    //printTree(vdb);
+    //SANITY CHECK:
+    printTree(vdb);
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
         .{ 0.0, 1.0, 0.0, 0.0 },
@@ -414,55 +480,11 @@ test "shape" {
     };
     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
-
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/1916_zig.vdb", .{});
-    defer file0.close();
-    try file0.writeAll(buffer.items);
-    if (cube == true) {
-        print("\ncubin\n", .{});
-    }
+    const file = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/test_zig.vdb", .{});
+    defer file.close();
+    try file.writeAll(buffer.items);
 }
 
-const nifti1 = @import("nifti1.zig");
-test "nifti" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
-
-    const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-    const img = try nifti1.Image.init(path);
-    defer img.deinit();
-    (&img).printHeader();
-    const dims = img.header.dim;
-    print("\nDimensions: {d}\n", .{dims});
-    //check to make sure it's a static 3D image:
-    if (dims[0] != 3) {
-        print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
-    }
-    print("iterating nifti file\n", .{});
-    for (0..@as(usize, @intCast(dims[3]))) |z| {
-        print("z index {d}\n", .{z});
-        for (0..@as(usize, @intCast(dims[2]))) |x| {
-            print("x index {d}\n", .{x});
-            for (0..@as(usize, @intCast(dims[1]))) |y| {
-                print("y index {d}\n", .{y});
-                const val = try img.getAt4D([4]usize{ x, y, z, 0 });
-                print("Voxel {d}, {d}, {d} is {d}\n", .{
-                    x,
-                    y,
-                    z,
-                    val,
-                });
-            }
-        }
-    }
-}
 // Utility functions
 
 fn toF32(v: [3]usize) [3]f32 {

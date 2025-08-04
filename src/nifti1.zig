@@ -1,5 +1,5 @@
 const std = @import("std");
-
+const print = std.debug.print;
 const AccessError = error{
     UnsupportedByteNumber,
 };
@@ -66,11 +66,15 @@ pub const Image = struct { //not sure why this was originally an extern struct?
         const nx: usize = @intCast(self.header.dim[1]);
         const ny: usize = @intCast(self.header.dim[2]);
         const nz: usize = @intCast(self.header.dim[3]);
+        print("nx: {d} ny: {d} nz: {d}\n position: {d}\n", .{ nx, ny, nz, pos });
 
-        const index: usize = pos[3] * nx * ny * nz + pos[2] * nx * ny + pos[1] * nx + pos[0];
-        const bit_start: usize = index * @as(usize, @intCast(self.bytes_per_voxel));
-        const bit_end: usize = (index + 1) * @as(usize, @intCast(self.bytes_per_voxel));
+        const idx: usize = pos[3] * nx * ny * nz + pos[2] * nx * ny + pos[1] * nx + pos[0];
 
+        const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
+        const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
+
+        print("index : {d} bit start: {d} bit end: {d}\n", .{ idx, bit_start, bit_end });
+        print("raw data len: {d}\n", .{self.data.len});
         const raw_value = switch (self.bytes_per_voxel) {
             2 => btf2(self.data[bit_start..bit_end]),
             //TODO: all of the other byte to float functions!
@@ -84,7 +88,7 @@ pub const Image = struct { //not sure why this was originally an extern struct?
     }
 
     pub fn printHeader(self: *const Image) void {
-        std.debug.print("{any}", .{self.header});
+        print("{any}", .{self.header});
     }
 
     pub fn init(filepath: []const u8) anyerror!Image {
@@ -153,7 +157,7 @@ test "open" {
     const img = try Image.init(static);
     defer img.deinit();
     (&img).printHeader();
-    std.debug.print("\ndatatype: {s}\n", .{img.data_type});
+    print("\ndatatype: {s}\n", .{img.data_type});
 
     const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
     const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
@@ -162,7 +166,7 @@ test "open" {
 
     const mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t });
 
-    std.debug.print("middle value: {d}\n", .{mid_value});
+    print("middle value: {d}\n", .{mid_value});
 }
 
 //convention:
