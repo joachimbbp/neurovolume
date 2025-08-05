@@ -453,6 +453,7 @@ test "nifti" {
             for (0..@as(usize, @intCast(dims[1]))) |y| {
                 print("y index {d}\n", .{y});
                 const val = try img.getAt4D([4]usize{ x, y, z, 0 });
+                //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
                 print("Voxel {d}, {d}, {d} is {d}\n", .{
                     x,
                     y,

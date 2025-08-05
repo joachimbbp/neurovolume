@@ -55,11 +55,40 @@ pub const Header = extern struct {
 
     magic: [4]u8,
 };
+const DataType = enum(i16) {
+    unknown = 0,
+    bool = 1,
+    unsigned_char = 2,
+    signed_short = 4,
+    signed_int = 8,
+    float = 16,
+    complex = 32,
+    double = 64,
+    rgb = 128,
+    all = 255,
+    signed_char = 256,
+    unsigned_short = 512,
+    unsigned_int = 768,
+    long_long = 1024,
+    unsigned_long_long = 1280,
+    long_double = 1536,
+    double_pair = 1792,
+    long_double_pair = 2048,
+    rgba = 2304,
+    //anyhting else is unknown
+    pub fn name(field: DataType) [:0]const u8 {
+        return @tagName(field);
+        //TODO: you could replace the "_" with " " if you feel like it!
+        //return raw_name;
+    }
+};
+
 pub const Image = struct { //not sure why this was originally an extern struct?
     header: *const Header,
     data: []const u8,
+    //    minmax: [2]u8,
     allocator: *const std.mem.Allocator,
-    data_type: []const u8,
+    data_type: DataType,
     bytes_per_voxel: i16,
 
     pub fn getAt4D(self: *const Image, pos: [4]usize) !f32 {
@@ -90,7 +119,7 @@ pub const Image = struct { //not sure why this was originally an extern struct?
     pub fn printHeader(self: *const Image) void {
         print("{any}", .{self.header});
     }
-
+    //fn getMinMax(self: *const Image) [2]u8 {}
     pub fn init(filepath: []const u8) anyerror!Image {
         const allocator = &std.heap.page_allocator;
         //Load File
@@ -111,28 +140,7 @@ pub const Image = struct { //not sure why this was originally an extern struct?
         _ = try file.readAll(raw_data);
 
         //datatype
-        const data_type: []const u8 = switch (header_ptr.*.datatype) {
-            0 => "unknown",
-            1 => "bool",
-            2 => "unsigned char",
-            4 => "signed short",
-            8 => "signed int",
-            16 => "float",
-            32 => "complex",
-            64 => "double",
-            128 => "rgb",
-            255 => "all",
-            256 => "signed char",
-            512 => "unsigned short",
-            768 => "unsigned int",
-            1024 => "long long",
-            1280 => "unsigned long long",
-            1536 => "long double",
-            1792 => "double pair",
-            2048 => "long double pair",
-            2304 => "rgba",
-            else => "unknown",
-        };
+        const data_type: DataType = @enumFromInt(header_ptr.*.datatype);
         const bytes_per_voxel = @divTrunc(header_ptr.*.bitpix, 8);
         return Image{ .header = header_ptr, .data = raw_data, .allocator = allocator, .data_type = data_type, .bytes_per_voxel = bytes_per_voxel };
     }
@@ -157,7 +165,7 @@ test "open" {
     const img = try Image.init(static);
     defer img.deinit();
     (&img).printHeader();
-    print("\ndatatype: {s}\n", .{img.data_type});
+    print("\ndatatype: {s}\n", .{DataType.name(img.data_type)});
 
     const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
     const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
