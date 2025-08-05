@@ -445,24 +445,41 @@ test "nifti" {
     if (dims[0] != 3) {
         print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
     }
+    var vdb = try VDB.build(allocator);
+
     print("iterating nifti file\n", .{});
     for (0..@as(usize, @intCast(dims[3]))) |z| {
-        print("z index {d}\n", .{z});
         for (0..@as(usize, @intCast(dims[2]))) |x| {
-            print("x index {d}\n", .{x});
             for (0..@as(usize, @intCast(dims[1]))) |y| {
-                print("y index {d}\n", .{y});
                 const val = try img.getAt4D([4]usize{ x, y, z, 0 });
+                //needs to be f16
+                //TODO: vdb should accept multiple types
+                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
+
                 //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
-                print("Voxel {d}, {d}, {d} is {d}\n", .{
-                    x,
-                    y,
-                    z,
-                    val,
-                });
+
+                // print("Voxel {d}, {d}, {d} is {d}\n", .{
+                //     x,
+                //     y,
+                //     z,
+                //     val,
+                // });
             }
         }
     }
+    const Identity4x4: [4][4]f64 = .{
+        .{ 1.0, 0.0, 0.0, 0.0 },
+        .{ 0.0, 1.0, 0.0, 0.0 },
+        .{ 0.0, 0.0, 1.0, 0.0 },
+        .{ 0.0, 0.0, 0.0, 1.0 },
+    };
+    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+    //printBuffer(&buffer);
+
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/nifti_zig.vdb", .{});
+    defer file0.close();
+    try file0.writeAll(buffer.items);
+    print("\nnifti file written\n", .{});
 }
 // Utility functions
 

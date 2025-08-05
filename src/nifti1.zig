@@ -1,8 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
-const AccessError = error{
-    UnsupportedByteNumber,
-};
+const AccessError = error{NotSupportedYet};
 
 pub const Header = extern struct {
     sizeofHdr: i32, //Must be 348
@@ -95,19 +93,20 @@ pub const Image = struct { //not sure why this was originally an extern struct?
         const nx: usize = @intCast(self.header.dim[1]);
         const ny: usize = @intCast(self.header.dim[2]);
         const nz: usize = @intCast(self.header.dim[3]);
-        print("nx: {d} ny: {d} nz: {d}\n position: {d}\n", .{ nx, ny, nz, pos });
+        //        print("nx: {d} ny: {d} nz: {d}\n position: {d}\n", .{ nx, ny, nz, pos });
 
         const idx: usize = pos[3] * nx * ny * nz + pos[2] * nx * ny + pos[1] * nx + pos[0];
 
         const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
         const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
 
-        print("index : {d} bit start: {d} bit end: {d}\n", .{ idx, bit_start, bit_end });
-        print("raw data len: {d}\n", .{self.data.len});
+        //        print("index : {d} bit start: {d} bit end: {d}\n", .{ idx, bit_start, bit_end });
+        //        print("raw data len: {d}\n", .{self.data.len});
         const raw_value = switch (self.bytes_per_voxel) {
             2 => btf2(self.data[bit_start..bit_end]),
             //TODO: all of the other byte to float functions!
-            else => return AccessError.UnsupportedByteNumber,
+            //which migth requrie multiple types?
+            else => return AccessError.NotSupportedYet,
         };
         if (self.header.sclSlope != 0) {
             return self.header.sclSlope * raw_value + self.header.sclInter;
@@ -119,7 +118,16 @@ pub const Image = struct { //not sure why this was originally an extern struct?
     pub fn printHeader(self: *const Image) void {
         print("{any}", .{self.header});
     }
-    //fn getMinMax(self: *const Image) [2]u8 {}
+    fn getMinMax(self: *const Image) AccessError![2]u8 {
+        //NOTE: this actually won't be needed until
+        //you do normalization, which probably can
+        //wait for a bit
+        var minmax: [2]u8 = .{ 0, 0 };
+        switch (self.data_type) {
+            .signed_short => minmax = .{ 5, 6 },
+            else => return error.NotSupportedYet,
+        }
+    }
     pub fn init(filepath: []const u8) anyerror!Image {
         const allocator = &std.heap.page_allocator;
         //Load File
@@ -156,8 +164,10 @@ pub const Image = struct { //not sure why this was originally an extern struct?
 //Byte to float functions
 fn btf2(bytes: []const u8) f32 {
     //This was GPT suggested *but* I checked through the docs and it *seems* correct
+    //The reason this casts to f32 is so that it's precision can be expanded
+    //with scl slope and inter (in the get at function)
     const value = std.mem.readInt(u16, bytes[0..2], .little);
-    return @floatFromInt(value); //@as(f32, @floatCast(value));
+    return @floatFromInt(value);
 }
 
 test "open" {
@@ -166,7 +176,7 @@ test "open" {
     defer img.deinit();
     (&img).printHeader();
     print("\ndatatype: {s}\n", .{DataType.name(img.data_type)});
-
+    print("bytes per voxel: {d}\n", .{img.bytes_per_voxel});
     const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
     const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
     const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
