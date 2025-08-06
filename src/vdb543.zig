@@ -6,7 +6,7 @@ fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) void
 }
 fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) void {
     const byte_data = std.mem.sliceAsBytes(slice);
-    print("writeSlice byte_data: {x}\n", .{byte_data});
+    //print("writeSlice byte_data: {x}\n", .{byte_data});
     buffer.appendSlice(byte_data) catch unreachable;
 }
 fn writeU8(buffer: *std.ArrayList(u8), value: u8) void {
@@ -184,10 +184,10 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & (64 - 1));
 
     node_3.data[bit_index_0] = value;
-    print("value at setVoxel: {d}\n", .{value});
-    print("bit index 4: {d}\n", .{bit_index_4});
-    print("bit index 3: {d}\n", .{bit_index_3});
-    print("bit index 0: {d}\n", .{bit_index_0});
+    // print("value at setVoxel: {d}\n", .{value});
+    // print("bit index 4: {d}\n", .{bit_index_4});
+    // print("bit index 3: {d}\n", .{bit_index_3});
+    // print("bit index 0: {d}\n", .{bit_index_0});
 }
 
 fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
@@ -374,59 +374,59 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 const R: u32 = 128;
 const D: u32 = R * 2;
 
-// test "shape" {
-//     const cube = true;
-//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-//     const gpa_alloc = gpa.allocator();
-//     defer _ = gpa.deinit();
-//
-//     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-//     defer arena.deinit();
-//     const allocator = arena.allocator();
-//
-//     var buffer = std.ArrayList(u8).init(allocator);
-//     defer buffer.deinit();
-//
-//     var vdb = try VDB.build(allocator);
-//
-//     const Rf: f32 = @floatFromInt(R);
-//     const R2: f32 = Rf * Rf;
-//     print("setting voxels\n", .{});
-//     for (0..D - 1) |z| {
-//         for (0..D - 1) |y| {
-//             for (0..D - 1) |x| {
-//                 const p = toF32(.{ x, y, z });
-//                 const diff = subVec(p, .{ Rf, Rf, Rf });
-//                 if (cube == true) {
-//                     try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-//                 }
-//                 if (cube == false) {
-//                     if (lengthSquared(diff) < R2) {
-//                         try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-//                     }
-//                 }
-//             }
-//         }
-//     }
-//
-//     //printTree(vdb);
-//     const Identity4x4: [4][4]f64 = .{
-//         .{ 1.0, 0.0, 0.0, 0.0 },
-//         .{ 0.0, 1.0, 0.0, 0.0 },
-//         .{ 0.0, 0.0, 1.0, 0.0 },
-//         .{ 0.0, 0.0, 0.0, 1.0 },
-//     };
-//     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-//     //printBuffer(&buffer);
-//
-//     const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/1916_zig.vdb", .{});
-//     defer file0.close();
-//     try file0.writeAll(buffer.items);
-//     if (cube == true) {
-//         print("\ncubin\n", .{});
-//     }
-// }
-//
+test "shape" {
+    const cube = false;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    var vdb = try VDB.build(allocator);
+
+    const Rf: f32 = @floatFromInt(R);
+    const R2: f32 = Rf * Rf;
+    // print("setting voxels\n", .{});
+    for (0..D - 1) |z| {
+        for (0..D - 1) |y| {
+            for (0..D - 1) |x| {
+                const p = toF32(.{ x, y, z });
+                const diff = subVec(p, .{ Rf, Rf, Rf });
+                if (cube == true) {
+                    try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+                }
+                if (cube == false) {
+                    if (lengthSquared(diff) < R2) {
+                        try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+                    }
+                }
+            }
+        }
+    }
+
+    //printTree(vdb);
+    const Identity4x4: [4][4]f64 = .{
+        .{ 1.0, 0.0, 0.0, 0.0 },
+        .{ 0.0, 1.0, 0.0, 0.0 },
+        .{ 0.0, 0.0, 1.0, 0.0 },
+        .{ 0.0, 0.0, 0.0, 1.0 },
+    };
+    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+    //printBuffer(&buffer);
+
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/1916_zig.vdb", .{});
+    defer file0.close();
+    try file0.writeAll(buffer.items);
+    if (cube == true) {
+        print("\ncubin\n", .{});
+    }
+}
+
 test "test_patern" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
