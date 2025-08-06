@@ -6,6 +6,7 @@ fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) void
 }
 fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) void {
     const byte_data = std.mem.sliceAsBytes(slice);
+    print("writeSlice byte_data: {x}\n", .{byte_data});
     buffer.appendSlice(byte_data) catch unreachable;
 }
 fn writeU8(buffer: *std.ArrayList(u8), value: u8) void {
@@ -85,7 +86,7 @@ const VDB = struct {
     }
 };
 const Node5 = struct {
-    mask: [512]u64, //NOTE: maybe thees should be called "masks" plural?
+    mask: [512]u64, // maybe thees should be called "masks" plural?
     four_nodes: std.AutoHashMap(u32, *Node4),
     fn build(allocator: std.mem.Allocator) !*Node5 {
         const four_nodes = std.AutoHashMap(u32, *Node4).init(allocator);
@@ -112,7 +113,7 @@ const Node3 = struct {
     data: [512]f16, //this can be any value but we're using f16. Probably should match source!
     fn build(allocator: std.mem.Allocator) !*Node3 {
         const node3 = try allocator.create(Node3);
-        node3.* = Node3{ .mask = @splat(0), .data = @splat(@as(f16, std.math.nan(f16))) };
+        node3.* = Node3{ .mask = @splat(0), .data = @splat(@as(f16, 0)) };
         return node3;
     }
 };
@@ -178,12 +179,15 @@ fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocato
     }
 
     const one: u64 = 1;
-    node_5.mask[bit_index_4 >> 6] |= one << @intCast(bit_index_4 & 63);
-    node_4.mask[bit_index_3 >> 6] |= one << @intCast(bit_index_3 & 63);
-    node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & 63);
+    node_5.mask[bit_index_4 >> 6] |= one << @intCast(bit_index_4 & (64 - 1));
+    node_4.mask[bit_index_3 >> 6] |= one << @intCast(bit_index_3 & (64 - 1));
+    node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & (64 - 1));
 
     node_3.data[bit_index_0] = value;
-    //    std.debug.print("bit_index_4: {d}  mask slot: {d}\n", .{ bit_index_4, bit_index_4 >> 6 });
+    print("value at setVoxel: {d}\n", .{value});
+    print("bit index 4: {d}\n", .{bit_index_4});
+    print("bit index 3: {d}\n", .{bit_index_3});
+    print("bit index 0: {d}\n", .{bit_index_0});
 }
 
 fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
@@ -370,8 +374,60 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 const R: u32 = 128;
 const D: u32 = R * 2;
 
-test "shape" {
-    const cube = false;
+// test "shape" {
+//     const cube = true;
+//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+//     const gpa_alloc = gpa.allocator();
+//     defer _ = gpa.deinit();
+//
+//     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+//     defer arena.deinit();
+//     const allocator = arena.allocator();
+//
+//     var buffer = std.ArrayList(u8).init(allocator);
+//     defer buffer.deinit();
+//
+//     var vdb = try VDB.build(allocator);
+//
+//     const Rf: f32 = @floatFromInt(R);
+//     const R2: f32 = Rf * Rf;
+//     print("setting voxels\n", .{});
+//     for (0..D - 1) |z| {
+//         for (0..D - 1) |y| {
+//             for (0..D - 1) |x| {
+//                 const p = toF32(.{ x, y, z });
+//                 const diff = subVec(p, .{ Rf, Rf, Rf });
+//                 if (cube == true) {
+//                     try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+//                 }
+//                 if (cube == false) {
+//                     if (lengthSquared(diff) < R2) {
+//                         try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//
+//     //printTree(vdb);
+//     const Identity4x4: [4][4]f64 = .{
+//         .{ 1.0, 0.0, 0.0, 0.0 },
+//         .{ 0.0, 1.0, 0.0, 0.0 },
+//         .{ 0.0, 0.0, 1.0, 0.0 },
+//         .{ 0.0, 0.0, 0.0, 1.0 },
+//     };
+//     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+//     //printBuffer(&buffer);
+//
+//     const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/1916_zig.vdb", .{});
+//     defer file0.close();
+//     try file0.writeAll(buffer.items);
+//     if (cube == true) {
+//         print("\ncubin\n", .{});
+//     }
+// }
+//
+test "test_patern" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -385,27 +441,8 @@ test "shape" {
 
     var vdb = try VDB.build(allocator);
 
-    const Rf: f32 = @floatFromInt(R);
-    const R2: f32 = Rf * Rf;
     print("setting voxels\n", .{});
-    for (0..D - 1) |z| {
-        for (0..D - 1) |y| {
-            for (0..D - 1) |x| {
-                const p = toF32(.{ x, y, z });
-                const diff = subVec(p, .{ Rf, Rf, Rf });
-                if (cube == true) {
-                    try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-                }
-                if (cube == false) {
-                    if (lengthSquared(diff) < R2) {
-                        try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
-                    }
-                }
-            }
-        }
-    }
-
-    //printTree(vdb);
+    try setVoxel(&vdb, .{ @intCast(0), @intCast(0), @intCast(0) }, 1.0, allocator);
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
         .{ 0.0, 1.0, 0.0, 0.0 },
@@ -415,72 +452,69 @@ test "shape" {
     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
 
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/1916_zig.vdb", .{});
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/one_voxel_01_zig.vdb", .{});
     defer file0.close();
     try file0.writeAll(buffer.items);
-    if (cube == true) {
-        print("\ncubin\n", .{});
-    }
 }
 
 const nifti1 = @import("nifti1.zig");
-test "nifti" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
-
-    const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-    const img = try nifti1.Image.init(path);
-    defer img.deinit();
-    (&img).printHeader();
-    const dims = img.header.dim;
-    print("\nDimensions: {d}\n", .{dims});
-    //check to make sure it's a static 3D image:
-    if (dims[0] != 3) {
-        print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
-    }
-    var vdb = try VDB.build(allocator);
-
-    print("iterating nifti file\n", .{});
-    for (0..@as(usize, @intCast(dims[3]))) |z| {
-        for (0..@as(usize, @intCast(dims[2]))) |x| {
-            for (0..@as(usize, @intCast(dims[1]))) |y| {
-                const val = try img.getAt4D([4]usize{ x, y, z, 0 });
-                //needs to be f16
-                //TODO: vdb should accept multiple types
-                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
-
-                //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
-
-                // print("Voxel {d}, {d}, {d} is {d}\n", .{
-                //     x,
-                //     y,
-                //     z,
-                //     val,
-                // });
-            }
-        }
-    }
-    const Identity4x4: [4][4]f64 = .{
-        .{ 1.0, 0.0, 0.0, 0.0 },
-        .{ 0.0, 1.0, 0.0, 0.0 },
-        .{ 0.0, 0.0, 1.0, 0.0 },
-        .{ 0.0, 0.0, 0.0, 1.0 },
-    };
-    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-    //printBuffer(&buffer);
-
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/nifti_zig.vdb", .{});
-    defer file0.close();
-    try file0.writeAll(buffer.items);
-    print("\nnifti file written\n", .{});
-}
+// test "nifti" {
+//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+//     const gpa_alloc = gpa.allocator();
+//     defer _ = gpa.deinit();
+//     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+//     defer arena.deinit();
+//     const allocator = arena.allocator();
+//
+//     var buffer = std.ArrayList(u8).init(allocator);
+//     defer buffer.deinit();
+//
+//     const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+//     const img = try nifti1.Image.init(path);
+//     defer img.deinit();
+//     (&img).printHeader();
+//     const dims = img.header.dim;
+//     print("\nDimensions: {d}\n", .{dims});
+//     //check to make sure it's a static 3D image:
+//     if (dims[0] != 3) {
+//         print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
+//     }
+//     var vdb = try VDB.build(allocator);
+//
+//     print("iterating nifti file\n", .{});
+//     for (0..@as(usize, @intCast(dims[3]))) |z| {
+//         for (0..@as(usize, @intCast(dims[2]))) |x| {
+//             for (0..@as(usize, @intCast(dims[1]))) |y| {
+//                 const val = try img.getAt4D([4]usize{ x, y, z, 0 });
+//                 //needs to be f16
+//                 //TODO: vdb should accept multiple types
+//                 try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
+//
+//                 //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
+//
+//                 // print("Voxel {d}, {d}, {d} is {d}\n", .{
+//                 //     x,
+//                 //     y,
+//                 //     z,
+//                 //     val,
+//                 // });
+//             }
+//         }
+//     }
+//     const Identity4x4: [4][4]f64 = .{
+//         .{ 1.0, 0.0, 0.0, 0.0 },
+//         .{ 0.0, 1.0, 0.0, 0.0 },
+//         .{ 0.0, 0.0, 1.0, 0.0 },
+//         .{ 0.0, 0.0, 0.0, 1.0 },
+//     };
+//     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+//     //printBuffer(&buffer);
+//
+//     const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/nifti_zig.vdb", .{});
+//     defer file0.close();
+//     try file0.writeAll(buffer.items);
+//     print("\nnifti file written\n", .{});
+// }
 // Utility functions
 
 fn toF32(v: [3]usize) [3]f32 {
