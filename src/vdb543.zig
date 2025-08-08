@@ -1,3 +1,9 @@
+//NOTE:
+//I am presently only using f32 (and should implement that in the vdb as well)
+//This is because the slslope and slinter are f32, which thus sets the data
+//to sort of always be this. I am curious what the larger datatypes
+//typically do (do the super big ones just not use slope and inter?)
+
 const std = @import("std");
 const print = std.debug.print;
 //IO helper functions
@@ -458,63 +464,56 @@ test "test_patern" {
 }
 
 const nifti1 = @import("nifti1.zig");
-// test "nifti" {
-//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-//     const gpa_alloc = gpa.allocator();
-//     defer _ = gpa.deinit();
-//     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-//     defer arena.deinit();
-//     const allocator = arena.allocator();
-//
-//     var buffer = std.ArrayList(u8).init(allocator);
-//     defer buffer.deinit();
-//
-//     const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-//     const img = try nifti1.Image.init(path);
-//     defer img.deinit();
-//     (&img).printHeader();
-//     const dims = img.header.dim;
-//     print("\nDimensions: {d}\n", .{dims});
-//     //check to make sure it's a static 3D image:
-//     if (dims[0] != 3) {
-//         print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
-//     }
-//     var vdb = try VDB.build(allocator);
-//
-//     print("iterating nifti file\n", .{});
-//     for (0..@as(usize, @intCast(dims[3]))) |z| {
-//         for (0..@as(usize, @intCast(dims[2]))) |x| {
-//             for (0..@as(usize, @intCast(dims[1]))) |y| {
-//                 const val = try img.getAt4D([4]usize{ x, y, z, 0 });
-//                 //needs to be f16
-//                 //TODO: vdb should accept multiple types
-//                 try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
-//
-//                 //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
-//
-//                 // print("Voxel {d}, {d}, {d} is {d}\n", .{
-//                 //     x,
-//                 //     y,
-//                 //     z,
-//                 //     val,
-//                 // });
-//             }
-//         }
-//     }
-//     const Identity4x4: [4][4]f64 = .{
-//         .{ 1.0, 0.0, 0.0, 0.0 },
-//         .{ 0.0, 1.0, 0.0, 0.0 },
-//         .{ 0.0, 0.0, 1.0, 0.0 },
-//         .{ 0.0, 0.0, 0.0, 1.0 },
-//     };
-//     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-//     //printBuffer(&buffer);
-//
-//     const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/nifti_zig.vdb", .{});
-//     defer file0.close();
-//     try file0.writeAll(buffer.items);
-//     print("\nnifti file written\n", .{});
-// }
+test "nifti" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    const img = try nifti1.Image.init(path);
+    defer img.deinit();
+    (&img).printHeader();
+    const dims = img.header.dim;
+    print("\nDimensions: {d}\n", .{dims});
+    //check to make sure it's a static 3D image:
+    if (dims[0] != 3) {
+        print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
+    }
+    var vdb = try VDB.build(allocator);
+
+    print("iterating nifti file\n", .{});
+    for (0..@as(usize, @intCast(dims[3]))) |z| {
+        for (0..@as(usize, @intCast(dims[2]))) |x| {
+            for (0..@as(usize, @intCast(dims[1]))) |y| {
+                const val = try img.getAt4D([4]usize{ x, y, z, 0 });
+                //needs to be f16
+                //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
+                //as in: norm_val = normalize(val, minmax)
+                //TODO: vdb should accept multiple types
+                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
+            }
+        }
+    }
+    const Identity4x4: [4][4]f64 = .{
+        .{ 1.0, 0.0, 0.0, 0.0 },
+        .{ 0.0, 1.0, 0.0, 0.0 },
+        .{ 0.0, 0.0, 1.0, 0.0 },
+        .{ 0.0, 0.0, 0.0, 1.0 },
+    };
+    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+    //printBuffer(&buffer);
+
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/nifti_zig.vdb", .{});
+    defer file0.close();
+    try file0.writeAll(buffer.items);
+    print("\nnifti file written\n", .{});
+}
 // Utility functions
 
 fn toF32(v: [3]usize) [3]f32 {
