@@ -106,7 +106,7 @@ pub const Image = struct {
         }
 
         if (normalize) {
-            return (post_slope - minmax[0]) / (minmax[0] - minmax[1]); //TODO: calc the denom only once
+            return (post_slope - minmax[0]) / (minmax[1] - minmax[0]); //TODO: calc the denom only once
         } else {
             return post_slope;
         }
