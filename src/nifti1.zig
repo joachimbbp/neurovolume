@@ -170,7 +170,7 @@ pub const Image = struct {
     }
 };
 fn minMax(img: Image) ![2]f32 {
-    var minmax: [2]f32 = .{ std.math.floatMax(f32), std.math.floatMax(f32) };
+    var minmax: [2]f32 = .{ std.math.floatMax(f32), std.math.floatMin(f32) };
     //dim is [num dimensions, x, y, z, time ...]
     for (0..@as(usize, @intCast(img.header.dim[4]))) |t| {
         for (0..@as(usize, @intCast(img.header.dim[3]))) |z| {
@@ -205,9 +205,9 @@ test "open and normalize" {
 
     const mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t });
 
-    print("middle value: {}\n", .{mid_value});
+    print("middle value: {d}\n", .{mid_value});
 
-    print("Normalizing\n", .{});
+    print("Normalizing\nSetting Min Max\n", .{});
     const minmax = try minMax(img);
     print("Min Max: {d}\n", .{minmax});
 }
