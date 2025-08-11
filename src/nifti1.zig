@@ -88,7 +88,7 @@ pub const Image = struct {
 
     //const Self = @This();
 
-    pub fn getAt4D(self: *const Image, pos: [4]usize) !f32 {
+    pub fn getAt4D(self: *const Image, pos: [4]usize, normalize: bool, minmax: [2]f32) !f32 {
         const nx: usize = @intCast(self.header.dim[1]);
         const ny: usize = @intCast(self.header.dim[2]);
         const nz: usize = @intCast(self.header.dim[3]);
@@ -100,11 +100,18 @@ pub const Image = struct {
 
         const raw_value = try byteToFloat(self.data, self.bytes_per_voxel, bit_start, bit_end);
 
+        var post_slope = raw_value;
         if (self.header.sclSlope != 0) {
-            return self.header.sclSlope * raw_value + self.header.sclInter;
-        } else {
-            return raw_value;
+            post_slope = self.header.sclSlope * raw_value + self.header.sclInter;
         }
+
+        if (normalize) {
+            return (post_slope - minmax[0]) / (minmax[0] - minmax[1]); //TODO: calc the denom only once
+        } else {
+            return post_slope;
+        }
+        //vol.Data[x][y][z][t] = (vol.Data[x][y][z][t] - vol.MinVal) / (vol.MaxVal - vol.MinVal)
+
     }
 
     pub fn printHeader(self: *const Image) void {
@@ -176,7 +183,7 @@ fn minMax(img: Image) ![2]f32 {
         for (0..@as(usize, @intCast(img.header.dim[3]))) |z| {
             for (0..@as(usize, @intCast(img.header.dim[2]))) |x| {
                 for (0..@as(usize, @intCast(img.header.dim[1]))) |y| {
-                    const val = try img.getAt4D([4]usize{ x, y, z, t });
+                    const val = try img.getAt4D([4]usize{ x, y, z, t }, false, .{ 0, 0 });
                     if (val < minmax[0]) {
                         minmax[0] = val;
                     }
@@ -203,13 +210,15 @@ test "open and normalize" {
     const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
     const mid_t: usize = @divFloor(@as(usize, @intCast(img.header.dim[4])), 2);
 
-    const mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t });
+    const mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t }, false, .{ 0, 0 });
 
     print("middle value: {d}\n", .{mid_value});
 
     print("Normalizing\nSetting Min Max\n", .{});
     const minmax = try minMax(img);
     print("Min Max: {d}\n", .{minmax});
+    const normalized_mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t }, true, minmax);
+    print("Normalized mid value: {d}\n", .{normalized_mid_value});
 }
 
 //convention:
