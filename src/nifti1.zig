@@ -88,12 +88,13 @@ pub const Image = struct {
 
     //const Self = @This();
 
-    pub fn getAt4D(self: *const Image, pos: [4]usize, normalize: bool, minmax: [2]f32) !f32 {
+    pub fn getAt4D(self: *const Image, xpos: usize, ypos: usize, zpos: usize, tpos: usize, normalize: bool, minmax: [2]f32) !f32 {
         const nx: usize = @intCast(self.header.dim[1]);
         const ny: usize = @intCast(self.header.dim[2]);
         const nz: usize = @intCast(self.header.dim[3]);
 
-        const idx: usize = pos[3] * nx * ny * nz + pos[2] * nx * ny + pos[1] * nx + pos[0];
+        const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
+        //index := uint64(t*nx*ny*nz + z*nx*ny + y*nx + x)
 
         const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
         const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
@@ -176,20 +177,18 @@ pub const Image = struct {
         self.allocator.free(self.data);
     }
 };
-fn minMax(img: Image) ![2]f32 {
-    var minmax: [2]f32 = .{ std.math.floatMax(f32), std.math.floatMin(f32) };
+fn MinMax3D(img: Image) ![2]f32 {
+    var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
     //dim is [num dimensions, x, y, z, time ...]
-    for (0..@as(usize, @intCast(img.header.dim[4]))) |t| {
-        for (0..@as(usize, @intCast(img.header.dim[3]))) |z| {
-            for (0..@as(usize, @intCast(img.header.dim[2]))) |x| {
-                for (0..@as(usize, @intCast(img.header.dim[1]))) |y| {
-                    const val = try img.getAt4D([4]usize{ x, y, z, t }, false, .{ 0, 0 });
-                    if (val < minmax[0]) {
-                        minmax[0] = val;
-                    }
-                    if (val > minmax[1]) {
-                        minmax[1] = val;
-                    }
+    for (0..@as(usize, @intCast(img.header.dim[3]))) |z| {
+        for (0..@as(usize, @intCast(img.header.dim[2]))) |x| {
+            for (0..@as(usize, @intCast(img.header.dim[1]))) |y| {
+                const val = try img.getAt4D(x, y, z, 0, false, .{ 0, 0 });
+                if (val < minmax[0]) {
+                    minmax[0] = val;
+                }
+                if (val > minmax[1]) {
+                    minmax[1] = val;
                 }
             }
         }
@@ -210,14 +209,14 @@ test "open and normalize" {
     const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
     const mid_t: usize = @divFloor(@as(usize, @intCast(img.header.dim[4])), 2);
 
-    const mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t }, false, .{ 0, 0 });
+    const mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, false, .{ 0, 0 });
 
     print("middle value: {d}\n", .{mid_value});
 
     print("Normalizing\nSetting Min Max\n", .{});
-    const minmax = try minMax(img);
+    const minmax = try MinMax3D(img);
     print("Min Max: {d}\n", .{minmax});
-    const normalized_mid_value = try img.getAt4D([4]usize{ mid_x, mid_y, mid_z, mid_t }, true, minmax);
+    const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
     print("Normalized mid value: {d}\n", .{normalized_mid_value});
 }
 
