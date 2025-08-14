@@ -176,7 +176,7 @@ pub const Image = struct {
         self.allocator.free(self.data);
     }
 };
-fn MinMax3D(img: Image) ![2]f32 {
+pub fn MinMax3D(img: Image) ![2]f32 {
     var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
     //dim is [num dimensions, x, y, z, time ...]
     for (0..@as(usize, @intCast(img.header.dim[3]))) |z| {

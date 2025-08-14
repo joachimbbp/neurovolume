@@ -492,7 +492,7 @@ test "nifti" {
     for (0..@as(usize, @intCast(dims[3]))) |z| {
         for (0..@as(usize, @intCast(dims[2]))) |x| {
             for (0..@as(usize, @intCast(dims[1]))) |y| {
-                const val = try img.getAt4D([4]usize{ x, y, z, 0 }, true, minmax);
+                const val = try img.getAt4D(x, y, z, 0, true, minmax);
                 //needs to be f16
                 //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
                 //as in: norm_val = normalize(val, minmax)
