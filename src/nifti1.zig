@@ -99,6 +99,7 @@ pub const Image = struct {
         const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
         const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
 
+        //rawVal := img.byte2floatF(img.rawData[index*uint64(img.bytesPerVoxel) : (index+1)*uint64(img.bytesPerVoxel)])
         const raw_value = try byteToFloat(self.data, self.bytes_per_voxel, bit_start, bit_end);
 
         var post_slope = raw_value;
@@ -118,6 +119,7 @@ pub const Image = struct {
     pub fn printHeader(self: *const Image) void {
         print("{any}", .{self.header});
     }
+
     fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {
         const raw_value = switch (bytes_per_voxel) {
             2 => btf2(raw_data[bit_start..bit_end]),
@@ -127,14 +129,11 @@ pub const Image = struct {
         };
         return raw_value;
     }
+
     fn btf2(bytes: []const u8) f32 {
-        //This was GPT suggested *but* I checked through the docs and it *seems* correct
-        //The reason this casts to f32 is so that it's precision can be expanded
-        //with scl slope and inter (in the get at function)
-        const value = std.mem.readInt(u16, bytes[0..2], .little);
+        const value = std.mem.readInt(i16, bytes[0..2], .little); // i16, not u16
         return @floatFromInt(value);
     }
-
     pub fn init(filepath: []const u8) anyerror!Image {
         const allocator = &std.heap.page_allocator;
         //Load File
@@ -181,8 +180,8 @@ fn MinMax3D(img: Image) ![2]f32 {
     var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
     //dim is [num dimensions, x, y, z, time ...]
     for (0..@as(usize, @intCast(img.header.dim[3]))) |z| {
-        for (0..@as(usize, @intCast(img.header.dim[2]))) |x| {
-            for (0..@as(usize, @intCast(img.header.dim[1]))) |y| {
+        for (0..@as(usize, @intCast(img.header.dim[2]))) |y| {
+            for (0..@as(usize, @intCast(img.header.dim[1]))) |x| {
                 const val = try img.getAt4D(x, y, z, 0, false, .{ 0, 0 });
                 if (val < minmax[0]) {
                     minmax[0] = val;
