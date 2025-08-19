@@ -96,7 +96,7 @@ test "nifti" {
         print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
     }
     const minmax = try nifti1.MinMax3D(img);
-    var vdb = try VDB.build(allocator);
+    var vdb = try vdb543.build(allocator);
 
     print("iterating nifti file\n", .{});
     for (0..@as(usize, @intCast(dims[3]))) |z| {
@@ -107,7 +107,7 @@ test "nifti" {
                 //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
                 //as in: norm_val = normalize(val, minmax)
                 //TODO: vdb should accept multiple types
-                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
+                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
             }
         }
     }
@@ -117,7 +117,7 @@ test "nifti" {
         .{ 0.0, 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
-    writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+    vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
 
     const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/nifti_zig.vdb", .{});

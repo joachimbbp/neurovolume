@@ -1,45 +1,33 @@
 const std = @import("std");
 const print = std.debug.print;
 const assert = std.debug.assert;
-pub fn PathExists(string: []const u8) bool {
-    _ = std.fs.cwd().openFile(string, .{}) catch {
+pub fn PathExists(path_string: []const u8) bool {
+    _ = std.fs.cwd().openFile(path_string, .{}) catch {
         return false;
     };
     return true;
 }
 //TODO:
-// - [ ] Build if not there
 // - [ ] Enumerate if there
 
-//Checks if a string could be a directory
-fn validDir(string: []const u8) bool { //NOTE: .openDir might have this baked in already  ¯\_ (ツ)_/¯
-    const split = std.mem.splitBackwardsScalar(u8, string, "/");
-    //check if valid basename
-
-    const basename = split.first();
-    if (std.mem.count(u8, basename, ".") > 0) {
-        return false;
-    }
-    if (PathExists(split.rest)) {
-        return true;
-    } else {
-        return false;
+//Builds a directory if one is not present at that filepath
+pub fn BuildDirIfAbsent(path_string: []const u8) !void {
+    if (!PathExists(path_string)) {
+        _ = try std.fs.cwd().makeDir(path_string);
     }
 }
 
-const DirectoryBuildError = error{
-    InvalidDirectory,
-};
-//Builds a directory if one is not present at that filepath
-pub fn BuildDirIfAbsent(string: []const u8) void {
-    if (PathExists(string)) {
-        return;
-    }
-    if (validDir(string)) {
-        const dir = try std.fs.cwd().openDir(string, .{});
-        defer dir.close();
-    } else {
-        return DirectoryBuildError.InvalidDirectory;
+pub fn SaveVersion(path_string: []const u8) !void {
+    var output = path_string;
+    var version_exists = true;
+    if (PathExists(path_string)) {
+        const filename = std.mem.splitBackwardsScalar(u8, path_string, "/").first();
+        const version = std.mem.splitBackwardsScalar(u8, filename, "_").first();
+        for (version) |c| {
+            if ((c < 0) or (c > 9)) {
+                version_exists = false;
+            }
+        }
     }
 }
 
@@ -56,13 +44,4 @@ test "path exists" {
     //WARNING: this only works on my machine
     assert(local_path == true);
     print("Local path's existence is {}\n", .{local_path});
-}
-test "valid dir" {
-    //WARNING: paths only work on my machine
-    const bad_path = "/ham/spam/land";
-    const bad_name = "/Users/joachimpfefferkorn/ham.spam";
-    const good_path = "./test_dir";
-    BuildDirIfAbsent(bad_path);
-    BuildDirIfAbsent(bad_name);
-    BuildDirIfAbsent(good_path);
 }
