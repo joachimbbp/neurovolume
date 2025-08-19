@@ -425,7 +425,7 @@ test "shape" {
     writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
 
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/1916_zig.vdb", .{});
+    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/0819a_zig.vdb", .{});
     defer file0.close();
     try file0.writeAll(buffer.items);
     if (cube == true) {
