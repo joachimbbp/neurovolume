@@ -141,7 +141,8 @@ pub const Image = struct {
         defer file.close();
 
         //Load Header
-        const reader = file.reader();
+        const reader = std.fs.File.deprecatedReader(file);
+
         const header_ptr = try allocator.create(Header);
         header_ptr.* = try reader.readStruct(Header);
 
@@ -201,7 +202,7 @@ test "open and normalize" {
     defer img.deinit();
     (&img).printHeader();
     print("\ndatatype: {s}\n", .{DataType.name(img.data_type)});
-    print("bytes per voxel: {d}\n", .{img.bytes_per_voxel});
+    print("bytes per voxel: {any}\n", .{img.bytes_per_voxel});
 
     const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
     const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
@@ -210,13 +211,13 @@ test "open and normalize" {
 
     const mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, false, .{ 0, 0 });
 
-    print("middle value: {d}\n", .{mid_value});
+    print("middle value: {any}\n", .{mid_value});
 
     print("Normalizing\nSetting Min Max\n", .{});
     const minmax = try MinMax3D(img);
-    print("Min Max: {d}\n", .{minmax});
+    print("Min Max: {any}\n", .{minmax});
     const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
-    print("Normalized mid value: {d}\n", .{normalized_mid_value});
+    print("Normalized mid value: {any}\n", .{normalized_mid_value});
 }
 
 //convention:

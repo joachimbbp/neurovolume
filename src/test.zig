@@ -7,6 +7,8 @@ const vdb543 = @import("vdb543.zig");
 const VDB = vdb543.VDB;
 const output_path = "../output";
 
+const ArrayList = std.array_list.Managed;
+
 test "sphere" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
@@ -14,7 +16,7 @@ test "sphere" {
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
     const allocator = arena.allocator();
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = ArrayList(u8).init(allocator);
     defer buffer.deinit();
 
     const R: u32 = 128;
@@ -54,7 +56,7 @@ test "test_patern" {
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
     const allocator = arena.allocator();
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = ArrayList(u8).init(allocator);
     defer buffer.deinit();
 
     var single_voxel = try VDB.build(allocator);
@@ -83,7 +85,7 @@ test "nifti" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = ArrayList(u8).init(allocator);
     defer buffer.deinit();
 
     const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
@@ -91,10 +93,10 @@ test "nifti" {
     defer img.deinit();
     (&img).printHeader();
     const dims = img.header.dim;
-    print("\nDimensions: {d}\n", .{dims});
+    print("\nDimensions: {any}\n", .{dims});
     //check to make sure it's a static 3D image:
     if (dims[0] != 3) {
-        print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
+        print("Warning! Not a static 3D file. Has {any} dimensions\n", .{dims[0]});
     }
     const minmax = try nifti1.MinMax3D(img);
     var vdb = try VDB.build(allocator);
