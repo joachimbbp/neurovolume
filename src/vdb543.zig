@@ -82,11 +82,11 @@ fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) 
     writeVec3i(buffer, value);
 }
 //VDB nodes
-const VDB = struct {
+pub const VDB = struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    fn build(allocator: std.mem.Allocator) !VDB {
+    pub fn build(allocator: std.mem.Allocator) !VDB {
         const five_node = try Node5.build(allocator);
         return VDB{ .five_node = five_node };
     }
@@ -159,7 +159,7 @@ fn getBitIndex0(position: [3]u32) u32 {
 //- [ ] have this set voxels one 3-node at a time to reduce syscalls
 //- [ ] have the value type mirror the input data type
 
-fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocator) !void {
+pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocator) !void {
     var node_5: *Node5 = vdb.five_node;
 
     const bit_index_4 = getBitIndex4(position);
@@ -350,7 +350,7 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeTree(buffer, vdb);
 }
 
-fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
+pub fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Magic Number (needed it spells out BDV)
     writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
@@ -378,8 +378,8 @@ fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 }
 
 // Utility functions
-
-fn toF32(v: [3]usize) [3]f32 {
+// Move these?
+pub fn toF32(v: [3]usize) [3]f32 {
     return .{
         @floatFromInt(v[0]),
         @floatFromInt(v[1]),
@@ -387,7 +387,7 @@ fn toF32(v: [3]usize) [3]f32 {
     };
 }
 
-fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
+pub fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
     return .{
         a[0] - b[0],
         a[1] - b[1],
@@ -395,6 +395,6 @@ fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
     };
 }
 
-fn lengthSquared(v: [3]f32) f32 {
+pub fn lengthSquared(v: [3]f32) f32 {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }

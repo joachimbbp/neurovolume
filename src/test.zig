@@ -4,7 +4,7 @@ const testing = std.testing;
 
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
-
+const VDB = vdb543.VDB;
 const output_path = "../output";
 
 test "sphere" {
@@ -25,7 +25,8 @@ test "sphere" {
         .{ 0.0, 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
-    var sphere = try vdb543.build(allocator);
+
+    var sphere = try VDB.build(allocator); //.build(allocator);
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
     for (0..D - 1) |z| {
@@ -43,7 +44,7 @@ test "sphere" {
     const sphere_file = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/0819a_zig.vdb", .{});
     defer sphere_file.close();
     try sphere_file.writeAll(buffer.items);
-    print("Sphere test pattern written\n");
+    print("Sphere test pattern written\n", .{});
 }
 
 test "test_patern" {
@@ -56,7 +57,7 @@ test "test_patern" {
     var buffer = std.ArrayList(u8).init(allocator);
     defer buffer.deinit();
 
-    var single_voxel = try vdb543.build(allocator);
+    var single_voxel = try VDB.build(allocator);
 
     print("setting voxels\n", .{});
     try vdb543.setVoxel(&single_voxel, .{ @intCast(0), @intCast(0), @intCast(0) }, 1.0, allocator);
@@ -96,7 +97,7 @@ test "nifti" {
         print("Warning! Not a static 3D file. Has {d} dimensions\n", .{dims[0]});
     }
     const minmax = try nifti1.MinMax3D(img);
-    var vdb = try vdb543.build(allocator);
+    var vdb = try VDB.build(allocator);
 
     print("iterating nifti file\n", .{});
     for (0..@as(usize, @intCast(dims[3]))) |z| {
