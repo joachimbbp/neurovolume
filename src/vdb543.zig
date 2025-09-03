@@ -3,45 +3,46 @@
 //This is because the slslope and slinter are f32, which thus sets the data
 //to sort of always be this. I am curious what the larger datatypes
 //typically do (do the super big ones just not use slope and inter?)
+const ArrayList = std.array_list.Managed;
 
 const std = @import("std");
 const print = std.debug.print;
 //IO helper functions
-fn writePointer(buffer: *std.ArrayList(u8), pointer: *const u8, len: usize) void {
+fn writePointer(buffer: *ArrayList(u8), pointer: *const u8, len: usize) void {
     buffer.appendSlice(pointer[0..len]) catch unreachable;
 }
-fn writeSlice(comptime T: type, buffer: *std.ArrayList(u8), slice: []const T) void {
+fn writeSlice(comptime T: type, buffer: *ArrayList(u8), slice: []const T) void {
     const byte_data = std.mem.sliceAsBytes(slice);
     //print("writeSlice byte_data: {x}\n", .{byte_data});
     buffer.appendSlice(byte_data) catch unreachable;
 }
-fn writeU8(buffer: *std.ArrayList(u8), value: u8) void {
+fn writeU8(buffer: *ArrayList(u8), value: u8) void {
     buffer.append(value) catch unreachable;
 }
 //NOTE:
 //Check endianness for these
 //These could probably be dryed with comptimes
-fn writeU16(buffer: *std.ArrayList(u8), value: u16) void {
+fn writeU16(buffer: *ArrayList(u8), value: u16) void {
     buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
     //  writePointer(buffer, &value, @sizeOf(value));
 }
-fn writeU32(buffer: *std.ArrayList(u8), value: u32) void {
+fn writeU32(buffer: *ArrayList(u8), value: u32) void {
     //NOTE: Need to change this to a const u32 somehow (but efficiently)
 
     buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 
     //  writePointer(buffer, &v, @sizeOf(value));
 }
-fn writeU64(buffer: *std.ArrayList(u8), value: u64) void {
+fn writeU64(buffer: *ArrayList(u8), value: u64) void {
     //  writePointer(buffer, &value, @sizeOf(value));
     buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 }
-fn writeU128(buffer: *std.ArrayList(u8), value: u128) void {
+fn writeU128(buffer: *ArrayList(u8), value: u128) void {
     //  writePointer(buffer, &value, @sizeOf(value));
     buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 }
 //NOTE: another good argument for comptiming these: this vdb data value should be arbitrary:
-fn writeF64(buffer: *std.ArrayList(u8), value: f64) void {
+fn writeF64(buffer: *ArrayList(u8), value: f64) void {
     //  writePointer(buffer, &value, @sizeOf(value));
     buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 }
@@ -49,33 +50,33 @@ fn castInt32ToU32(value: i32) u32 {
     const result: u32 = @bitCast(value);
     return result;
 }
-fn writeVec3i(buffer: *std.ArrayList(u8), value: [3]i32) void {
+fn writeVec3i(buffer: *ArrayList(u8), value: [3]i32) void {
     writeU32(buffer, castInt32ToU32(value[0]));
     writeU32(buffer, castInt32ToU32(value[1]));
     writeU32(buffer, castInt32ToU32(value[2]));
 }
 
-fn writeString(buffer: *std.ArrayList(u8), string: []const u8) void {
+fn writeString(buffer: *ArrayList(u8), string: []const u8) void {
     for (string) |character| {
         buffer.append(character) catch unreachable;
     }
 }
-fn writeName(buffer: *std.ArrayList(u8), name: []const u8) void {
+fn writeName(buffer: *ArrayList(u8), name: []const u8) void {
     writeU32(buffer, @intCast(name.len));
     writeString(buffer, name);
 }
-fn writeMetaString(buffer: *std.ArrayList(u8), name: []const u8, string: []const u8) void {
+fn writeMetaString(buffer: *ArrayList(u8), name: []const u8, string: []const u8) void {
     writeName(buffer, name);
     writeName(buffer, "string");
     writeName(buffer, string);
 }
-fn writeMetaBool(buffer: *std.ArrayList(u8), name: []const u8, value: bool) void {
+fn writeMetaBool(buffer: *ArrayList(u8), name: []const u8, value: bool) void {
     writeName(buffer, name);
     writeName(buffer, "bool");
     writeU32(buffer, 1); //bool is stored in one whole byte
     writeU8(buffer, if (value) 1 else 0);
 }
-fn writeMetaVector(buffer: *std.ArrayList(u8), name: []const u8, value: [3]i32) void {
+fn writeMetaVector(buffer: *ArrayList(u8), name: []const u8, value: [3]i32) void {
     writeName(buffer, name);
     writeName(buffer, "vec3i");
     writeU32(buffer, 3 * @sizeOf(i32));
@@ -196,7 +197,7 @@ pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allo
     // print("bit index 0: {d}\n", .{bit_index_0});
 }
 
-fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
+fn writeNode5Header(buffer: *ArrayList(u8), node: *Node5) void {
     //origin of 5-node:
     writeVec3i(buffer, .{ 0, 0, 0 });
     //child masks:
@@ -214,7 +215,7 @@ fn writeNode5Header(buffer: *std.ArrayList(u8), node: *Node5) void {
         writeU16(buffer, 0);
     }
 }
-fn writeNode4Header(buffer: *std.ArrayList(u8), node: *Node4) void {
+fn writeNode4Header(buffer: *ArrayList(u8), node: *Node4) void {
     //Child masks
     for (node.mask) |child_mask| {
         writeU64(buffer, child_mask);
@@ -236,7 +237,7 @@ const TreeError = error{
     ThreeNodeNotFound,
 };
 
-fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
+fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
     writeU32(buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
     writeU32(buffer, 0); //Root node background value
     writeU32(buffer, 0); //number of tiles
@@ -293,7 +294,7 @@ fn writeTree(buffer: *std.ArrayList(u8), vdb: *VDB) void {
     print("end of tree writing function\n", .{});
 }
 
-fn writeMetadata(buffer: *std.ArrayList(u8)) void {
+fn writeMetadata(buffer: *ArrayList(u8)) void {
     // lots of hard coded things that will by dynamic if we expand this!
     writeU32(buffer, 4); //write number of entries
     writeMetaString(buffer, "class", "unknown");
@@ -302,7 +303,7 @@ fn writeMetadata(buffer: *std.ArrayList(u8)) void {
     writeMetaString(buffer, "name", "density");
 }
 
-fn writeTransform(buffer: *std.ArrayList(u8), affine: [4][4]f64) void {
+fn writeTransform(buffer: *ArrayList(u8), affine: [4][4]f64) void {
     writeName(buffer, "AffineMap");
 
     writeF64(buffer, affine[0][0]);
@@ -326,7 +327,7 @@ fn writeTransform(buffer: *std.ArrayList(u8), affine: [4][4]f64) void {
     writeF64(buffer, 1);
 }
 
-fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
+fn writeGrid(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //grid name (should be dynamic when doing multiple grids)
     writeName(buffer, "density");
 
@@ -350,7 +351,7 @@ fn writeGrid(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeTree(buffer, vdb);
 }
 
-pub fn writeVDB(buffer: *std.ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
+pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //Magic Number (needed it spells out BDV)
     writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
