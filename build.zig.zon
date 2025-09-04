@@ -8,10 +8,7 @@
     .minimum_zig_version = "0.15.1",
 
     .dependencies = .{
-        .zools = .{
-            .url = "/Users/joachimpfefferkorn/repos/zools",
-            .hash = "zools-0.0.0-VPOS2mpFAAABP7kvuQ_mfI0rXl6dqgPIXIdRucbzeiqM",
-        },
+        .zools = .{ .path = "./deps/zools" },
     },
     .paths = .{
         "build.zig",

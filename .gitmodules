@@ -1,0 +1,3 @@
+[submodule "deps/zools"]
+	path = deps/zools
+	url = https://github.com/joachimbbp/zools

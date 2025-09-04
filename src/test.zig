@@ -1,6 +1,7 @@
 const std = @import("std");
 const print = std.debug.print;
 const testing = std.testing;
+const zools = @import("zools");
 
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
@@ -8,6 +9,10 @@ const VDB = vdb543.VDB;
 const output_path = "../output";
 
 const ArrayList = std.array_list.Managed;
+
+test "imports" {
+    zools.debug.helloZools();
+}
 
 test "sphere" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
