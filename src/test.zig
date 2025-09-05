@@ -21,6 +21,8 @@ test "sphere" {
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
     const allocator = arena.allocator();
+    //WARNING: this naming convention is really
+    //weird and certainly differs from zools!
     var buffer = ArrayList(u8).init(allocator);
     defer buffer.deinit();
 
@@ -48,10 +50,9 @@ test "sphere" {
         }
     }
     vdb543.writeVDB(&buffer, &sphere, Identity4x4); // assumes compatible signature
-    const sphere_file = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/0819a_zig.vdb", .{});
-    defer sphere_file.close();
-    try sphere_file.writeAll(buffer.items);
-    print("Sphere test pattern written\n", .{});
+
+    const file_name = try zools.save.version("./output/0819a_zig.vdb", buffer, allocator);
+    print("Sphere test pattern written to  {s}\n", .{file_name.items});
 }
 
 test "test_patern" {
@@ -77,9 +78,9 @@ test "test_patern" {
     vdb543.writeVDB(&buffer, &single_voxel, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
 
-    const single_voxel_file = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/one_voxel_01_zig.vdb", .{});
-    defer single_voxel_file.close();
-    try single_voxel_file.writeAll(buffer.items);
+    const file_path = "./output/one_voxel_01_zig.vdb";
+    const versioned_name = try zools.save.version(file_path, buffer, allocator);
+    print("saved to {s}\n", .{versioned_name.items});
 }
 
 test "nifti" {
@@ -126,10 +127,7 @@ test "nifti" {
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
     vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-    //printBuffer(&buffer);
-
-    const file0 = try std.fs.cwd().createFile("/Users/joachimpfefferkorn/repos/neurovolume/output/nifti_zig.vdb", .{});
-    defer file0.close();
-    try file0.writeAll(buffer.items);
-    print("\nnifti file written\n", .{});
+    const save_path = "./output/nifti_zig.vdb";
+    const file_name = try zools.save.version(save_path, buffer, allocator);
+    print("\nnifti file written to {}\n", .{file_name});
 }
