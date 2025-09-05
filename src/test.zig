@@ -1,3 +1,7 @@
+//TODO:
+//These tests are very incomplete as this project is WIP
+//It would be nice to have some cool emojis (especially 🧠, 🧲, ⚪️)
+
 const std = @import("std");
 const print = std.debug.print;
 const testing = std.testing;
@@ -130,4 +134,28 @@ test "nifti" {
     const save_path = "./output/nifti_zig.vdb";
     const file_name = try zools.save.version(save_path, buffer, allocator);
     print("\nnifti file written to {}\n", .{file_name});
+}
+
+test "open and normalize nifti file" {
+    const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    var img = try nifti1.Image.init(static);
+    defer img.deinit();
+    (&img).printHeader();
+    print("\ndatatype: {s}\n", .{nifti1.DataType.name(img.data_type)});
+    print("bytes per voxel: {any}\n", .{img.bytes_per_voxel});
+
+    const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
+    const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
+    const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
+    const mid_t: usize = @divFloor(@as(usize, @intCast(img.header.dim[4])), 2);
+
+    const mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, false, .{ 0, 0 });
+
+    print("middle value: {any}\n", .{mid_value});
+
+    print("Normalizing\nSetting Min Max\n", .{});
+    const minmax = try nifti1.MinMax3D(img);
+    print("Min Max: {any}\n", .{minmax});
+    const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
+    print("Normalized mid value: {any}\n", .{normalized_mid_value});
 }

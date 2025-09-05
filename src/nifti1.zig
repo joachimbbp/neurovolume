@@ -53,7 +53,7 @@ pub const Header = extern struct {
 
     magic: [4]u8,
 };
-const DataType = enum(i16) {
+pub const DataType = enum(i16) {
     unknown = 0,
     bool = 1,
     unsigned_char = 2,
@@ -86,20 +86,16 @@ pub const Image = struct {
     data_type: DataType,
     bytes_per_voxel: u16,
 
-    //const Self = @This();
-
     pub fn getAt4D(self: *const Image, xpos: usize, ypos: usize, zpos: usize, tpos: usize, normalize: bool, minmax: [2]f32) !f32 {
         const nx: usize = @intCast(self.header.dim[1]);
         const ny: usize = @intCast(self.header.dim[2]);
         const nz: usize = @intCast(self.header.dim[3]);
 
         const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
-        //index := uint64(t*nx*ny*nz + z*nx*ny + y*nx + x)
 
         const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
         const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
 
-        //rawVal := img.byte2floatF(img.rawData[index*uint64(img.bytesPerVoxel) : (index+1)*uint64(img.bytesPerVoxel)])
         const raw_value = try byteToFloat(self.data, self.bytes_per_voxel, bit_start, bit_end);
 
         var post_slope = raw_value;
@@ -112,8 +108,6 @@ pub const Image = struct {
         } else {
             return post_slope;
         }
-        //vol.Data[x][y][z][t] = (vol.Data[x][y][z][t] - vol.MinVal) / (vol.MaxVal - vol.MinVal)
-
     }
 
     pub fn printHeader(self: *const Image) void {
@@ -195,32 +189,3 @@ pub fn MinMax3D(img: Image) ![2]f32 {
     }
     return minmax;
 }
-
-test "open and normalize" {
-    const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-    var img = try Image.init(static);
-    defer img.deinit();
-    (&img).printHeader();
-    print("\ndatatype: {s}\n", .{DataType.name(img.data_type)});
-    print("bytes per voxel: {any}\n", .{img.bytes_per_voxel});
-
-    const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
-    const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
-    const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
-    const mid_t: usize = @divFloor(@as(usize, @intCast(img.header.dim[4])), 2);
-
-    const mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, false, .{ 0, 0 });
-
-    print("middle value: {any}\n", .{mid_value});
-
-    print("Normalizing\nSetting Min Max\n", .{});
-    const minmax = try MinMax3D(img);
-    print("Min Max: {any}\n", .{minmax});
-    const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
-    print("Normalized mid value: {any}\n", .{normalized_mid_value});
-}
-
-//convention:
-//Types: pascal
-//fields: snake
-//methods: camel
