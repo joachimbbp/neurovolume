@@ -21,11 +21,17 @@ fn writeU8(buffer: *ArrayList(u8), value: u8) void {
 }
 //NOTE:
 //Check endianness for these
-//These could probably be dryed with comptimes
+//These could probably be dryed with comptime values!
+//      (I mean look, they're all the same!)
 fn writeU16(buffer: *ArrayList(u8), value: u16) void {
     buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
     //  writePointer(buffer, &value, @sizeOf(value));
 }
+
+fn writeF32(buffer: *ArrayList(u8), value: f32) void {
+    buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
+}
+
 fn writeU32(buffer: *ArrayList(u8), value: u32) void {
     //NOTE: Need to change this to a const u32 somehow (but efficiently)
 
@@ -117,10 +123,10 @@ const Node4 = struct {
 
 const Node3 = struct {
     mask: [8]u64,
-    data: [512]f16, //this can be any value but we're using f16. Probably should match source!
+    data: [512]f32, //can technically be any value!
     fn build(allocator: std.mem.Allocator) !*Node3 {
         const node3 = try allocator.create(Node3);
-        node3.* = Node3{ .mask = @splat(0), .data = @splat(@as(f16, 0)) };
+        node3.* = Node3{ .mask = @splat(0), .data = @splat(@as(f32, 0)) };
         return node3;
     }
 };
@@ -160,7 +166,7 @@ fn getBitIndex0(position: [3]u32) u32 {
 //- [ ] have this set voxels one 3-node at a time to reduce syscalls
 //- [ ] have the value type mirror the input data type
 
-pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f16, allocator: std.mem.Allocator) !void {
+pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f32, allocator: std.mem.Allocator) !void {
     var node_5: *Node5 = vdb.five_node;
 
     const bit_index_4 = getBitIndex4(position);
@@ -212,7 +218,7 @@ fn writeNode5Header(buffer: *ArrayList(u8), node: *Node5) void {
     writeU8(buffer, 6);
     var i: usize = 0;
     while (i < 32768) : (i += 1) {
-        writeU16(buffer, 0);
+        writeF32(buffer, 0);
     }
 }
 fn writeNode4Header(buffer: *ArrayList(u8), node: *Node4) void {
@@ -228,7 +234,7 @@ fn writeNode4Header(buffer: *ArrayList(u8), node: *Node4) void {
     writeU8(buffer, 6);
     var i: usize = 0;
     while (i < 4096) : (i += 1) {
-        writeU16(buffer, 0);
+        writeF32(buffer, 0);
     }
 }
 
@@ -239,7 +245,7 @@ const TreeError = error{
 
 fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
     writeU32(buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
-    writeU32(buffer, 0); //Root node background value
+    writeF32(buffer, 0); //Root node background value
     writeU32(buffer, 0); //number of tiles
     writeU32(buffer, 1); //number of 5 nodes
 
@@ -286,7 +292,7 @@ fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
                         writeU64(buffer, three_mask); //we must re-write the masks for some reason
                     }
                     writeU8(buffer, 6); //6 means no compression
-                    writeSlice(f16, buffer, &node_3_d.data);
+                    writeSlice(f32, buffer, &node_3_d.data);
                 }
             }
         }
@@ -299,7 +305,7 @@ fn writeMetadata(buffer: *ArrayList(u8)) void {
     writeU32(buffer, 4); //write number of entries
     writeMetaString(buffer, "class", "unknown");
     writeMetaString(buffer, "file_compression", "none");
-    writeMetaBool(buffer, "is_saved_as_half_float", true);
+    writeMetaBool(buffer, "is_saved_as_half_float", false);
     writeMetaString(buffer, "name", "density");
 }
 
@@ -333,7 +339,7 @@ fn writeGrid(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
 
     //grid type
     //  (thiswill probably always be 543 but who knows! precision should match source eventually
-    writeName(buffer, "Tree_float_5_4_3_HalfFloat");
+    writeName(buffer, "Tree_float_5_4_3");
 
     //Indicate no instance parent
     writeU32(buffer, 0);
