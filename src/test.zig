@@ -16,6 +16,9 @@ const ArrayList = std.array_list.Managed;
 
 test "imports" {
     zools.debug.helloZools();
+    for (0..5) |_| {
+        print("random uuid: {s}\n", .{zools.uuid.v4()});
+    }
 }
 
 test "sphere" {

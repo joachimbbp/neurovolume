@@ -3,6 +3,13 @@
 //This is because the slslope and slinter are f32, which thus sets the data
 //to sort of always be this. I am curious what the larger datatypes
 //typically do (do the super big ones just not use slope and inter?)
+
+//WARNING:
+// This is an external UUID writing dependency (written by me, Joachim)
+// If you don't want to deal with imports feel free to hard code a
+// UUID down under the comment "write UUID"
+const zools = @import("zools");
+
 const ArrayList = std.array_list.Managed;
 
 const std = @import("std");
@@ -39,6 +46,7 @@ fn writeString(buffer: *ArrayList(u8), string: []const u8) void {
         buffer.append(character) catch unreachable;
     }
 }
+
 fn writeName(buffer: *ArrayList(u8), name: []const u8) void {
     writeScalar(u32, buffer, @intCast(name.len));
     writeString(buffer, name);
@@ -343,9 +351,9 @@ pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     //no grid offsets
     writeU8(buffer, 0);
 
-    //Temporary UUID
-    //TODO: generate one
-    writeString(buffer, "7a0f79c6-c47a-4954-8af8-8a9dcc384448");
+    //write UUID
+    const uuid = zools.uuid.v4(); //Feel free to replace with your own
+    writeString(buffer, uuid[0..]);
 
     //No Metadata for now
     writeScalar(u32, buffer, 0);
