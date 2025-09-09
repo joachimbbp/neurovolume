@@ -4,6 +4,11 @@
 //to sort of always be this. I am curious what the larger datatypes
 //typically do (do the super big ones just not use slope and inter?)
 
+//TODO:
+// [ ] Add multiple grids
+// [ ] Add tiles
+// [ ] Arbitrary input data
+// [ ]  setVoxels one 3-node at a time to reduce syscalls
 //WARNING:
 // This is an external UUID writing dependency (written by me, Joachim)
 // If you don't want to deal with imports feel free to hard code a
@@ -14,7 +19,8 @@ const ArrayList = std.array_list.Managed;
 
 const std = @import("std");
 const print = std.debug.print;
-//IO helper functions
+
+//SECTION: IO helper functions
 fn writePointer(buffer: *ArrayList(u8), pointer: *const u8, len: usize) void {
     buffer.appendSlice(pointer[0..len]) catch unreachable;
 }
@@ -25,8 +31,6 @@ fn writeSlice(comptime T: type, buffer: *ArrayList(u8), slice: []const T) void {
 fn writeU8(buffer: *ArrayList(u8), value: u8) void {
     buffer.append(value) catch unreachable;
 }
-//NOTE:
-//Check endianness for these
 fn writeScalar(comptime T: type, buffer: *ArrayList(u8), value: T) void {
     buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
 }
@@ -68,7 +72,7 @@ fn writeMetaVector(buffer: *ArrayList(u8), name: []const u8, value: [3]i32) void
     writeScalar(u32, buffer, 3 * @sizeOf(i32));
     writeVec3i(buffer, value);
 }
-//VDB nodes
+//SECTION: VDB nodes
 pub const VDB = struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
@@ -111,13 +115,13 @@ const Node3 = struct {
     }
 };
 
-//NOTE: Bit index functions:
-//Generalized Function to pack the whole thing down into xxxyyyzzz:
-//From the original: bit_index = z + y * dim + x * dim^2
-//bit_index = z | (y << dim) | (x << (dim << 1))
-//TODO:
-// - [ ] Dry out pedagogical code (4096-1) etc
-// - [ ] make comptime zig
+//SECTION: Bit index functions:
+// Generalized Function to pack the whole thing down into xxxyyyzzz:
+// From the original: bit_index = z + y * dim + x * dim^2
+// bit_index = z | (y << dim) | (x << (dim << 1))
+// Note the pedagogical code (4096-1, etc). This is a holdover
+// from the jengaFX repo. I'm keeping it around for clarity
+// as I don't believe there is a runtime performance hit.
 fn getBitIndex4(position: [3]u32) u32 {
     const relative_position: [3]u32 = .{ position[0] & (4096 - 1), position[1] & (4096 - 1), position[2] & (4096 - 1) };
     const index_3d: [3]u32 = .{
@@ -141,10 +145,6 @@ fn getBitIndex0(position: [3]u32) u32 {
     const index_3d: [3]u32 = .{ relative_position[0] >> 0, relative_position[1] >> 0, relative_position[2] >> 0 };
     return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
-
-//TODO:
-//- [ ] have this set voxels one 3-node at a time to reduce syscalls
-//- [ ] have the value type mirror the input data type
 
 pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f32, allocator: std.mem.Allocator) !void {
     var node_5: *Node5 = vdb.five_node;
@@ -277,7 +277,7 @@ fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
             }
         }
     }
-    print("end of tree writing function\n", .{});
+    //    print("end of tree writing function\n", .{});
 }
 
 fn writeMetadata(buffer: *ArrayList(u8)) void {
@@ -364,8 +364,7 @@ pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
     writeGrid(buffer, vdb, affine);
 }
 
-// Utility functions
-//TODO: Move these?
+//SECTION: Utility functions
 pub fn toF32(v: [3]usize) [3]f32 {
     return .{
         @floatFromInt(v[0]),
