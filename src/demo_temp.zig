@@ -1,7 +1,7 @@
 const std = @import("std");
 
-extern fn deps_test() void;
-
+extern fn hello() void;
+//NOTE: this works because of the setup in the build file
 pub fn main() void {
-    deps_test();
+    hello();
 }

@@ -121,9 +121,6 @@ test "nifti" {
             for (0..@as(usize, @intCast(dims[1]))) |y| {
                 const val = try img.getAt4D(x, y, z, 0, true, minmax);
                 //needs to be f16
-                //TODO: probably you'll want normalization functions here, then plug it into the VDB (or an ACII visualizer, or image generator for debugging)
-                //as in: norm_val = normalize(val, minmax)
-                //TODO: vdb should accept multiple types
                 try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
             }
         }

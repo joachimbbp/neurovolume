@@ -4,6 +4,7 @@ lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolu
 
 lib = cdll.LoadLibrary(lib_path)
 
-lib.deps_test()
-print(lib.add(5, 6))
-lib.hello_neurovolume()
+lib.hello()
+# lib.nifti1ToVDB(id(lib_path), True)
+echo_me = b"ham spam land echo\n"
+lib.echo(echo_me)

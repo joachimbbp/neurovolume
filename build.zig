@@ -16,7 +16,6 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-
     //NOTE: This is really just for testing purposes
     const exe = b.addExecutable(.{
         .name = "demo",

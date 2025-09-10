@@ -7,6 +7,8 @@
 
     .minimum_zig_version = "0.15.1",
 
+    //HACK: currently zools submodule is just in
+    //the src folder.
     // .dependencies = .{
     //     .zools = .{ .path = "./deps/zools" },
     // },
