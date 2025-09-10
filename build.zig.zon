@@ -7,9 +7,9 @@
 
     .minimum_zig_version = "0.15.1",
 
-    .dependencies = .{
-        .zools = .{ .path = "./deps/zools" },
-    },
+    // .dependencies = .{
+    //     .zools = .{ .path = "./deps/zools" },
+    // },
     .paths = .{
         "build.zig",
         "build.zig.zon",
