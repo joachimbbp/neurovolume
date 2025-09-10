@@ -1,4 +1,8 @@
 from ctypes import cdll
 
-lib = cdll.LoadLibrary(
-    "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.a")
+lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
+
+lib = cdll.LoadLibrary(lib_path)
+
+lib.deps_test()
+print(lib.add(5, 6))

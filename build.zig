@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
 
     const libneurovolume = b.addLibrary(.{
         .name = "neurovolume",
-        .linkage = .static,
+        .linkage = .dynamic,
         .root_module = b.createModule(.{
             .root_source_file = b.path("./src/root.zig"),
             .target = target,
@@ -14,6 +14,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    //NOTE: This is really just for testing purposes
     const exe = b.addExecutable(.{
         .name = "demo",
         .root_module = b.createModule(.{

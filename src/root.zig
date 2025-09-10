@@ -16,8 +16,5 @@ pub export fn deps_test() void {
 
 //TEST:
 //Let's see if this gets us nifti functionality
-pub const nifti1 = @import("nifti1.zig");
-
-// test "basic add functionality" {
-//     try testing.expect(add(3, 7) == 10);
-// }
+//pub const nifti1 = @import("nifti1.zig");
+//WARN: it does not!
