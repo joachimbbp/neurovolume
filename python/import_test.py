@@ -6,3 +6,4 @@ lib = cdll.LoadLibrary(lib_path)
 
 lib.deps_test()
 print(lib.add(5, 6))
+lib.hello_neurovolume()
