@@ -14,7 +14,8 @@ print(lib.echo(echo_me))
 result = lib.echo(echo_me)
 print(f"echo result: {result.decode('utf-8')}")
 
-# LLM: following code is chatGPT
+print("should be zero: ", lib.alwaysFails())
+# LLM START:
 lib.echoHam.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]
 lib.echoHam.restype = ctypes.c_size_t
 
@@ -27,4 +28,19 @@ written = lib.echoHam(b"spam", out_buf, BUF_SIZE)
 
 print("Written bytes:", written)
 print("Output string:", out_buf.value.decode())
-# LLM END:
+
+# NOTE: don't forget about these!
+lib.writePathToBufC.argtypes = [
+    ctypes.c_char_p, ctypes.POINTER(ctypes.c_char), ctypes.c_size_t]
+lib.writePathToBufC.restype = ctypes.c_size_t
+
+string_buf = ctypes.create_string_buffer(BUF_SIZE)
+written_string = lib.writePathToBufC(b"ham/land/spam", string_buf, BUF_SIZE)
+
+print("string: ", string_buf.value.decode())
+
+# nifti_path = b"/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
+# NIFTI_BUF_SIZE = 256
+# output_buf = ctypes.create_string_buffer(NIFTI_BUF_SIZE)
+# nifti_buf_len = lib.nifti1ToVDB(nifti_path, True, output_buf, NIFTI_BUF_SIZE)
+# print("VDB saved to: ", output_buf.value.decode())
