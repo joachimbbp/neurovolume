@@ -6,6 +6,7 @@ const debug = @import("debug.zig");
 const nifti1 = @import("nifti1.zig");
 const ArrayList = std.array_list.Managed;
 const vdb543 = @import("vdb543.zig");
+
 //_: Debug and Test Functions
 pub export fn hello() void {
     print("🪾 Root level print\n", .{});
@@ -59,8 +60,11 @@ pub export fn writePathToBufC(
 }
 //LLM END:
 
+//_: Actual functions:
+
 //Writes to the buffer, file saving happens on the python level
 pub export fn nifti1ToVDB(nifti_path: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
+    //TODO: loud vs quiet debug, certainly some kind of loaidng feature
     const filepath = std.mem.span(nifti_path);
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator(); //TODO: standardize these
@@ -112,6 +116,7 @@ pub export fn nifti1ToVDB(nifti_path: [*:0]const u8, normalize: bool, out_buf: [
     };
     vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     const save_path = "./output/nifti_zig.vdb";
+    //TODO: save path from the basename of the nifti file
     const file_path = zools.save.version(save_path, buffer, allocator) catch {
         return 0;
     };
