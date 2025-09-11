@@ -35,12 +35,16 @@ lib.writePathToBufC.argtypes = [
 lib.writePathToBufC.restype = ctypes.c_size_t
 
 string_buf = ctypes.create_string_buffer(BUF_SIZE)
-written_string = lib.writePathToBufC(b"ham/land/spam", string_buf, BUF_SIZE)
+written_string_len = lib.writePathToBufC(
+    b"ham/land/spam", string_buf, BUF_SIZE)
 
 print("string: ", string_buf.value.decode())
 
-# nifti_path = b"/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
-# NIFTI_BUF_SIZE = 256
-# output_buf = ctypes.create_string_buffer(NIFTI_BUF_SIZE)
-# nifti_buf_len = lib.nifti1ToVDB(nifti_path, True, output_buf, NIFTI_BUF_SIZE)
-# print("VDB saved to: ", output_buf.value.decode())
+# SECTION: Nifti
+nifti_path = b"/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
+lib.nifti1ToVDB.argtypes = [
+    ctypes.c_char_p, ctypes.c_bool, ctypes.POINTER(ctypes.c_char), ctypes.c_size_t]
+lib.nifti1ToVDB.restype = ctypes.c_size_t
+save_loc_buf = ctypes.create_string_buffer(BUF_SIZE)
+save_loc_len = lib.nifti1ToVDB(nifti_path, True, save_loc_buf, BUF_SIZE)
+print("save location: ", save_loc_buf.value.decode())
