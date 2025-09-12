@@ -87,6 +87,24 @@ fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [
     const output = try std.fmt.allocPrint(alloc, f, .{ output_dir, p.basename, ext });
     return output;
 }
+// names folder after input_path item basename, for fMRI sequences
+fn dirNameFromFile(alloc: std.mem.Allocator, filepath: [:0]const u8, parent_dir: [:0]const u8) ![]u8 {
+    const f = "{s}/{s}";
+    const p = try zools.path.Parts.init(filepath);
+    const output = try std.fmt.allocPrint(alloc, f, .{ parent_dir, p.basename });
+    return output;
+}
+
+test "dir name" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    const parent = "./output";
+    const filepath = "/Users/joachimpfefferkorn/repos/neurovolume/output/sub-01_T1w_1.vdb";
+    const dir = try dirNameFromFile(alloc, filepath, parent);
+    print("dir name from filepath: {s}\n", .{dir});
+    alloc.free(dir);
+}
 
 // Writes and saves VDB File
 fn writeVDB(
@@ -105,13 +123,13 @@ fn writeVDB(
     defer buffer.deinit();
 
     const minmax = try nifti1.MinMax3D(img_deprecated);
-    const dims = img_deprecated.header.dim;
+    const dim = img_deprecated.header.dim;
     var vdb = try vdb543.VDB.build(alloc);
 
     print("iterating nifti file\n", .{});
-    for (0..@as(usize, @intCast(dims[3]))) |z| {
-        for (0..@as(usize, @intCast(dims[2]))) |x| {
-            for (0..@as(usize, @intCast(dims[1]))) |y| {
+    for (0..@as(usize, @intCast(dim[3]))) |z| {
+        for (0..@as(usize, @intCast(dim[2]))) |x| {
+            for (0..@as(usize, @intCast(dim[1]))) |y| {
                 const val = try img_deprecated.getAt4D(x, y, z, 0, normalize, minmax);
                 try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), alloc);
             }
@@ -141,10 +159,6 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     defer img_deprecated.deinit();
     (&img_deprecated).printHeader();
 
-    // if (dims[0] != 3) {
-    //     print("Warning! Not a static 3D file. Has {any} dimensions\n", .{dims[0]});
-    // } //TODO: just generally check if it's a valid Nifti1 file!
-    //
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
         .{ 0.0, 1.0, 0.0, 0.0 },
@@ -152,18 +166,31 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
 
-    const vdb_filepath = writeVDB(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4) catch {
-        return 0;
-    };
+    const num_dims = img_deprecated.header.dim[0];
+    if (num_dims == 3) {
+        //Signifies a static, 3D MRI
+        print("Static MRI\n", .{});
+        const vdb_filepath = writeVDB(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4) catch {
+            return 0;
+        };
 
-    //NOTE: Returning the name here:
-    //LLM: inspired. More or less copypasta
-    if (out_cap == 0) return 0;
-    const src = vdb_filepath.items;
-    const n = if (src.len + 1 <= out_cap) src.len else out_cap - 1;
-    //Q: I don't fully grasp the reason for the above code
-    @memcpy(out_buf[0..n], src[0..n]);
-    out_buf[n] = 0; //NULL terminate
-    return n;
-    //LLM END:
+        //NOTE: Returning the name here:
+        //LLM: inspired. More or less copypasta
+        if (out_cap == 0) return 0;
+        const src = vdb_filepath.items;
+        const n = if (src.len + 1 <= out_cap) src.len else out_cap - 1;
+        //Q: I don't fully grasp the reason for the above code
+        @memcpy(out_buf[0..n], src[0..n]);
+        out_buf[n] = 0; //NULL terminate
+        return n;
+        //LLM END:
+    }
+    if (num_dims == 4) {
+        print("Time series MRI\n unsuported right now\n", .{});
+        return 0;
+        //        const seq_dir =
+    } else {
+        print("unrecognized dim number: {d}, returning 0 for error\n", .{num_dims});
+        return 0;
+    }
 }
