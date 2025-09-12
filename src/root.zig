@@ -78,39 +78,55 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     return num_frames;
 }
 
-//WARN: not sure about arena here, and your naming convention
-//is all over the place!
-//TODO: This function should be universal to all possible file formats
+// /input/source_file.any -> /output/soure_file.vdb
+fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8) ![]u8 {
+    //NOTE: might be good to make this public eventually
+    const f = "{s}/{s}.{s}";
+    const p = try zools.path.Parts.init(input_path);
+    const output = try std.fmt.allocPrint(alloc, f, .{ output_dir, p.basename, ".vdb" });
+    return output;
+}
+
+// Writes and saves VDB File
 fn writeVDB(
-    allocator: std.mem.Allocator,
+    alloc: std.mem.Allocator,
+    input_path: [:0]const u8,
+    output_dir: [:0]const u8,
     img_deprecated: nifti1.Image,
     normalize: bool,
     transform: [4][4]f64,
 ) !ArrayList(u8) {
-    var buffer = ArrayList(u8).init(allocator);
+    //TODO: This function should be universal to all possible file formats
+    //WARN: not sure about arena here, and your naming convention
+    //is all over the place!
+    // Writes VDB and saves it to disk
+    var buffer = ArrayList(u8).init(alloc);
     defer buffer.deinit();
 
     const minmax = try nifti1.MinMax3D(img_deprecated);
     const dims = img_deprecated.header.dim;
-    var vdb = try vdb543.VDB.build(allocator);
+    var vdb = try vdb543.VDB.build(alloc);
+
     print("iterating nifti file\n", .{});
     for (0..@as(usize, @intCast(dims[3]))) |z| {
         for (0..@as(usize, @intCast(dims[2]))) |x| {
             for (0..@as(usize, @intCast(dims[1]))) |y| {
                 const val = try img_deprecated.getAt4D(x, y, z, 0, normalize, minmax);
-                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
+                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), alloc);
             }
         }
     }
     vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
-    const save_path = "./output/nifti_zig.vdb"; //TODO: save path from the basename of the nifti file
-    const vdb_filepath = try zools.save.version(save_path, buffer, allocator);
+
+    const default_save_path = try filenameVDB(alloc, input_path, output_dir);
+    const vdb_filepath = try zools.save.version(default_save_path, buffer, alloc);
     return vdb_filepath;
 }
 // Returns path to VDB file (or folder containing sequence if fMRI)
-pub export fn nifti1ToVDB(c_filepath: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
+pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
     //TODO: loud vs quiet debug, certainly some kind of loaidng feature
-    const filepath = std.mem.span(c_filepath);
+    const nifti_filepath = std.mem.span(c_nifti_filepath);
+    const output_dir = std.mem.span(c_output_dir);
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator(); //TODO: standardize these
     defer _ = gpa.deinit();
@@ -118,7 +134,7 @@ pub export fn nifti1ToVDB(c_filepath: [*:0]const u8, normalize: bool, out_buf: [
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const img_deprecated = nifti1.Image.init(filepath) catch { //DEPRECATED: img should be universal
+    const img_deprecated = nifti1.Image.init(nifti_filepath) catch { //DEPRECATED: img should be universal
         return 0;
     };
     defer img_deprecated.deinit();
@@ -135,7 +151,7 @@ pub export fn nifti1ToVDB(c_filepath: [*:0]const u8, normalize: bool, out_buf: [
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
 
-    const vdb_filepath = writeVDB(allocator, img_deprecated, normalize, Identity4x4) catch {
+    const vdb_filepath = writeVDB(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4) catch {
         return 0;
     };
 
