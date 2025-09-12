@@ -6,7 +6,7 @@ const std = @import("std");
 const print = std.debug.print;
 const testing = std.testing;
 //HACK: there is a more legit way to do this in the build system, I'm sure
-const zools = @import("zools/src/root.zig");
+const zools = @import("zools/src/root.zig"); //MY SUBMODULE:
 
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");

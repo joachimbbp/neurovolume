@@ -1,94 +1,114 @@
-# ------------------------------------------------------------------------------
-# region:                               User Set Path
+# :_: ------------------------------------------------------------------------
+#                               Imports
+# ----------------------------------------------------------------------------
+import json
+import os
+import bpy
+from . import neurovolume_lib  # LOCAL:
+# :_: ------------------------------------------------------------------------
+#                               User Set Path
 #                                           Replace these paths with
 #                                           the the corresponding paths
 #                                           on your machine
 # ------------------------------------------------------------------------------
-import json
-import os
-import bpy
 user_set_output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output"
-user_set_exe_path = "/Users/joachimpfefferkorn/repos/neurovolume/cmd/neurovolume/main"
 user_set_default_nifti = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"  # optional
-# endregion
-# ------------------------------------------------------------------------------
-# region:                               Setup
-# ------------------------------------------------------------------------------
 
+# :_: ------------------------------------------------------------------------
+#                               Setup
+# ------------------------------------------------------------------------------
 bl_info = {
     "name": "Neurovolume",
     "author": "Joachim Pfefferkorn",
     "description": "",
     "blender": (2, 80, 0),
-    "version": (0, 0, 1),
+    "version": (0, 0, 0),
     "location": "",
     "warning": "",
     "category": "Generic",
 }
-
 print("Neurovolume is running")
 
 
-# endregion
+# :_: ------------------------------------------------------------------------
+#                               Backend Functions
 # ------------------------------------------------------------------------------
-# region:                               Backend Functions
-# ------------------------------------------------------------------------------
-
+# THOUGHT: Not sure if these first two should go into the neurovolume_lib?
 
 def get_basename(path):
     hierarchy = path.split("/")
     return hierarchy[-1].split(".")[0]
 
 
+def get_folder(path):
+    """Returns the folder in which the path points to"""
+    hiearchy = path.split("/")
+    return "/".join(hiearchy[:-1])
+
+
 def vdb_frames_sort(entry: dict):
     return int(entry["name"].split(".")[0].split("_")[-1])
 
 
-def load_vdb(nifti_filepath):
-    print("Creating VDB from NIfTI File")
-    print("     NIfTI Filepath: ", nifti_filepath)
-    output_filepath = user_set_output_path
-    print("     Output Folder: ", output_filepath)
-    exe_path = user_set_exe_path
+def load_nifti1(filepath: str, normalize: bool = True):
+    # FIX: Static for now!
+    # HACK: Very much an MVP move for the zig implementation,
+    # the generalized function load_vdb is better
+    # You should probably generalize at src/root: nifti1ToVDB
+    vdb_path = os.path.abspath(neurovolume_lib.nifti1ToVDB(filepath, normalize))
+    print("vdb path: ", vdb_path)
 
-    os.system(f"{exe_path} {nifti_filepath} {output_filepath}")
-    vdb_basename = get_basename(nifti_filepath)
-    vdb_metadata_filepath = f"{output_filepath}/{vdb_basename}_metadata.json"
+    bpy.ops.object.volume_import(filepath=vdb_path,
+                                 relative_path = False,
+                                 align='WORLD',
+                                 location=(0, 0, 0),
+                                 scale=(1, 1, 1))
 
-    metadata = json.load(open(vdb_metadata_filepath))
-
-    if metadata["Frames"] == 1:
-        vdb_filename = f"{vdb_basename}.vdb"
-        vdb_filepath = f"{output_filepath}/{vdb_filename}"
-        print(f"loading in static VDB: {vdb_filepath}")
-        bpy.ops.object.volume_import(filepath=vdb_filepath, directory=output_filepath, files=[
-                                     {"name": vdb_filename}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-    elif metadata["Frames"] > 1:
-        print("loading VDB seq")
-        vdb_seq_folder = f"{output_filepath}/{vdb_basename}_seq"
-        vdb_sequence = []
-
-        for filename in os.listdir(vdb_seq_folder):
-            if filename.endswith(".vdb"):
-                vdb_sequence.append({"name": filename})
-
-            else:
-                continue
-
-        vdb_sequence.sort(key=vdb_frames_sort)
-        print(f"loading in VDB sequence:\n{vdb_sequence}")
-        bpy.ops.object.volume_import(filepath=vdb_seq_folder, directory=vdb_seq_folder, files=vdb_sequence,
-                                     relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-
-    else:
-        print("Invalid Frame number: ", metadata["Frames"])
-        return "VDBs loaded into scene, Invalid Frame Number"
-    return "VDBs loaded into scene"
+# def load_vdb(nifti_filepath):
+#     print("Creating VDB from NIfTI File")
+#     print("     NIfTI Filepath: ", nifti_filepath)
+#     output_filepath = user_set_output_path
+#     print("     Output Folder: ", output_filepath)
+#     exe_path = user_set_exe_path
+#
+#     os.system(f"{exe_path} {nifti_filepath} {output_filepath}")
+#     vdb_basename = get_basename(nifti_filepath)
+#     vdb_metadata_filepath = f"{output_filepath}/{vdb_basename}_metadata.json"
+#
+#     metadata = json.load(open(vdb_metadata_filepath))
+#
+#     if metadata["Frames"] == 1:
+#         vdb_filename = f"{vdb_basename}.vdb"
+#         vdb_filepath = f"{output_filepath}/{vdb_filename}"
+#         print(f"loading in static VDB: {vdb_filepath}")
+#         bpy.ops.object.volume_import(filepath=vdb_filepath, directory=output_filepath, files=[
+#                                      {"name": vdb_filename}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+#     elif metadata["Frames"] > 1:
+#         print("loading VDB seq")
+#         vdb_seq_folder = f"{output_filepath}/{vdb_basename}_seq"
+#         vdb_sequence = []
+#
+#         for filename in os.listdir(vdb_seq_folder):
+#             if filename.endswith(".vdb"):
+#                 vdb_sequence.append({"name": filename})
+#
+#             else:
+#                 continue
+#
+#         vdb_sequence.sort(key=vdb_frames_sort)
+#         print(f"loading in VDB sequence:\n{vdb_sequence}")
+#         bpy.ops.object.volume_import(filepath=vdb_seq_folder, directory=vdb_seq_folder, files=vdb_sequence,
+#                                      relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+#
+#     else:
+#         print("Invalid Frame number: ", metadata["Frames"])
+#         return "VDBs loaded into scene, Invalid Frame Number"
+#     return "VDBs loaded into scene"
 # endregion
+# :_: ------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
-# region:                               GUI Functions
+#                               GUI Functions
 # ------------------------------------------------------------------------------
-
 
 class Neurovolume(bpy.types.Panel):
     # Eventually this will probably just be "Load Volumes." Other functionality can go in other panels
@@ -110,12 +130,11 @@ class Volume(bpy.types.Operator):
     bl_label = "Load Volume"
 
     def execute(self, context):
-        report = load_vdb(context.scene.path_input)
+        report = load_nifti1(context.scene.path_input)
         self.report({'INFO'}, report)
         return {"FINISHED"}
-# endregion
-# ------------------------------------------------------------------------------
-# region:                               Property Registration
+# :_: ------------------------------------------------------------------------
+#                               Property Registration
 # ------------------------------------------------------------------------------
 
 
@@ -148,5 +167,3 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-
-# endregion

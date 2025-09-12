@@ -13,7 +13,8 @@
 // This is an external UUID writing dependency (written by me, Joachim)
 // If you don't want to deal with imports feel free to hard code a
 // UUID down under the comment "write UUID"
-const zools = @import("./zools/src/root.zig");
+// Note it is a git submodule!
+const zools = @import("./zools/src/root.zig"); //MY SUBMODULE:
 
 const ArrayList = std.array_list.Managed;
 

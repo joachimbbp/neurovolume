@@ -120,7 +120,6 @@ pub export fn nifti1ToVDB(nifti_path: [*:0]const u8, normalize: bool, out_buf: [
     const file_path = zools.save.version(save_path, buffer, allocator) catch {
         return 0;
     };
-    print("\nnifti file written to {}\n", .{file_path});
 
     //NOTE: Returning the name here:
     //LLM: inspired. More or less copypasta

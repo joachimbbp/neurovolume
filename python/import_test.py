@@ -1,6 +1,5 @@
 # NOTE: this is more or less a scratchpad
 
-
 from ctypes import cdll, c_char_p
 import ctypes
 lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"

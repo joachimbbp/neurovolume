@@ -12,7 +12,7 @@ def b(string):
     return string.encode("utf-8")
 
 
-def nifti1ToVDB(filepath, normalize) -> str:
+def nifti1ToVDB(filepath: str, normalize: bool) -> str:
     BUF_SIZE = 256  # somewhat arbitrary, should be big enough
     nvol.writePathToBufC.argtypes = [
         c.c_char_p, c.POINTER(c.c_char), c.c_size_t]
