@@ -64,7 +64,7 @@ pub export fn writePathToBufC(
 
 pub export fn nifti1NumDims(c_filepath: [*:0]const u8) i16 {
     //Maybe a little computationally redundant with nifti1ToVDB
-    //Still figuring out the best librar architecture here, tbh
+    //Still figuring out the best lib architecture here, tbh
     //Writes to the buffer, file saving happens on the python level
     const filepath: []const u8 = std.mem.span(c_filepath);
     const img = nifti1.Image.init(filepath) catch {
