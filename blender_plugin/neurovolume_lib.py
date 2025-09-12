@@ -32,7 +32,8 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 
 # SECTION: Testing:
 static_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
-# save_location = nifti1ToVDB(static_testfile, True)
-# print("VDB saved to: ", save_location, "\n")
+fmri_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii"
+save_location = nifti1_to_VDB(static_testfile, True)
+print("VDB saved to: ", save_location, "\n")
 nf = num_frames(static_testfile)
 print(nf)

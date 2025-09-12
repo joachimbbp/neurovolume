@@ -30,7 +30,7 @@ pub export fn echoHam(word: [*:0]const u8, output_buffer: [*]u8, buf_len: usize)
     output_buffer[total_len] = 0; // Null terminate
 
     return total_len;
-    //LLM END:
+    //LLM ENDAlignManaged(u8)li:
 }
 
 pub export fn alwaysFails() usize {
@@ -63,6 +63,7 @@ pub export fn writePathToBufC(
 //_: Actual functions:
 
 pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
+    //WARN:
     //Maybe a little computationally redundant with nifti1ToVDB
     //Still figuring out the best lib architecture here, tbh
     //Writes to the buffer, file saving happens on the python level
@@ -76,6 +77,37 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     print("zig level dim print: {d}\n", .{num_frames});
     return num_frames;
 }
+
+//WARN: not sure about arena here, and your naming convention
+//is all over the place!
+//TODO: This function should be universal to all possible file formats
+fn writeVDB(
+    allocator: std.mem.Allocator,
+    img_deprecated: nifti1.Image,
+    normalize: bool,
+    transform: [4][4]f64,
+) !ArrayList(u8) {
+    var buffer = ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    const minmax = try nifti1.MinMax3D(img_deprecated);
+    const dims = img_deprecated.header.dim;
+    var vdb = try vdb543.VDB.build(allocator);
+    print("iterating nifti file\n", .{});
+    for (0..@as(usize, @intCast(dims[3]))) |z| {
+        for (0..@as(usize, @intCast(dims[2]))) |x| {
+            for (0..@as(usize, @intCast(dims[1]))) |y| {
+                const val = try img_deprecated.getAt4D(x, y, z, 0, normalize, minmax);
+                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
+            }
+        }
+    }
+    vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
+    const save_path = "./output/nifti_zig.vdb"; //TODO: save path from the basename of the nifti file
+    const vdb_filepath = try zools.save.version(save_path, buffer, allocator);
+    return vdb_filepath;
+}
+// Returns path to VDB file (or folder containing sequence if fMRI)
 pub export fn nifti1ToVDB(c_filepath: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
     //TODO: loud vs quiet debug, certainly some kind of loaidng feature
     const filepath = std.mem.span(c_filepath);
@@ -86,58 +118,31 @@ pub export fn nifti1ToVDB(c_filepath: [*:0]const u8, normalize: bool, out_buf: [
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    var buffer = ArrayList(u8).init(allocator);
-    defer buffer.deinit();
-
-    const img = nifti1.Image.init(filepath) catch {
+    const img_deprecated = nifti1.Image.init(filepath) catch { //DEPRECATED: img should be universal
         return 0;
     };
-    defer img.deinit();
-    //    (&img).printHeader();
+    defer img_deprecated.deinit();
+    (&img_deprecated).printHeader();
 
-    const dims = img.header.dim;
-    //    print("\nDimensions: {any}\n", .{dims});
-    if (dims[0] != 3) {
-        print("Warning! Not a static 3D file. Has {any} dimensions\n", .{dims[0]});
-    } //TODO: just generally check if it's a valid Nifti1 file!
-
-    const minmax = nifti1.MinMax3D(img) catch {
-        return 0;
-    };
-    var vdb = vdb543.VDB.build(allocator) catch {
-        return 0;
-    };
-
-    print("iterating nifti file\n", .{});
-    for (0..@as(usize, @intCast(dims[3]))) |z| {
-        for (0..@as(usize, @intCast(dims[2]))) |x| {
-            for (0..@as(usize, @intCast(dims[1]))) |y| {
-                const val = img.getAt4D(x, y, z, 0, normalize, minmax) catch {
-                    return 0;
-                };
-                vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator) catch {
-                    return 0;
-                };
-            }
-        }
-    }
+    // if (dims[0] != 3) {
+    //     print("Warning! Not a static 3D file. Has {any} dimensions\n", .{dims[0]});
+    // } //TODO: just generally check if it's a valid Nifti1 file!
+    //
     const Identity4x4: [4][4]f64 = .{
         .{ 1.0, 0.0, 0.0, 0.0 },
         .{ 0.0, 1.0, 0.0, 0.0 },
         .{ 0.0, 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
-    vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-    const save_path = "./output/nifti_zig.vdb";
-    //TODO: save path from the basename of the nifti file
-    const file_path = zools.save.version(save_path, buffer, allocator) catch {
+
+    const vdb_filepath = writeVDB(allocator, img_deprecated, normalize, Identity4x4) catch {
         return 0;
     };
 
     //NOTE: Returning the name here:
     //LLM: inspired. More or less copypasta
     if (out_cap == 0) return 0;
-    const src = file_path.items;
+    const src = vdb_filepath.items;
     const n = if (src.len + 1 <= out_cap) src.len else out_cap - 1;
     //Q: I don't fully grasp the reason for the above code
     @memcpy(out_buf[0..n], src[0..n]);

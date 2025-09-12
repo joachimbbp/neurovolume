@@ -79,6 +79,7 @@ pub const DataType = enum(i16) {
     }
 };
 
+//DEPRECATED: Image should be universal to all input formats, not just nifti 1
 pub const Image = struct {
     header: *const Header,
     data: []const u8,
