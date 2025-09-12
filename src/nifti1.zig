@@ -128,6 +128,7 @@ pub const Image = struct {
         const value = std.mem.readInt(i16, bytes[0..2], .little); // i16, not u16
         return @floatFromInt(value);
     }
+    //DEPRECATED: This can be made much better
     pub fn init(filepath: []const u8) anyerror!Image {
         const allocator = &std.heap.page_allocator;
         //Load File
