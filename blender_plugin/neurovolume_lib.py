@@ -12,15 +12,15 @@ def b(string):
     return string.encode("utf-8")
 
 
-def nifti_dims(filepath) -> int:
-    nvol.nifti1NumDims.argtypes = [c.c_char_p]
-    nvol.nifti1NumDims.restype = c.c_int16
-    dim_zero = nvol.nifti1NumDims(b(filepath))
-    return dim_zero
-    # TODO: If you keep this around, make sure it covers all nifti types
+def num_frames(filepath) -> int:
+    print("filepath: ", b(filepath))
+    nvol.numFrames.argtypes = [c.c_char_p]
+    nvol.numFrames.restype = c.c_int16
+    num_frames = nvol.numFrames(b(filepath))
+    return num_frames
 
 
-def nifti1ToVDB(filepath: str, normalize: bool) -> str:
+def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
     BUF_SIZE = 256  # somewhat arbitrary, should be big enough
     nvol.nifti1ToVDB.argtypes = [c.c_char_p,
                                  c.c_bool, c.POINTER(c.c_char), c.c_size_t]
@@ -32,6 +32,7 @@ def nifti1ToVDB(filepath: str, normalize: bool) -> str:
 
 # SECTION: Testing:
 static_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
-save_location = nifti1ToVDB(static_testfile, True)
-print("VDB saved to: ", save_location, "\n")
-# nvol.nifti1NumDims(static_testfile)
+# save_location = nifti1ToVDB(static_testfile, True)
+# print("VDB saved to: ", save_location, "\n")
+nf = num_frames(static_testfile)
+print(nf)

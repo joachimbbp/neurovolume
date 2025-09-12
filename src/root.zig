@@ -62,19 +62,19 @@ pub export fn writePathToBufC(
 
 //_: Actual functions:
 
-pub export fn nifti1NumDims(c_filepath: [*:0]const u8) i16 {
+pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     //Maybe a little computationally redundant with nifti1ToVDB
     //Still figuring out the best lib architecture here, tbh
     //Writes to the buffer, file saving happens on the python level
-    const filepath: []const u8 = std.mem.span(c_filepath);
+    const filepath = std.mem.span(c_filepath);
     const img = nifti1.Image.init(filepath) catch {
         print("Failed to load nifti image\n", .{});
         return 0;
     };
     defer img.deinit();
-    const num_dims = img.header.dim[0];
-    print("zig level dim print: {d}\n", .{num_dims});
-    return num_dims;
+    const num_frames = img.header.dim[4];
+    print("zig level dim print: {d}\n", .{num_frames});
+    return num_frames;
 }
 pub export fn nifti1ToVDB(c_filepath: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
     //TODO: loud vs quiet debug, certainly some kind of loaidng feature
