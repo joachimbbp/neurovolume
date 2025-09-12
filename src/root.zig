@@ -81,9 +81,10 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
 // /input/source_file.any -> /output/soure_file.vdb
 fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8) ![]u8 {
     //NOTE: might be good to make this public eventually
+    const ext = "vdb";
     const f = "{s}/{s}.{s}";
     const p = try zools.path.Parts.init(input_path);
-    const output = try std.fmt.allocPrint(alloc, f, .{ output_dir, p.basename, ".vdb" });
+    const output = try std.fmt.allocPrint(alloc, f, .{ output_dir, p.basename, ext });
     return output;
 }
 
