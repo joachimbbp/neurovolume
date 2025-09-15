@@ -17,8 +17,7 @@ pub export fn echo(word: [*:0]const u8) [*:0]const u8 {
     print("zig level echo print: {s}\n", .{word});
     return word;
 }
-pub export fn echoHam(word: [*:0]const u8, output_buffer: [*]u8, buf_len: usize) usize {
-    //LLM START:
+pub export fn echoHam(word: [*:0]const u8, output_buffer: [*]u8, buf_len: usize) usize { //LLM: Function is gpt copypasta
     const input = std.mem.span(word);
     const suffix = " ham";
     const total_len = input.len + suffix.len;
@@ -41,8 +40,7 @@ pub export fn alwaysFails() usize {
     return 1;
 }
 
-//LLM:
-pub export fn writePathToBufC(
+pub export fn writePathToBufC( //LLM: Function is gpt copypasta
     path_nt: [*:0]const u8, // C string from Python
     out_buf: [*]u8,
     out_cap: usize,
@@ -58,12 +56,11 @@ pub export fn writePathToBufC(
 
     return n; // bytes written (excludes NUL)
 }
-//LLM END:
 
 //_: Actual functions:
 
 pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
-    //WARN:
+    //TIDY:
     //Maybe a little computationally redundant with nifti1ToVDB
     //Still figuring out the best lib architecture here, tbh
     //Writes to the buffer, file saving happens on the python level
@@ -79,12 +76,18 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
 }
 
 // /input/source_file.any -> /output/soure_file.vdb
-fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8) ![]u8 {
+fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8, frame_num: [:0]const u8, part_of_sequence: bool) ![]u8 {
     //NOTE: might be good to make this public eventually
     const ext = "vdb";
     const f = "{s}/{s}.{s}";
     const p = try zools.path.Parts.init(input_path);
-    const output = try std.fmt.allocPrint(alloc, f, .{ output_dir, p.basename, ext });
+    var output: []u8 = undefined;
+    if (part_of_sequence) { 
+    output = try std.fmt.allocPrint(alloc, "{s}/{s}_{d}.{s}", .{ output_dir, p.basename, frame_num, ext });
+    } else {
+     output = try std.fmt.allocPrint(alloc, "{s}/{s}.{s}", .{ output_dir, p.basename, ext });
+
+    }
     return output;
 }
 // names folder after input_path item basename, for fMRI sequences
@@ -107,13 +110,15 @@ test "dir name" {
 }
 
 // Writes and saves VDB File
-fn writeVDB(
+fn writeVDBFrame(
     alloc: std.mem.Allocator,
     input_path: [:0]const u8,
     output_dir: [:0]const u8,
     img_deprecated: nifti1.Image,
     normalize: bool,
     transform: [4][4]f64,
+    frame: usize,
+    part_of_sequence: bool,
 ) !ArrayList(u8) {
     //TODO: This function should be universal to all possible file formats
     //WARN: not sure about arena here, and your naming convention
@@ -130,13 +135,14 @@ fn writeVDB(
     for (0..@as(usize, @intCast(dim[3]))) |z| {
         for (0..@as(usize, @intCast(dim[2]))) |x| {
             for (0..@as(usize, @intCast(dim[1]))) |y| {
-                const val = try img_deprecated.getAt4D(x, y, z, 0, normalize, minmax);
+                const val = try img_deprecated.getAt4D(x, y, z, frame, normalize, minmax);
                 try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), alloc);
             }
         }
     }
     vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
 
+    
     const default_save_path = try filenameVDB(alloc, input_path, output_dir);
     const vdb_filepath = try zools.save.version(default_save_path, buffer, alloc);
     return vdb_filepath;
@@ -144,8 +150,6 @@ fn writeVDB(
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
     //TODO: loud vs quiet debug, certainly some kind of loaidng feature
-    const nifti_filepath = std.mem.span(c_nifti_filepath);
-    const output_dir = std.mem.span(c_output_dir);
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator(); //TODO: standardize these
     defer _ = gpa.deinit();
@@ -153,9 +157,29 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    const nifti_filepath = std.mem.span(c_nifti_filepath);
+    var output_dir = undefined;
     const img_deprecated = nifti1.Image.init(nifti_filepath) catch { //DEPRECATED: img should be universal
         return 0;
     };
+    var static = true;
+    if (img_deprecated.header.dim[0] == 3) {
+        static = false;
+        //SHould be:
+        //output folder / new filename / framename_0
+        const n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
+        const name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
+        const ext = name_split.first();
+        _ = ext;
+        const basename = name_split.rest();
+        const base_seq_folder = try std.fmt.allocPrint(gpa_alloc, u8, "{s}/{s}", .{ output_dir, basename });
+        defer gpa_alloc.free(base_seq_folder);
+        const odir_list = try zools.save.versionFolder(base_seq_folder, arena);
+        output_dir = odir_list.items;
+    } else {
+        output_dir = std.mem.span(c_output_dir);
+    }
+
     defer img_deprecated.deinit();
     (&img_deprecated).printHeader();
 
@@ -166,11 +190,10 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
 
-    const num_dims = img_deprecated.header.dim[0];
-    if (num_dims == 3) {
+    if (static) {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
-        const vdb_filepath = writeVDB(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4) catch {
+        const vdb_filepath = writeVDBFrame(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4, 0, false) catch {
             return 0;
         };
 
@@ -184,13 +207,13 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         out_buf[n] = 0; //NULL terminate
         return n;
         //LLM END:
-    }
-    if (num_dims == 4) {
-        print("Time series MRI\n unsuported right now\n", .{});
-        return 0;
-        //        const seq_dir =
     } else {
-        print("unrecognized dim number: {d}, returning 0 for error\n", .{num_dims});
+        print("Time series, most likely fMRI\n", .{});
         return 0;
+        //NOTE: if it's the first frame, it must index at zero to create a sequence
+        for (0..img_deprecated.header.dim[4]) |frame| {
+            const vdb_frame_filepath = writeVDBFrame(allocatory, nifti_filepath, output_dir, 
+        }
+        //        const seq_dir =
     }
 }
