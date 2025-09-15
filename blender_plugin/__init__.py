@@ -4,7 +4,7 @@
 import json
 import os
 import bpy
-from . import neurovolume_lib  # LOCAL:
+from . import neurovolume_lib as nv  # LOCAL:
 # :_: ------------------------------------------------------------------------
 #                               User Set Path
 #                                           Replace these paths with
@@ -51,61 +51,30 @@ def vdb_frames_sort(entry: dict):
 
 
 def load_nifti1(filepath: str, normalize: bool = True):
-    # FIX: Static for now!
-    # HACK: Very much an MVP move for the zig implementation,
-    # the generalized function load_vdb is better
-    # You should probably generalize at src/root: nifti1ToVDB
     vdb_path = os.path.abspath(
-        neurovolume_lib.nifti1ToVDB(filepath, normalize))
+        nv.nifti1_to_VDB(filepath, normalize))
     print("vdb path: ", vdb_path)
 
-    bpy.ops.object.volume_import(filepath=vdb_path,
-                                 relative_path=False,
-                                 align='WORLD',
-                                 location=(0, 0, 0),
-                                 scale=(1, 1, 1))
+    n_frames = nv.num_frames(filepath)
+    #DEPRECATED: num_frames is clunky, just load from header dims in future
+    if n_frames == 1:
+        bpy.ops.object.volume_import(filepath=vdb_path,
+                                    relative_path=False,
+                                    align='WORLD',
+                                    location=(0, 0, 0),
+                                    scale=(1, 1, 1))
+    elif n_frames > 1 :
+         vdb_sequence = []
 
-# def load_vdb(nifti_filepath):
-#     print("Creating VDB from NIfTI File")
-#     print("     NIfTI Filepath: ", nifti_filepath)
-#     output_filepath = user_set_output_path
-#     print("     Output Folder: ", output_filepath)
-#     exe_path = user_set_exe_path
-#
-#     os.system(f"{exe_path} {nifti_filepath} {output_filepath}")
-#     vdb_basename = get_basename(nifti_filepath)
-#     vdb_metadata_filepath = f"{output_filepath}/{vdb_basename}_metadata.json"
-#
-#     metadata = json.load(open(vdb_metadata_filepath))
-#
-#     if metadata["Frames"] == 1:
-#         vdb_filename = f"{vdb_basename}.vdb"
-#         vdb_filepath = f"{output_filepath}/{vdb_filename}"
-#         print(f"loading in static VDB: {vdb_filepath}")
-#         bpy.ops.object.volume_import(filepath=vdb_filepath, directory=output_filepath, files=[
-#                                      {"name": vdb_filename}], relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-#     elif metadata["Frames"] > 1:
-#         print("loading VDB seq")
-#         vdb_seq_folder = f"{output_filepath}/{vdb_basename}_seq"
-#         vdb_sequence = []
-#
-#         for filename in os.listdir(vdb_seq_folder):
-#             if filename.endswith(".vdb"):
-#                 vdb_sequence.append({"name": filename})
-#
-#             else:
-#                 continue
-#
-#         vdb_sequence.sort(key=vdb_frames_sort)
-#         print(f"loading in VDB sequence:\n{vdb_sequence}")
-#         bpy.ops.object.volume_import(filepath=vdb_seq_folder, directory=vdb_seq_folder, files=vdb_sequence,
-#                                      relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-#
-#     else:
-#         print("Invalid Frame number: ", metadata["Frames"])
-#         return "VDBs loaded into scene, Invalid Frame Number"
-#     return "VDBs loaded into scene"
-# endregion
+         for filename in os.listdir(vdb_path): #NOTE: filepath is seq folderpath here
+             if filename.endswith(".vdb"):
+                 vdb_sequence.append({"name": filename})
+             else:
+                 continue
+         vdb_sequence.sort(key=vdb_frames_sort)
+         print(f"loading in VDB sequence:\n{vdb_sequence}")
+         bpy.ops.object.volume_import(filepath=filepath, directory=vdb_path, files=vdb_sequence,
+                                      relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
 # :_: ------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 #                               GUI Functions

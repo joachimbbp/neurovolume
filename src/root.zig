@@ -64,6 +64,7 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     //Maybe a little computationally redundant with nifti1ToVDB
     //Still figuring out the best lib architecture here, tbh
     //Writes to the buffer, file saving happens on the python level
+    //DEPRECATED: later just spit out the header and get it from there
     const filepath = std.mem.span(c_filepath);
     const img = nifti1.Image.init(filepath) catch {
         print("Failed to load nifti image\n", .{});

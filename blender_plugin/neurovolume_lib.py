@@ -18,6 +18,7 @@ def b(string):
 
 
 def num_frames(filepath) -> int:
+    #DEPRECATED: later just use the header
     print("filepath: ", b(filepath))
     nvol.numFrames.argtypes = [c.c_char_p]
     nvol.numFrames.restype = c.c_int16
@@ -52,6 +53,6 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 #
 # fMRI:
 
-fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+# fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
 # print("VDB fmri saved to: ", fmri_save_location, "\n")
 # print("python level num frames: ", num_frames(fmri_testfile))
