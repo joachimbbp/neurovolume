@@ -53,5 +53,5 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 # fMRI:
 
 fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
-print("VDB fmri saved to: ", fmri_save_location, "\n")
-print("python level num frames: ", num_frames(fmri_testfile))
+# print("VDB fmri saved to: ", fmri_save_location, "\n")
+# print("python level num frames: ", num_frames(fmri_testfile))

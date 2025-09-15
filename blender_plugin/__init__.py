@@ -55,11 +55,12 @@ def load_nifti1(filepath: str, normalize: bool = True):
     # HACK: Very much an MVP move for the zig implementation,
     # the generalized function load_vdb is better
     # You should probably generalize at src/root: nifti1ToVDB
-    vdb_path = os.path.abspath(neurovolume_lib.nifti1ToVDB(filepath, normalize))
+    vdb_path = os.path.abspath(
+        neurovolume_lib.nifti1ToVDB(filepath, normalize))
     print("vdb path: ", vdb_path)
 
     bpy.ops.object.volume_import(filepath=vdb_path,
-                                 relative_path = False,
+                                 relative_path=False,
                                  align='WORLD',
                                  location=(0, 0, 0),
                                  scale=(1, 1, 1))
@@ -109,6 +110,7 @@ def load_nifti1(filepath: str, normalize: bool = True):
 # ------------------------------------------------------------------------------
 #                               GUI Functions
 # ------------------------------------------------------------------------------
+
 
 class Neurovolume(bpy.types.Panel):
     # Eventually this will probably just be "Load Volumes." Other functionality can go in other panels

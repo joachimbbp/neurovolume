@@ -214,7 +214,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
             };
             print("new frame: {s}\n", .{new_frame.items});
         }
-        //WARNING: Don't forget to set  the vdb_path
+        vdb_path = vdb_seq_folder;
     }
     if (static) {
         //Signifies a static, 3D MRI
@@ -223,14 +223,17 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
             return 0;
         };
     }
+
     //NOTE: Returning the name here:
     //LLM: inspired. More or less copypasta
     if (out_cap == 0) return 0;
-    const src = vdb_path.items;
+
+    var src = vdb_path.items;
     const n = if (src.len + 1 <= out_cap) src.len else out_cap - 1;
     //Q: I don't fully grasp the reason for the above code
     @memcpy(out_buf[0..n], src[0..n]);
     out_buf[n] = 0; //NULL terminate
+    print("checkpoint\n        n:{d}", .{n});
     return n;
     //LLM END:
 }
