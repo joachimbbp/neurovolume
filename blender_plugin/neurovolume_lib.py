@@ -24,9 +24,14 @@ def num_frames(filepath) -> int:
     num_frames = nvol.numFrames(b(filepath))
     return num_frames
 
+# TODO:
+# [ ] load static file
+# [ ] load fMRI
+# def load_nifti(filepath: str) -> str:
+
 
 def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
-    BUF_SIZE = 256  # somewhat arbitrary, should be big enough
+    BUF_SIZE = 256  # somewhat arbitrary, should be big enough for file name
     nvol.nifti1ToVDB.argtypes = [c.c_char_p,
                                  c.c_char_p,
                                  c.c_bool,
@@ -39,7 +44,14 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 
 
 # SECTION: Testing:
-save_location = nifti1_to_VDB(static_testfile, True)
-print("VDB saved to: ", save_location, "\n")
-nf = num_frames(static_testfile)
-print("python level num frames: ", nf)
+# Static:
+# save_location = nifti1_to_VDB(static_testfile, True)
+# print("VDB saved to: ", save_location, "\n")
+# nf = num_frames(static_testfile)
+# print("python level num frames: ", nf)
+#
+# fMRI:
+
+fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+print("VDB fmri saved to: ", fmri_save_location, "\n")
+print("python level num frames: ", num_frames(fmri_testfile))

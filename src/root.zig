@@ -76,17 +76,15 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
 }
 
 // /input/source_file.any -> /output/soure_file.vdb
-fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8, frame_num: [:0]const u8, part_of_sequence: bool) ![]u8 {
+fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8, frame_num: usize, part_of_sequence: bool) ![]u8 {
     //NOTE: might be good to make this public eventually
     const ext = "vdb";
-    const f = "{s}/{s}.{s}";
     const p = try zools.path.Parts.init(input_path);
     var output: []u8 = undefined;
-    if (part_of_sequence) { 
-    output = try std.fmt.allocPrint(alloc, "{s}/{s}_{d}.{s}", .{ output_dir, p.basename, frame_num, ext });
+    if (part_of_sequence) {
+        output = try std.fmt.allocPrint(alloc, "{s}/{s}_{d}.{s}", .{ output_dir, p.basename, frame_num, ext });
     } else {
-     output = try std.fmt.allocPrint(alloc, "{s}/{s}.{s}", .{ output_dir, p.basename, ext });
-
+        output = try std.fmt.allocPrint(alloc, "{s}/{s}.{s}", .{ output_dir, p.basename, ext });
     }
     return output;
 }
@@ -142,44 +140,28 @@ fn writeVDBFrame(
     }
     vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
 
-    
-    const default_save_path = try filenameVDB(alloc, input_path, output_dir);
+    var default_save_path = try filenameVDB(alloc, input_path, output_dir, 0, false);
+    if (part_of_sequence) {
+        default_save_path = try filenameVDB(alloc, input_path, output_dir, 0, true);
+    }
     const vdb_filepath = try zools.save.version(default_save_path, buffer, alloc);
     return vdb_filepath;
 }
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
-    //TODO: loud vs quiet debug, certainly some kind of loaidng feature
+    //TODO: loud vs quiet debug, certainly some kind of loadng feature
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator(); //TODO: standardize these
     defer _ = gpa.deinit();
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-    const allocator = arena.allocator();
+    const allocator = arena.allocator(); //CURSED: terrible naming convetion mismatch here
 
     const nifti_filepath = std.mem.span(c_nifti_filepath);
-    var output_dir = undefined;
+    const output_dir = std.mem.span(c_output_dir);
     const img_deprecated = nifti1.Image.init(nifti_filepath) catch { //DEPRECATED: img should be universal
         return 0;
     };
-    var static = true;
-    if (img_deprecated.header.dim[0] == 3) {
-        static = false;
-        //SHould be:
-        //output folder / new filename / framename_0
-        const n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
-        const name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
-        const ext = name_split.first();
-        _ = ext;
-        const basename = name_split.rest();
-        const base_seq_folder = try std.fmt.allocPrint(gpa_alloc, u8, "{s}/{s}", .{ output_dir, basename });
-        defer gpa_alloc.free(base_seq_folder);
-        const odir_list = try zools.save.versionFolder(base_seq_folder, arena);
-        output_dir = odir_list.items;
-    } else {
-        output_dir = std.mem.span(c_output_dir);
-    }
-
     defer img_deprecated.deinit();
     (&img_deprecated).printHeader();
 
@@ -190,30 +172,65 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
 
+    var static = true;
+    if (img_deprecated.header.dim[0] == 4) {
+        static = false;
+    } //TODO: coverage for any weird dim numbers
+    var vdb_path: ArrayList(u8) = undefined;
+    if (!static) {
+        print("non static fmri!\n", .{});
+        static = false;
+        //SHould be:
+        //output folder / new filename / framename_0
+        var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
+        var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
+        const ext = name_split.first();
+        _ = ext;
+        const basename = name_split.rest();
+        const base_seq_folder = std.fmt.allocPrint(gpa_alloc, "{s}/{s}", .{ output_dir, basename }) catch {
+            return 0;
+        };
+        defer gpa_alloc.free(base_seq_folder);
+        const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, allocator) catch { //CURSED: allocator naming convention
+            return 0;
+        };
+        //FIX: This feels really hacky and verbose
+        var buf = ArrayList(u8).init(allocator);
+        defer buf.deinit();
+        for (vdb_seq_folder.items) |c| {
+            buf.append(c) catch {
+                return 0;
+            };
+        }
+        buf.append(0) catch {
+            return 0;
+        };
+        const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
+
+        const frames: usize = @intCast(img_deprecated.header.dim[4]);
+        for (0..frames) |frame| {
+            const new_frame = writeVDBFrame(allocator, nifti_filepath, vdb_seq_folder_slice, img_deprecated, normalize, Identity4x4, frame, true) catch {
+                return 0;
+            };
+            print("new frame: {s}\n", .{new_frame.items});
+        }
+        //WARNING: Don't forget to set  the vdb_path
+    }
     if (static) {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
-        const vdb_filepath = writeVDBFrame(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4, 0, false) catch {
+        vdb_path = writeVDBFrame(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4, 0, false) catch {
             return 0;
         };
-
-        //NOTE: Returning the name here:
-        //LLM: inspired. More or less copypasta
-        if (out_cap == 0) return 0;
-        const src = vdb_filepath.items;
-        const n = if (src.len + 1 <= out_cap) src.len else out_cap - 1;
-        //Q: I don't fully grasp the reason for the above code
-        @memcpy(out_buf[0..n], src[0..n]);
-        out_buf[n] = 0; //NULL terminate
-        return n;
-        //LLM END:
-    } else {
-        print("Time series, most likely fMRI\n", .{});
-        return 0;
-        //NOTE: if it's the first frame, it must index at zero to create a sequence
-        for (0..img_deprecated.header.dim[4]) |frame| {
-            const vdb_frame_filepath = writeVDBFrame(allocatory, nifti_filepath, output_dir, 
-        }
-        //        const seq_dir =
     }
+    //NOTE: Returning the name here:
+    //LLM: inspired. More or less copypasta
+    if (out_cap == 0) return 0;
+    const src = vdb_path.items;
+    const n = if (src.len + 1 <= out_cap) src.len else out_cap - 1;
+    //Q: I don't fully grasp the reason for the above code
+    @memcpy(out_buf[0..n], src[0..n]);
+    out_buf[n] = 0; //NULL terminate
+    return n;
+    //LLM END:
 }
