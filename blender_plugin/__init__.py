@@ -63,18 +63,20 @@ def load_nifti1(filepath: str, normalize: bool = True):
                                     align='WORLD',
                                     location=(0, 0, 0),
                                     scale=(1, 1, 1))
+        return "Static VDB loaded into scene"
     elif n_frames > 1 :
-         vdb_sequence = []
+        vdb_sequence = []
 
-         for filename in os.listdir(vdb_path): #NOTE: filepath is seq folderpath here
-             if filename.endswith(".vdb"):
-                 vdb_sequence.append({"name": filename})
-             else:
-                 continue
-         vdb_sequence.sort(key=vdb_frames_sort)
-         print(f"loading in VDB sequence:\n{vdb_sequence}")
-         bpy.ops.object.volume_import(filepath=filepath, directory=vdb_path, files=vdb_sequence,
+        for filename in os.listdir(vdb_path):
+            if filename.endswith(".vdb"):
+                vdb_sequence.append({"name": filename})
+            else:
+                continue
+            vdb_sequence.sort(key=vdb_frames_sort)
+            print(f"loading in VDB sequence:\n{vdb_sequence}")
+        bpy.ops.object.volume_import(filepath=filepath, directory=vdb_path, files=vdb_sequence,
                                       relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+        return "VDB sequence loaded into scene"
 # :_: ------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 #                               GUI Functions
