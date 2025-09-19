@@ -7,7 +7,7 @@ const print = std.debug.print;
 const testing = std.testing;
 //HACK: there is a more legit way to do this in the build system, I'm sure
 const zools = @import("zools/src/root.zig"); //MY SUBMODULE:
-
+const t = zools.timer;
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
 const VDB = vdb543.VDB;
@@ -21,8 +21,18 @@ test "imports" {
         print("random uuid: {s}\n", .{zools.uuid.v4()});
     }
 }
-
+test "timers" {
+    //NOTE: This is more or less the pattern
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\ntimer test:\n", .{});
+    std.Thread.sleep(3333000);
+}
 test "sphere" {
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\n⏰ sphere timer:\n", .{});
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -64,6 +74,10 @@ test "sphere" {
 }
 
 test "test_patern" {
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\n⏰test pattern timer:\n", .{});
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -92,6 +106,10 @@ test "test_patern" {
 }
 
 test "nifti" {
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\n⏰nifti timer:\n", .{});
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -138,6 +156,10 @@ test "nifti" {
 }
 
 test "open and normalize nifti file" {
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\n⏰ open and normalize nifti file timer:\n", .{});
+
     const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
     var img = try nifti1.Image.init(static);
     defer img.deinit();
