@@ -181,7 +181,6 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
-        //SHould be:
         //output folder / new filename / framename_0
         var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
         var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
@@ -192,7 +191,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
             return 0;
         };
         defer gpa_alloc.free(base_seq_folder);
-        const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, allocator) catch { //CURSED: allocator naming convention
+        const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, allocator) catch { //EXORCISE: allocator naming convention
             return 0;
         };
         //FIX: This feels really hacky and verbose
@@ -234,7 +233,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     //Q: I don't fully grasp the reason for the above code
     @memcpy(out_buf[0..n], src[0..n]);
     out_buf[n] = 0; //NULL terminate
-    print("checkpoint\n        n:{d}", .{n});
+    //    print("checkpoint\n        n:{d}", .{n});
     return n;
     //LLM END:
 }

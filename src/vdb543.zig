@@ -9,12 +9,13 @@
 // [ ] Add tiles
 // [ ] Arbitrary input data
 // [ ]  setVoxels one 3-node at a time to reduce syscalls
-//WARNING:
+// [ ] Improve error handling
+//SUBMODULE:
 // This is an external UUID writing dependency (written by me, Joachim)
 // If you don't want to deal with imports feel free to hard code a
 // UUID down under the comment "write UUID"
 // Note it is a git submodule!
-const zools = @import("./zools/src/root.zig"); //MY SUBMODULE:
+const zools = @import("./zools/src/root.zig");
 
 const ArrayList = std.array_list.Managed;
 
