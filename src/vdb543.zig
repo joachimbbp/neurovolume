@@ -22,18 +22,18 @@ const std = @import("std");
 const print = std.debug.print;
 
 //SECTION: IO helper functions
-fn writePointer(buffer: *ArrayList(u8), pointer: *const u8, len: usize) void {
-    buffer.appendSlice(pointer[0..len]) catch unreachable;
+fn writePointer(buffer: *ArrayList(u8), pointer: *const u8, len: usize) !void {
+    try buffer.appendSlice(pointer[0..len]);
 }
-fn writeSlice(comptime T: type, buffer: *ArrayList(u8), slice: []const T) void {
+fn writeSlice(comptime T: type, buffer: *ArrayList(u8), slice: []const T) !void {
     const byte_data = std.mem.sliceAsBytes(slice);
-    buffer.appendSlice(byte_data) catch unreachable;
+    try buffer.appendSlice(byte_data);
 }
-fn writeU8(buffer: *ArrayList(u8), value: u8) void {
-    buffer.append(value) catch unreachable;
+fn writeU8(buffer: *ArrayList(u8), value: u8) !void {
+    try buffer.append(value);
 }
-fn writeScalar(comptime T: type, buffer: *ArrayList(u8), value: T) void {
-    buffer.appendSlice(std.mem.asBytes(&value)) catch unreachable;
+fn writeScalar(comptime T: type, buffer: *ArrayList(u8), value: T) !void {
+    try buffer.appendSlice(std.mem.asBytes(&value));
 }
 
 fn castInt32ToU32(value: i32) u32 {
@@ -46,9 +46,9 @@ fn writeVec3i(buffer: *ArrayList(u8), value: [3]i32) void {
     writeScalar(u32, buffer, castInt32ToU32(value[2]));
 }
 
-fn writeString(buffer: *ArrayList(u8), string: []const u8) void {
+fn writeString(buffer: *ArrayList(u8), string: []const u8) !void {
     for (string) |character| {
-        buffer.append(character) catch unreachable;
+        try buffer.append(character);
     }
 }
 
