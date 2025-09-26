@@ -141,9 +141,8 @@ fn writeVDBFrame(
             }
         }
     }
-    vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
-    const leading_zeros = zools.math.numDigitsShort(dim[4]);
-    const vdb_filepath = try zools.save.version(output_path, leading_zeros, buffer, alloc);
+    try vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
+    const vdb_filepath = try zools.save.version(output_path, buffer, alloc);
     return vdb_filepath;
 }
 // Returns path to VDB file (or folder containing sequence if fMRI)
@@ -209,15 +208,22 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
 
         const frames: usize = @intCast(img_deprecated.header.dim[4]);
 
+        //WARN: technically a bit unsafe, but there shouldnt be negative dimensions. Will iron out when making img univeral
+        const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
         for (0..frames) |frame| {
             //TODO: un-hard code leading zeros (and extension?)
-            const frame_path = zools.sequence.elementName(vdb_seq_folder_slice, basename, ".vdb", frame, 4, allocator);
-
-            //new_frame will include any versioning (which is -honestly- a little messy)
-            const new_frame = writeVDBFrame(allocator, nifti_filepath, vdb_seq_folder_slice, img_deprecated, normalize, Identity4x4, frame, true) catch {
+            const frame_path = zools.sequence.elementName(vdb_seq_folder_slice, basename, ".vdb", frame, leading_zeros, allocator) catch {
+                print("Error on sequence element name\n", .{});
                 return 0;
             };
-            allocator.free(frame_path);
+
+            defer allocator.free(frame_path);
+            //new_frame will include any versioning (which is -honestly- a little messy)
+            const new_frame = writeVDBFrame(allocator, vdb_seq_folder_slice, img_deprecated, normalize, Identity4x4, frame) catch {
+                print("Error on writeVDBFrame", .{});
+                return 0;
+            };
+            //WARN: Free new_frame?
             print("new frame: {s}\n", .{new_frame.items});
         }
         vdb_path = vdb_seq_folder;
@@ -225,7 +231,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     if (static) {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
-        vdb_path = writeVDBFrame(allocator, nifti_filepath, output_dir, img_deprecated, normalize, Identity4x4, 0, false) catch {
+        vdb_path = writeVDBFrame(allocator, output_dir, img_deprecated, normalize, Identity4x4, 0) catch {
             return 0;
         };
     }
