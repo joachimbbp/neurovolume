@@ -67,7 +67,7 @@ test "sphere" {
             }
         }
     }
-    vdb543.writeVDB(&buffer, &sphere, Identity4x4); // assumes compatible signature
+    try vdb543.writeVDB(&buffer, &sphere, Identity4x4); // assumes compatible signature
 
     const file_name = try zools.save.version("./output/0819a_zig.vdb", buffer, allocator);
     print("Sphere test pattern written to  {s}\n", .{file_name.items});
@@ -97,7 +97,7 @@ test "test_patern" {
         .{ 0.0, 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
-    vdb543.writeVDB(&buffer, &single_voxel, Identity4x4); // assumes compatible signature
+    try vdb543.writeVDB(&buffer, &single_voxel, Identity4x4); // assumes compatible signature
     //printBuffer(&buffer);
 
     const file_path = "./output/one_voxel_01_zig.vdb";
@@ -149,7 +149,7 @@ test "nifti" {
         .{ 0.0, 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
-    vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+    try vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
     const save_path = "./output/nifti_zig.vdb";
     const file_name = try zools.save.version(save_path, buffer, allocator);
     print("\nnifti file written to {}\n", .{file_name});

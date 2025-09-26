@@ -41,10 +41,10 @@ fn castInt32ToU32(value: i32) u32 {
     const result: u32 = @bitCast(value);
     return result;
 }
-fn writeVec3i(buffer: *ArrayList(u8), value: [3]i32) void {
-    writeScalar(u32, buffer, castInt32ToU32(value[0]));
-    writeScalar(u32, buffer, castInt32ToU32(value[1]));
-    writeScalar(u32, buffer, castInt32ToU32(value[2]));
+fn writeVec3i(buffer: *ArrayList(u8), value: [3]i32) !void {
+    try writeScalar(u32, buffer, castInt32ToU32(value[0]));
+    try writeScalar(u32, buffer, castInt32ToU32(value[1]));
+    try writeScalar(u32, buffer, castInt32ToU32(value[2]));
 }
 
 fn writeString(buffer: *ArrayList(u8), string: []const u8) !void {
@@ -53,26 +53,26 @@ fn writeString(buffer: *ArrayList(u8), string: []const u8) !void {
     }
 }
 
-fn writeName(buffer: *ArrayList(u8), name: []const u8) void {
-    writeScalar(u32, buffer, @intCast(name.len));
-    writeString(buffer, name);
+fn writeName(buffer: *ArrayList(u8), name: []const u8) !void {
+    try writeScalar(u32, buffer, @intCast(name.len));
+    try writeString(buffer, name);
 }
-fn writeMetaString(buffer: *ArrayList(u8), name: []const u8, string: []const u8) void {
-    writeName(buffer, name);
-    writeName(buffer, "string");
-    writeName(buffer, string);
+fn writeMetaString(buffer: *ArrayList(u8), name: []const u8, string: []const u8) !void {
+    try writeName(buffer, name);
+    try writeName(buffer, "string");
+    try writeName(buffer, string);
 }
-fn writeMetaBool(buffer: *ArrayList(u8), name: []const u8, value: bool) void {
-    writeName(buffer, name);
-    writeName(buffer, "bool");
-    writeScalar(u32, buffer, 1); //bool is stored in one whole byte
-    writeU8(buffer, if (value) 1 else 0);
+fn writeMetaBool(buffer: *ArrayList(u8), name: []const u8, value: bool) !void {
+    try writeName(buffer, name);
+    try writeName(buffer, "bool");
+    try writeScalar(u32, buffer, 1); //bool is stored in one whole byte
+    try writeU8(buffer, if (value) 1 else 0);
 }
-fn writeMetaVector(buffer: *ArrayList(u8), name: []const u8, value: [3]i32) void {
-    writeName(buffer, name);
-    writeName(buffer, "vec3i");
-    writeScalar(u32, buffer, 3 * @sizeOf(i32));
-    writeVec3i(buffer, value);
+fn writeMetaVector(buffer: *ArrayList(u8), name: []const u8, value: [3]i32) !void {
+    try writeName(buffer, name);
+    try writeName(buffer, "vec3i");
+    try writeScalar(u32, buffer, 3 * @sizeOf(i32));
+    try writeVec3i(buffer, value);
 }
 //SECTION: VDB nodes
 pub const VDB = struct {
@@ -185,38 +185,38 @@ pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f32, allocator: std.mem.Allo
     // print("bit index 0: {d}\n", .{bit_index_0});
 }
 
-fn writeNode5Header(buffer: *ArrayList(u8), node: *Node5) void {
+fn writeNode5Header(buffer: *ArrayList(u8), node: *Node5) !void {
     //origin of 5-node:
-    writeVec3i(buffer, .{ 0, 0, 0 });
+    try writeVec3i(buffer, .{ 0, 0, 0 });
     //child masks:
     for (node.mask) |child_mask| {
-        writeScalar(u64, buffer, child_mask);
+        try writeScalar(u64, buffer, child_mask);
     }
     //Presently we don't have any values masks, so just zeroing those out
     for (node.mask) |_| {
-        writeScalar(u64, buffer, 0);
+        try writeScalar(u64, buffer, 0);
     }
     //Write uncompressed (signified by 6) node values
-    writeU8(buffer, 6);
+    try writeU8(buffer, 6);
     var i: usize = 0;
     while (i < 32768) : (i += 1) {
-        writeScalar(f32, buffer, 0);
+        try writeScalar(f32, buffer, 0);
     }
 }
-fn writeNode4Header(buffer: *ArrayList(u8), node: *Node4) void {
+fn writeNode4Header(buffer: *ArrayList(u8), node: *Node4) !void {
     //Child masks
     for (node.mask) |child_mask| {
-        writeScalar(u64, buffer, child_mask);
+        try writeScalar(u64, buffer, child_mask);
     }
     //No value masks atm
     for (node.mask) |_| {
-        writeScalar(u64, buffer, 0);
+        try writeScalar(u64, buffer, 0);
     }
 
-    writeU8(buffer, 6);
+    try writeU8(buffer, 6);
     var i: usize = 0;
     while (i < 4096) : (i += 1) {
-        writeScalar(f32, buffer, 0);
+        try writeScalar(f32, buffer, 0);
     }
 }
 
@@ -225,15 +225,15 @@ const TreeError = error{
     ThreeNodeNotFound,
 };
 
-fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
-    writeScalar(u32, buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
-    writeScalar(u32, buffer, 0); //Root node background value
-    writeScalar(u32, buffer, 0); //number of tiles
-    writeScalar(u32, buffer, 1); //number of 5 nodes
+fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) !void {
+    try writeScalar(u32, buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
+    try writeScalar(u32, buffer, 0); //Root node background value
+    try writeScalar(u32, buffer, 0); //number of tiles
+    try writeScalar(u32, buffer, 1); //number of 5 nodes
 
     const node_5 = vdb.five_node;
 
-    writeNode5Header(buffer, node_5);
+    try writeNode5Header(buffer, node_5);
 
     //CREATE TOPOLOGY:
     for (node_5.mask[0..], 0..) |five_mask_og_t, five_mask_idx_t| {
@@ -242,7 +242,7 @@ fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
             const bit_index_4n = @as(u32, @intCast(five_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(five_mask_t));
             const node_4 = node_5.four_nodes.get(bit_index_4n).?;
 
-            writeNode4Header(buffer, node_4);
+            try writeNode4Header(buffer, node_4);
 
             //Iterate 3-nodes
             for (node_4.mask[0..], 0..) |four_mask_og_t, four_mask_idx_t| {
@@ -251,7 +251,7 @@ fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
                     const bit_index_3n_t = @as(u32, @intCast(four_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(four_mask_t));
                     const node_3_t = node_4.three_nodes.get(bit_index_3n_t).?;
                     for (node_3_t.mask) |three_mask| {
-                        writeScalar(u64, buffer, three_mask);
+                        try writeScalar(u64, buffer, three_mask);
                     }
                 }
             }
@@ -271,10 +271,10 @@ fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
                     const bit_index_3_d = @as(u32, @intCast(four_mask_idx_d)) * 64 + @as(u32, @intCast(@ctz(four_mask_d)));
                     const node_3_d = node_4_t.three_nodes.get(bit_index_3_d).?;
                     for (node_3_d.mask) |three_mask| {
-                        writeScalar(u64, buffer, three_mask); //we must re-write the masks for some reason
+                        try writeScalar(u64, buffer, three_mask); //we must re-write the masks for some reason
                     }
-                    writeU8(buffer, 6); //6 means no compression
-                    writeSlice(f32, buffer, &node_3_d.data);
+                    try writeU8(buffer, 6); //6 means no compression
+                    try writeSlice(f32, buffer, &node_3_d.data);
                 }
             }
         }
@@ -282,88 +282,88 @@ fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) void {
     //    print("end of tree writing function\n", .{});
 }
 
-fn writeMetadata(buffer: *ArrayList(u8)) void {
+fn writeMetadata(buffer: *ArrayList(u8)) !void {
     // lots of hard coded things that will by dynamic if we expand this!
-    writeScalar(u32, buffer, 4); //write number of entries
-    writeMetaString(buffer, "class", "unknown");
-    writeMetaString(buffer, "file_compression", "none");
-    writeMetaBool(buffer, "is_saved_as_half_float", false);
-    writeMetaString(buffer, "name", "density");
+    try writeScalar(u32, buffer, 4); //write number of entries
+    try writeMetaString(buffer, "class", "unknown");
+    try writeMetaString(buffer, "file_compression", "none");
+    try writeMetaBool(buffer, "is_saved_as_half_float", false);
+    try writeMetaString(buffer, "name", "density");
 }
 
-fn writeTransform(buffer: *ArrayList(u8), affine: [4][4]f64) void {
-    writeName(buffer, "AffineMap");
+fn writeTransform(buffer: *ArrayList(u8), affine: [4][4]f64) !void {
+    try writeName(buffer, "AffineMap");
 
-    writeScalar(f64, buffer, affine[0][0]);
-    writeScalar(f64, buffer, affine[1][0]);
-    writeScalar(f64, buffer, affine[2][0]);
-    writeScalar(f64, buffer, 0);
+    try writeScalar(f64, buffer, affine[0][0]);
+    try writeScalar(f64, buffer, affine[1][0]);
+    try writeScalar(f64, buffer, affine[2][0]);
+    try writeScalar(f64, buffer, 0);
 
-    writeScalar(f64, buffer, affine[0][1]);
-    writeScalar(f64, buffer, affine[1][1]);
-    writeScalar(f64, buffer, affine[2][1]);
-    writeScalar(f64, buffer, 0);
+    try writeScalar(f64, buffer, affine[0][1]);
+    try writeScalar(f64, buffer, affine[1][1]);
+    try writeScalar(f64, buffer, affine[2][1]);
+    try writeScalar(f64, buffer, 0);
 
-    writeScalar(f64, buffer, affine[0][2]);
-    writeScalar(f64, buffer, affine[1][2]);
-    writeScalar(f64, buffer, affine[2][2]);
-    writeScalar(f64, buffer, 0);
+    try writeScalar(f64, buffer, affine[0][2]);
+    try writeScalar(f64, buffer, affine[1][2]);
+    try writeScalar(f64, buffer, affine[2][2]);
+    try writeScalar(f64, buffer, 0);
 
-    writeScalar(f64, buffer, affine[0][3]);
-    writeScalar(f64, buffer, affine[1][3]);
-    writeScalar(f64, buffer, affine[2][3]);
-    writeScalar(f64, buffer, 1);
+    try writeScalar(f64, buffer, affine[0][3]);
+    try writeScalar(f64, buffer, affine[1][3]);
+    try writeScalar(f64, buffer, affine[2][3]);
+    try writeScalar(f64, buffer, 1);
 }
 
-fn writeGrid(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
+fn writeGrid(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
     //grid name (should be dynamic when doing multiple grids)
-    writeName(buffer, "density");
+    try writeName(buffer, "density");
 
     //grid type
     //  (thiswill probably always be 543 but who knows! precision should match source eventually
-    writeName(buffer, "Tree_float_5_4_3");
+    try writeName(buffer, "Tree_float_5_4_3");
 
     //Indicate no instance parent
-    writeScalar(u32, buffer, 0);
+    try writeScalar(u32, buffer, 0);
 
     //Grid descriptor stream position
-    writeScalar(u64, buffer, @as(u64, @intCast(buffer.items.len)) + @sizeOf(u64) * 3);
-    writeScalar(u64, buffer, 0);
-    writeScalar(u64, buffer, 0);
+    try writeScalar(u64, buffer, @as(u64, @intCast(buffer.items.len)) + @sizeOf(u64) * 3);
+    try writeScalar(u64, buffer, 0);
+    try writeScalar(u64, buffer, 0);
 
     //no compression
-    writeScalar(u32, buffer, 0);
+    try writeScalar(u32, buffer, 0);
 
-    writeMetadata(buffer);
-    writeTransform(buffer, affine);
-    writeTree(buffer, vdb);
+    try writeMetadata(buffer);
+    try writeTransform(buffer, affine);
+    try writeTree(buffer, vdb);
 }
 
-pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) void {
+pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
     //Magic Number (needed it spells out BDV)
-    writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
+    try writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
     //File Version
-    writeScalar(u32, buffer, 224);
+    try writeScalar(u32, buffer, 224);
 
     //Library version (pretend OpenVDB 8.1)
-    writeScalar(u32, buffer, 8);
-    writeScalar(u32, buffer, 1);
+    try writeScalar(u32, buffer, 8);
+    try writeScalar(u32, buffer, 1);
 
     //no grid offsets
-    writeU8(buffer, 0);
+    try writeU8(buffer, 0);
 
     //write UUID
     const uuid = zools.uuid.v4(); //Feel free to replace with your own
-    writeString(buffer, uuid[0..]);
+    try writeString(buffer, uuid[0..]);
 
     //No Metadata for now
-    writeScalar(u32, buffer, 0);
+    try writeScalar(u32, buffer, 0);
 
     //One Grid
-    writeScalar(u32, buffer, 1);
+    try writeScalar(u32, buffer, 1);
 
-    writeGrid(buffer, vdb, affine);
+    try writeGrid(buffer, vdb, affine);
 }
 
 //SECTION: Utility functions

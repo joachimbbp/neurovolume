@@ -77,18 +77,20 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
 }
 
 // /input/source_file.any -> /output/soure_file.vdb
-fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8, frame_num: usize, part_of_sequence: bool) ![]u8 {
-    //NOTE: might be good to make this public eventually
-    const ext = "vdb";
-    const p = try zools.path.Parts.init(input_path);
-    var output: []u8 = undefined;
-    if (part_of_sequence) {
-        output = try std.fmt.allocPrint(alloc, "{s}/{s}_{d}.{s}", .{ output_dir, p.basename, frame_num, ext });
-    } else {
-        output = try std.fmt.allocPrint(alloc, "{s}/{s}.{s}", .{ output_dir, p.basename, ext });
-    }
-    return output;
-}
+// fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8, leading_zeros: u8, frame_num: usize, part_of_sequence: bool) ![]u8 {
+//     //NOTE: might be good to make this public eventually
+//     const ext = "vdb";
+//     const p = try zools.path.Parts.init(input_path);
+//     var output: []u8 = undefined;
+//     if (part_of_sequence) {
+//         //  "{[dir]s}/{[pf]s}_{[n]d:0>[w]}.{[ext]s}"
+//         //        output = try std.fmt.allocPrint(alloc, "{s}/{s}_{d}.{s}", .{ output_dir, p.basename, frame_num, ext });
+//
+//     } else {
+//         output = try std.fmt.allocPrint(alloc, "{s}/{s}.{s}", .{ output_dir, p.basename, ext });
+//     }
+//     return output;
+// }
 // names folder after input_path item basename, for fMRI sequences
 fn dirNameFromFile(alloc: std.mem.Allocator, filepath: [:0]const u8, parent_dir: [:0]const u8) ![]u8 {
     const f = "{s}/{s}";
@@ -109,17 +111,17 @@ test "dir name" {
 }
 
 // Writes and saves VDB File
+// Will version if already present
 fn writeVDBFrame(
     alloc: std.mem.Allocator,
-    input_path: [:0]const u8,
-    output_dir: [:0]const u8,
+    output_path: [:0]const u8,
     img_deprecated: nifti1.Image,
     normalize: bool,
     transform: [4][4]f64,
     frame: usize,
-    part_of_sequence: bool,
 ) !ArrayList(u8) {
     //TODO: This function should be universal to all possible file formats
+    //This should probably be done on the img level
     //WARN: not sure about arena here, and your naming convention
     //is all over the place!
     // Writes VDB and saves it to disk
@@ -140,12 +142,8 @@ fn writeVDBFrame(
         }
     }
     vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
-
-    var default_save_path = try filenameVDB(alloc, input_path, output_dir, 0, false);
-    if (part_of_sequence) {
-        default_save_path = try filenameVDB(alloc, input_path, output_dir, 0, true);
-    }
-    const vdb_filepath = try zools.save.version(default_save_path, buffer, alloc);
+    const leading_zeros = zools.math.numDigitsShort(dim[4]);
+    const vdb_filepath = try zools.save.version(output_path, leading_zeros, buffer, alloc);
     return vdb_filepath;
 }
 // Returns path to VDB file (or folder containing sequence if fMRI)
@@ -181,6 +179,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
+
         //output folder / new filename / framename_0
         var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
         var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
@@ -190,11 +189,12 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         const base_seq_folder = std.fmt.allocPrint(gpa_alloc, "{s}/{s}", .{ output_dir, basename }) catch {
             return 0;
         };
+
         defer gpa_alloc.free(base_seq_folder);
         const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, allocator) catch { //EXORCISE: allocator naming convention
             return 0;
         };
-        //FIX: This feels really hacky and verbose
+        //CLEAN: This feels really hacky and verbose
         var buf = ArrayList(u8).init(allocator);
         defer buf.deinit();
         for (vdb_seq_folder.items) |c| {
@@ -208,10 +208,16 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
         const frames: usize = @intCast(img_deprecated.header.dim[4]);
+
         for (0..frames) |frame| {
+            //TODO: un-hard code leading zeros (and extension?)
+            const frame_path = zools.sequence.elementName(vdb_seq_folder_slice, basename, ".vdb", frame, 4, allocator);
+
+            //new_frame will include any versioning (which is -honestly- a little messy)
             const new_frame = writeVDBFrame(allocator, nifti_filepath, vdb_seq_folder_slice, img_deprecated, normalize, Identity4x4, frame, true) catch {
                 return 0;
             };
+            allocator.free(frame_path);
             print("new frame: {s}\n", .{new_frame.items});
         }
         vdb_path = vdb_seq_folder;
