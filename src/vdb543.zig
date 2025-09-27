@@ -15,7 +15,7 @@
 // If you don't want to deal with imports feel free to hard code a
 // UUID down under the comment "write UUID"
 // Note it is a git submodule!
-const zools = @import("./zools/src/root.zig");
+const zools = @import("zools");
 
 const ArrayList = std.array_list.Managed;
 

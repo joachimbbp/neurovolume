@@ -2,6 +2,12 @@
     .name = .neurovolume,
 
     .version = "0.0.0",
+    .dependencies = .{
+        .zools = .{
+            .url = "git+https://github.com/joachimbbp/zools#b6fd281bf2b19f26992fdad8a397ef08d2edf67e",
+            .hash = "zools-0.0.0-VPOS2jFTAADqgAu0fMHXnZ2oiTXsHWkbFSuO2e-c4OLO",
+        },
+    },
 
     .fingerprint = 0x7f0c83e043c37613, // Changing this has security and trust implications.
 

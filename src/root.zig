@@ -1,7 +1,7 @@
 //_: IMPORTS
 const std = @import("std");
 const print = std.debug.print;
-const zools = @import("zools/src/root.zig");
+const zools = @import("zools");
 const debug = @import("debug.zig");
 const nifti1 = @import("nifti1.zig");
 const ArrayList = std.array_list.Managed;
