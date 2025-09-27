@@ -7,6 +7,60 @@ test "echo name" {
     print("🧠 nifti1.zig module\n", .{});
 }
 
+pub const PackedHeader = packed struct {
+    sizeof_hdr: enum(i32) {
+        default = 348,
+    } = .default,
+    _1: [10]u8, //data_type
+    _2: [18]u8, //db_name
+    _3: [14]u8, //extents
+    _4: [2]u8, //session_error
+    _5: [1]u8, //regular
+    dim_info: enum(u8) {
+        one = 1,
+        two = 2,
+        three = 3,
+    },
+    dim: packed struct { // TODO: add std.Io.Limit
+        number_of_dimensions: i16,
+        x: i16,
+        y: i16,
+        z: i16,
+        t: i16,
+        optional_dim_1: i16,
+        optional_dim_2: i16,
+        optional_dim_3: i16,
+    },
+    intent: packed struct {
+        //NOTE: Might be a way to have a union here to use
+        //different structs based on the intent code?
+        p1: f32,
+        p2: f32,
+        p3: f32,
+        code: enum(i16) {
+            //WARN: Not checked with NIH specs
+            none = 0,
+            corelation = 2,
+            t_test = 3,
+            f_test = 4,
+            z_score = 5,
+            chi_squared_statistic = 6,
+            beta_distribution = 7,
+            //TODO:... contnue
+        },
+    },
+};
+
+// const Intent = enum(i16) {
+//     none = 0,
+//     correlation = 2
+// }
+//
+
+const Intent = union {
+    none: [3]f32,
+}; //all params + actual intent code
+
 pub const Header = extern struct {
     sizeofHdr: i32, //Must be 348
     dataType: [10]u8,
