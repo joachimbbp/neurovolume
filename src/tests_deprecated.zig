@@ -6,12 +6,12 @@ const std = @import("std");
 const print = std.debug.print;
 const testing = std.testing;
 //HACK: there is a more legit way to do this in the build system, I'm sure
-const zools = @import("zools/src/root.zig"); //MY SUBMODULE:
+const zools = @import("zools"); //MY SUBMODULE:
 const t = zools.timer;
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
 const VDB = vdb543.VDB;
-const output_path = "../output";
+const output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output"; //TODO: make this not local //TODO: make this not local
 
 const ArrayList = std.array_list.Managed;
 

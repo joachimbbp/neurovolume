@@ -7,56 +7,6 @@ const nifti1 = @import("nifti1.zig");
 const ArrayList = std.array_list.Managed;
 const vdb543 = @import("vdb543.zig");
 
-//_: Debug and Test Functions
-pub export fn hello() void {
-    print("🪾 Root level print\n", .{});
-    debug.helloNeurovolume();
-    zools.debug.helloZools();
-}
-pub export fn echo(word: [*:0]const u8) [*:0]const u8 {
-    print("zig level echo print: {s}\n", .{word});
-    return word;
-}
-pub export fn echoHam(word: [*:0]const u8, output_buffer: [*]u8, buf_len: usize) usize { //LLM: Function is gpt copypasta
-    const input = std.mem.span(word);
-    const suffix = " ham";
-    const total_len = input.len + suffix.len;
-    if (total_len + 1 > buf_len) {
-        return 0;
-    }
-    @memcpy(output_buffer[0..input.len], input); //HUMAN EDIT: changed to @memcpy
-    @memcpy(output_buffer[input.len..][0..suffix.len], suffix); //HUMAN EDIT:
-    output_buffer[total_len] = 0; // Null terminate
-
-    return total_len;
-    //LLM ENDAlignManaged(u8)li:
-}
-
-pub export fn alwaysFails() usize {
-    std.testing.expect(true == false) catch
-        {
-            return 0;
-        };
-    return 1;
-}
-
-pub export fn writePathToBufC( //LLM: Function is gpt copypasta
-    path_nt: [*:0]const u8, // C string from Python
-    out_buf: [*]u8,
-    out_cap: usize,
-) usize {
-    if (out_cap == 0) return 0;
-
-    const src = std.mem.span(path_nt); // []const u8 (no NUL)
-    const want = src.len;
-    const n = if (want + 1 <= out_cap) want else out_cap - 1;
-
-    @memcpy(out_buf[0..n], src[0..n]);
-    out_buf[n] = 0; // NUL-terminate
-
-    return n; // bytes written (excludes NUL)
-}
-
 //_: Actual functions:
 
 pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
@@ -76,39 +26,6 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     return num_frames;
 }
 
-// /input/source_file.any -> /output/soure_file.vdb
-// fn filenameVDB(alloc: std.mem.Allocator, input_path: [:0]const u8, output_dir: [:0]const u8, leading_zeros: u8, frame_num: usize, part_of_sequence: bool) ![]u8 {
-//     //NOTE: might be good to make this public eventually
-//     const ext = "vdb";
-//     const p = try zools.path.Parts.init(input_path);
-//     var output: []u8 = undefined;
-//     if (part_of_sequence) {
-//         //  "{[dir]s}/{[pf]s}_{[n]d:0>[w]}.{[ext]s}"
-//         //        output = try std.fmt.allocPrint(alloc, "{s}/{s}_{d}.{s}", .{ output_dir, p.basename, frame_num, ext });
-//
-//     } else {
-//         output = try std.fmt.allocPrint(alloc, "{s}/{s}.{s}", .{ output_dir, p.basename, ext });
-//     }
-//     return output;
-// }
-// names folder after input_path item basename, for fMRI sequences
-fn dirNameFromFile(alloc: std.mem.Allocator, filepath: [:0]const u8, parent_dir: [:0]const u8) ![]u8 {
-    const f = "{s}/{s}";
-    const p = try zools.path.Parts.init(filepath);
-    const output = try std.fmt.allocPrint(alloc, f, .{ parent_dir, p.basename });
-    return output;
-}
-
-test "dir name" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    const parent = "./output";
-    const filepath = "/Users/joachimpfefferkorn/repos/neurovolume/output/sub-01_T1w_1.vdb";
-    const dir = try dirNameFromFile(alloc, filepath, parent);
-    print("dir name from filepath: {s}\n", .{dir});
-    alloc.free(dir);
-}
 
 // Writes and saves VDB File
 // Will version if already present
@@ -248,4 +165,57 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     //    print("checkpoint\n        n:{d}", .{n});
     return n;
     //LLM END:
+}
+
+//_: Debug and Test Functions
+test "print ham" {
+    print("🐷 Test ham\n", .{});
+}
+pub export fn hello() void {
+    print("🪾 Root level print\n", .{});
+    debug.helloNeurovolume();
+    zools.debug.helloZools();
+}
+pub export fn echo(word: [*:0]const u8) [*:0]const u8 {
+    print("zig level echo print: {s}\n", .{word});
+    return word;
+}
+pub export fn echoHam(word: [*:0]const u8, output_buffer: [*]u8, buf_len: usize) usize { //LLM: Function is gpt copypasta
+    const input = std.mem.span(word);
+    const suffix = " ham";
+    const total_len = input.len + suffix.len;
+    if (total_len + 1 > buf_len) {
+        return 0;
+    }
+    @memcpy(output_buffer[0..input.len], input); //HUMAN EDIT: changed to @memcpy
+    @memcpy(output_buffer[input.len..][0..suffix.len], suffix); //HUMAN EDIT:
+    output_buffer[total_len] = 0; // Null terminate
+
+    return total_len;
+    //LLM ENDAlignManaged(u8)li:
+}
+
+pub export fn alwaysFails() usize {
+    std.testing.expect(true == false) catch
+        {
+            return 0;
+        };
+    return 1;
+}
+
+pub export fn writePathToBufC( //LLM: Function is gpt copypasta
+    path_nt: [*:0]const u8, // C string from Python
+    out_buf: [*]u8,
+    out_cap: usize,
+) usize {
+    if (out_cap == 0) return 0;
+
+    const src = std.mem.span(path_nt); // []const u8 (no NUL)
+    const want = src.len;
+    const n = if (want + 1 <= out_cap) want else out_cap - 1;
+
+    @memcpy(out_buf[0..n], src[0..n]);
+    out_buf[n] = 0; // NUL-terminate
+
+    return n; // bytes written (excludes NUL)
 }

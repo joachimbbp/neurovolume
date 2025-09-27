@@ -2,6 +2,11 @@ const std = @import("std");
 const print = std.debug.print;
 const AccessError = error{NotSupportedYet};
 
+test "echo name" {
+    //NOTE: just to see if this runs in zig build test
+    print("🧠 nifti1.zig module\n", .{});
+}
+
 pub const Header = extern struct {
     sizeofHdr: i32, //Must be 348
     dataType: [10]u8,
