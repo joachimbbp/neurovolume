@@ -162,7 +162,7 @@ pub const Image = struct {
     }
 
     pub fn printHeader(self: *const Image) void {
-        print("{any}", .{self.header});
+        print("🧠 Nifti Header:\n-------- \n{any}\n--------\n", .{self.header});
     }
 
     fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {
@@ -247,10 +247,11 @@ const zools = @import("zools");
 const t = zools.timer;
 
 test "echo module" {
-    print("🧠 nifti1.zig test print\n", .{});
+    print("🧠 nifti1.zig module echo\n", .{});
 }
 
 test "open and normalize nifti file" {
+    print("🧠 Opening and normalizing nifti1 file\n", .{});
     const timer_start = t.Click();
     defer t.Stop(timer_start);
     defer print("\n⏰ open and normalize nifti file timer:\n", .{});
