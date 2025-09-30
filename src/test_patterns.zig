@@ -1,9 +1,13 @@
 const std = @import("std");
-const print = std.debug.print();
+const print = std.debug.print;
 const zools = @import("zools");
 const t = zools.timer;
 const vdb543 = @import("vdb543.zig");
 const VDB = vdb543.VDB;
+
+const TestPatternError = error{
+    PersistentSaveNotImplementedYet,
+};
 
 const Identity4x4: [4][4]f64 = .{
     .{ 1.0, 0.0, 0.0, 0.0 },
@@ -13,27 +17,21 @@ const Identity4x4: [4][4]f64 = .{
 };
 
 //Use "tmp" to override save path to a temporary output
-pub fn sphere(save_path: []const u8) void {
+pub fn sphere(comptime save_dir: []const u8) !void {
     print("⚪️ Sphere Test Pattern\n", .{});
-    const timer_start = t.Click();
-    defer t.Stop(timer_start);
-    defer print("\n⏰ sphere start: {d}\n", .{timer_start});
-
+    //NICE: This seems to follow the idiomatic pattern for arena: https://zig.guide/master/standard-library/allocators
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-    const allocator = arena.allocator();
-    //WARNING: this naming convention is really
-    //weird and certainly differs from zools!
-    var buffer = std.array_list.Managed(u8).init(allocator);
-    defer buffer.deinit();
+    const alloc = arena.allocator();
 
+    var buffer = std.array_list.Managed(u8).init(alloc);
+    defer buffer.deinit();
     const R: u32 = 128;
     const D: u32 = R * 2;
-
-    var sphere_vdb = try VDB.build(allocator); //.build(allocator);
+    var sphere_vdb = try VDB.build(alloc);
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
     for (0..D - 1) |z| {
@@ -42,18 +40,28 @@ pub fn sphere(save_path: []const u8) void {
                 const p = vdb543.toF32(.{ x, y, z });
                 const diff = vdb543.subVec(p, .{ Rf, Rf, Rf });
                 if (vdb543.lengthSquared(diff) < R2) {
-                    try vdb543.setVoxel(&sphere_vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, allocator);
+                    try vdb543.setVoxel(&sphere_vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, alloc);
                 }
             }
         }
     }
     try vdb543.writeVDB(&buffer, &sphere_vdb, Identity4x4); // assumes compatible signature
-
-    if (save_path == "tmp") {
-        //TODO: use https://ziglang.org/documentation/master/std/#std.testing.refAllDecls
+    const basename = "sphere_test_pattern";
+    const fmt = "{s}/{s}.vdb";
+    var save_path = try std.fmt.allocPrint(alloc, fmt, .{ save_dir, basename });
+    defer alloc.free(save_path);
+    if (std.mem.eql(u8, save_dir, "tmp") == true) {
+        var tmp_dir = std.testing.tmpDir(.{});
+        defer tmp_dir.cleanup();
+        const tmp_dir_slice = try tmp_dir.dir.realpathAlloc(alloc, ".");
+        save_path = try std.fmt.allocPrint(alloc, fmt, .{ tmp_dir_slice, basename });
+        const final_save_location = try zools.save.version(save_path, buffer, alloc);
+        print("Sphere test pattern saved to: {s}\n", .{final_save_location.items});
+    } else {
+        print("Error: custom save directory not implemented yet. 'tmp' is not given string:\n{s}", .{save_dir});
+        return TestPatternError.PersistentSaveNotImplementedYet;
+        //TODO: Implement
     }
-    const file_name = try zools.save.version("./output/0819a_zig.vdb", buffer, allocator);
-    print("Sphere test pattern written to  {s}\n", .{file_name.items});
 }
 
 // test "test_patern" {

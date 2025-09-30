@@ -235,5 +235,10 @@ test "timers" {
     defer print("\ntimer test:\n", .{});
     std.Thread.sleep(3333000);
 }
-
+const test_patterns = @import("test_patterns.zig");
 //TODO: Call test pattern functions with temp output here!
+test "test patterns" {
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    try test_patterns.sphere("tmp");
+}
