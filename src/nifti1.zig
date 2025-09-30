@@ -2,65 +2,56 @@ const std = @import("std");
 const print = std.debug.print;
 const AccessError = error{NotSupportedYet};
 
-test "echo name" {
-    //NOTE: just to see if this runs in zig build test
-    print("🧠 nifti1.zig module\n", .{});
-}
-
-pub const PackedHeader = packed struct {
-    sizeof_hdr: enum(i32) {
-        default = 348,
-    } = .default,
-    _1: [10]u8, //data_type
-    _2: [18]u8, //db_name
-    _3: [14]u8, //extents
-    _4: [2]u8, //session_error
-    _5: [1]u8, //regular
-    dim_info: enum(u8) {
-        one = 1,
-        two = 2,
-        three = 3,
-    },
-    dim: packed struct { // TODO: add std.Io.Limit
-        number_of_dimensions: i16,
-        x: i16,
-        y: i16,
-        z: i16,
-        t: i16,
-        optional_dim_1: i16,
-        optional_dim_2: i16,
-        optional_dim_3: i16,
-    },
-    intent: packed struct {
-        //NOTE: Might be a way to have a union here to use
-        //different structs based on the intent code?
-        p1: f32,
-        p2: f32,
-        p3: f32,
-        code: enum(i16) {
-            //WARN: Not checked with NIH specs
-            none = 0,
-            corelation = 2,
-            t_test = 3,
-            f_test = 4,
-            z_score = 5,
-            chi_squared_statistic = 6,
-            beta_distribution = 7,
-            //TODO:... contnue
-        },
-    },
-};
-
-// const Intent = enum(i16) {
-//     none = 0,
-//     correlation = 2
-// }
+//WIP: packed header (commented out for now)
+// pub const PackedHeader = packed struct {
+//     //SOURCE: https://brainder.org/2012/09/23/the-nifti-file-format/
+//     sizeof_hdr: enum(i32) {
+//         default = 348,
+//     } = .default,
+//     _1: [10]u8, //data_type
+//     _2: [18]u8, //db_name
+//     _3: [14]u8, //extents
+//     _4: [2]u8, //session_error
+//     _5: [1]u8, //regular
+//     dim_info: enum(u8) {
+//         one = 1,
+//         two = 2,
+//         three = 3,
+//     },
+//     dim: packed struct { // TODO: add std.Io.Limit
+//         number_of_dimensions: i16,
+//         x: i16,
+//         y: i16,
+//         z: i16,
+//         t: i16,
+//         optional_dim_1: i16,
+//         optional_dim_2: i16,
+//         optional_dim_3: i16,
+//     },
+//     intent: packed struct {
+//         //NOTE: Might be a way to have a union here to use
+//         //different structs based on the intent code?
+//         p1: f32,
+//         p2: f32,
+//         p3: f32,
+//         code: enum(i16) {
+//             //WARN: Not checked with NIH specs
+//             none = 0,
+//             corelation = 2,
+//             t_test = 3,
+//             f_test = 4,
+//             z_score = 5,
+//             chi_squared_statistic = 6,
+//             beta_distribution = 7,
+//             //TODO:... contnue
+//         },
+//     },
+// };
 //
-
-const Intent = union {
-    none: [3]f32,
-}; //all params + actual intent code
-
+// const Intent = union {
+//     none: [3]f32,
+// }; //all params + actual intent code
+//
 pub const Header = extern struct {
     sizeofHdr: i32, //Must be 348
     dataType: [10]u8,
@@ -249,4 +240,40 @@ pub fn MinMax3D(img: Image) ![2]f32 {
         }
     }
     return minmax;
+}
+
+//SECTION: Tests:
+const zools = @import("zools");
+const t = zools.timer;
+
+test "echo module" {
+    print("🧠 nifti1.zig test print\n", .{});
+}
+
+test "open and normalize nifti file" {
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\n⏰ open and normalize nifti file timer:\n", .{});
+
+    const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    var img = try Image.init(static);
+    defer img.deinit();
+    (&img).printHeader();
+    print("\ndatatype: {s}\n", .{DataType.name(img.data_type)});
+    print("bytes per voxel: {any}\n", .{img.bytes_per_voxel});
+
+    const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
+    const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
+    const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
+    const mid_t: usize = @divFloor(@as(usize, @intCast(img.header.dim[4])), 2);
+
+    const mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, false, .{ 0, 0 });
+
+    print("middle value: {any}\n", .{mid_value});
+
+    print("Normalizing\nSetting Min Max\n", .{});
+    const minmax = try MinMax3D(img);
+    print("Min Max: {any}\n", .{minmax});
+    const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
+    print("Normalized mid value: {any}\n", .{normalized_mid_value});
 }

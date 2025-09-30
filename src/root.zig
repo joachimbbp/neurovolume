@@ -26,7 +26,6 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     return num_frames;
 }
 
-
 // Writes and saves VDB File
 // Will version if already present
 fn writeVDBFrame(
@@ -168,8 +167,8 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
 }
 
 //_: Debug and Test Functions
-test "print ham" {
-    print("🐷 Test ham\n", .{});
+test "echo module" {
+    print("🪾root.zig test print\n", .{});
 }
 pub export fn hello() void {
     print("🪾 Root level print\n", .{});
@@ -219,3 +218,22 @@ pub export fn writePathToBufC( //LLM: Function is gpt copypasta
 
     return n; // bytes written (excludes NUL)
 }
+
+//_: Root Tests:
+const t = zools.timer;
+
+test "imports" {
+    zools.debug.helloZools();
+    for (0..5) |_| {
+        print("random uuid: {s}\n", .{zools.uuid.v4()});
+    }
+}
+test "timers" {
+    //NOTE: This is more or less the pattern
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\ntimer test:\n", .{});
+    std.Thread.sleep(3333000);
+}
+
+//TODO: Call test pattern functions with temp output here!

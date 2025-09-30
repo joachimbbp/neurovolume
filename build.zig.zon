@@ -4,8 +4,8 @@
     .version = "0.0.0",
     .dependencies = .{
         .zools = .{
-            .url = "git+https://github.com/joachimbbp/zools#b6fd281bf2b19f26992fdad8a397ef08d2edf67e",
-            .hash = "zools-0.0.0-VPOS2jFTAADqgAu0fMHXnZ2oiTXsHWkbFSuO2e-c4OLO",
+            .url = "git+https://github.com/joachimbbp/zools#65c6fed10e07a985d1ab9f33033d7b2bab87970b",
+            .hash = "zools-0.0.0-VPOS2q1SAAB-Echb9uhgmX2dVGL39_sbuOgFLTcddjHV",
         },
     },
 
@@ -13,11 +13,6 @@
 
     .minimum_zig_version = "0.15.1",
 
-    //HACK: currently zools submodule is just in
-    //the src folder.
-    // .dependencies = .{
-    //     .zools = .{ .path = "./deps/zools" },
-    // },
     .paths = .{
         "build.zig",
         "build.zig.zon",

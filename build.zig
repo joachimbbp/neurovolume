@@ -23,7 +23,7 @@ pub fn build(b: *std.Build) void {
         .root_module = nvol_mod,
     });
     libneurovolume.root_module.addImport("zools", zools);
-    //NOTE: This is really just for testing purposes
+    //NOTE: This doesn't really do much at the moment
     const exe = b.addExecutable(.{
         .name = "demo",
         .root_module = b.createModule(.{
