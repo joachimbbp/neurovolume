@@ -7,6 +7,9 @@ const nifti1 = @import("nifti1.zig");
 const ArrayList = std.array_list.Managed;
 const vdb543 = @import("vdb543.zig");
 
+//_: CONSTS:
+const id_4x4 = zools.matrix.IdentityMatrix4x4;
+
 //_: Actual functions:
 
 pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
@@ -57,8 +60,12 @@ fn writeVDBFrame(
             }
         }
     }
-    try vdb543.writeVDB(&buffer, &vdb, transform); // assumes compatible signature
-    const vdb_filepath = try zools.save.version(output_path, buffer, alloc);
+    try vdb543.writeVDB(&buffer, &vdb, transform);
+    const vdb_filepath = try zools.save.version(
+        output_path,
+        buffer,
+        alloc,
+    );
     return vdb_filepath;
 }
 // Returns path to VDB file (or folder containing sequence if fMRI)
@@ -78,13 +85,6 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     };
     defer img_deprecated.deinit();
     (&img_deprecated).printHeader();
-
-    const Identity4x4: [4][4]f64 = .{
-        .{ 1.0, 0.0, 0.0, 0.0 },
-        .{ 0.0, 1.0, 0.0, 0.0 },
-        .{ 0.0, 0.0, 1.0, 0.0 },
-        .{ 0.0, 0.0, 0.0, 1.0 },
-    };
 
     var static = true;
     if (img_deprecated.header.dim[0] == 4) {
@@ -135,7 +135,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
 
             defer allocator.free(frame_path);
             //new_frame will include any versioning (which is -honestly- a little messy)
-            const new_frame = writeVDBFrame(allocator, vdb_seq_folder_slice, img_deprecated, normalize, Identity4x4, frame) catch {
+            const new_frame = writeVDBFrame(allocator, vdb_seq_folder_slice, img_deprecated, normalize, id_4x4, frame) catch {
                 print("Error on writeVDBFrame", .{});
                 return 0;
             };
@@ -147,7 +147,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     if (static) {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
-        vdb_path = writeVDBFrame(allocator, output_dir, img_deprecated, normalize, Identity4x4, 0) catch {
+        vdb_path = writeVDBFrame(allocator, output_dir, img_deprecated, normalize, id_4x4, 0) catch {
             return 0;
         };
     }
@@ -161,7 +161,6 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     //Q: I don't fully grasp the reason for the above code
     @memcpy(out_buf[0..n], src[0..n]);
     out_buf[n] = 0; //NULL terminate
-    //    print("checkpoint\n        n:{d}", .{n});
     return n;
     //LLM END:
 }
@@ -220,68 +219,79 @@ pub export fn writePathToBufC( //LLM: Function is gpt copypasta
 }
 
 //_: Root Tests:
-const t = zools.timer;
+// Each module has it's own test suite. The root module contains tests that must
+// incorportate multiple modules (such as nifti->vdb), as well as general import
+// tests for zools ("imports");
 
+const t = zools.timer;
+const test_utils = @import("test_utils.zig");
 test "imports" {
+    const timer_start = t.Click();
+    defer t.Stop(timer_start);
+    defer print("\nUUID Timer test:\n", .{});
     zools.debug.helloZools();
     for (0..5) |_| {
         print("random uuid: {s}\n", .{zools.uuid.v4()});
     }
 }
-test "timers" {
-    //NOTE: This is more or less the pattern
-    const timer_start = t.Click();
-    defer t.Stop(timer_start);
-    defer print("\ntimer test:\n", .{});
-    std.Thread.sleep(3333000);
+
+pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
+    //TODO: Eventually this should be integrated more tightly as to test
+    //the actual nifti1->VDB functions, not just the VDB writing as it does now?
+    //This will probably mean splitting that function out into smaller functions
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    var arena_alloc = arena.allocator();
+
+    var buffer = ArrayList(u8).init(arena_alloc);
+    defer buffer.deinit();
+
+    const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    //TODO: Move this test file path to
+    const img = try nifti1.Image.init(path);
+    defer img.deinit();
+    (&img).printHeader();
+    const dims = img.header.dim;
+    //check to make sure it's a static 3D image:
+    if (dims[0] != 3) {
+        print(
+            "Warning! Not a static 3D file. Has {any} dimensions\nPlease check test file source",
+            .{dims[0]},
+        );
+        return test_utils.TestPatternError.FileError;
+    }
+    const minmax = try nifti1.MinMax3D(img);
+
+    var vdb = try vdb543.VDB.build(arena_alloc);
+
+    print("iterating nifti file\n", .{});
+    for (0..@as(usize, @intCast(dims[3]))) |z| {
+        for (0..@as(usize, @intCast(dims[2]))) |x| {
+            for (0..@as(usize, @intCast(dims[1]))) |y| {
+                const val = try img.getAt4D(x, y, z, 0, true, minmax);
+                //needs to be f16
+                try vdb543.setVoxel(
+                    &vdb,
+                    .{ @intCast(x), @intCast(y), @intCast(z) },
+                    @floatCast(val),
+                    arena_alloc,
+                );
+            }
+        }
+    }
+    try vdb543.writeVDB(&buffer, &vdb, id_4x4); // assumes compatible signature
+    try test_utils.saveTestPattern(
+        save_dir,
+        "static_nifti1_test_file",
+        &arena_alloc,
+        &buffer,
+    );
 }
-//TODO: Call nifti->vdb
-// test "nifti" {
-//     const timer_start = t.Click();
-//     defer t.Stop(timer_start);
-//     defer print("\n⏰nifti timer:\n", .{});
-//
-//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-//     const gpa_alloc = gpa.allocator();
-//     defer _ = gpa.deinit();
-//     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-//     defer arena.deinit();
-//     const allocator = arena.allocator();
-//
-//     var buffer = ArrayList(u8).init(allocator);
-//     defer buffer.deinit();
-//
-//     const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
-//     const img = try nifti1.Image.init(path);
-//     defer img.deinit();
-//     (&img).printHeader();
-//     const dims = img.header.dim;
-//     print("\nDimensions: {any}\n", .{dims});
-//     //check to make sure it's a static 3D image:
-//     if (dims[0] != 3) {
-//         print("Warning! Not a static 3D file. Has {any} dimensions\n", .{dims[0]});
-//     }
-//     const minmax = try nifti1.MinMax3D(img);
-//     var vdb = try VDB.build(allocator);
-//
-//     print("iterating nifti file\n", .{});
-//     for (0..@as(usize, @intCast(dims[3]))) |z| {
-//         for (0..@as(usize, @intCast(dims[2]))) |x| {
-//             for (0..@as(usize, @intCast(dims[1]))) |y| {
-//                 const val = try img.getAt4D(x, y, z, 0, true, minmax);
-//                 //needs to be f16
-//                 try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
-//             }
-//         }
-//     }
-//     const Identity4x4: [4][4]f64 = .{
-//         .{ 1.0, 0.0, 0.0, 0.0 },
-//         .{ 0.0, 1.0, 0.0, 0.0 },
-//         .{ 0.0, 0.0, 1.0, 0.0 },
-//         .{ 0.0, 0.0, 0.0, 1.0 },
-//     };
-//     try vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
-//     const save_path = "./output/nifti_zig.vdb";
-//     const file_name = try zools.save.version(save_path, buffer, allocator);
-//     print("\nnifti file written to {}\n", .{file_name});
-// } //TODO: DRIED save test pattern in test_utils
+
+test "static nifti to vdb" {
+    try staticTestNifti1ToVDB("tmp");
+    print("static nifti test saved\n", .{});
+}

@@ -389,9 +389,11 @@ pub fn lengthSquared(v: [3]f32) f32 {
 }
 
 //SECTION: Tests:
-
+//SUBMODULE: as the UUID above, this has lots of zools. However, these are just for testing,
+//so you could just comment it out.
 const id_4x4 = zools.matrix.IdentityMatrix4x4;
 const test_utils = @import("test_utils.zig");
+//Use "tmp" to use the tmp folder in zig cache
 pub fn sphereTest(comptime save_dir: []const u8) !void {
     print("⚪️ Sphere Test Pattern\n", .{});
     //NICE: I think this is a good convention for allocators and arena allocators
@@ -415,7 +417,12 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
-                    try setVoxel(&sphere_vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, arena_alloc);
+                    try setVoxel(
+                        &sphere_vdb,
+                        .{ @intCast(x), @intCast(y), @intCast(z) },
+                        1.0,
+                        arena_alloc,
+                    );
                 }
             }
         }
@@ -432,6 +439,40 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
         &buffer,
     );
 }
-test "sphere" {
+pub fn onePixelTest(comptime save_dir: []const u8) !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    var arena_alloc = arena.allocator();
+
+    var buffer = ArrayList(u8).init(arena_alloc);
+    defer buffer.deinit();
+
+    var single_voxel = try VDB.build(arena_alloc);
+
+    print("setting voxels\n", .{});
+    try setVoxel(
+        &single_voxel,
+        .{ @intCast(0), @intCast(0), @intCast(0) },
+        1.0,
+        arena_alloc,
+    );
+    try writeVDB(
+        &buffer,
+        &single_voxel,
+        id_4x4,
+    ); // assumes compatible signature
+    try test_utils.saveTestPattern(
+        save_dir,
+        "one_pixel_test_pattern",
+        &arena_alloc,
+        &buffer,
+    );
+}
+
+test "test patterns" {
     try sphereTest("tmp");
+    try onePixelTest("tmp");
 }
