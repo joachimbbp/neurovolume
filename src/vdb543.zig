@@ -386,3 +386,57 @@ pub fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
 pub fn lengthSquared(v: [3]f32) f32 {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
+
+//SECTION: Tests:
+
+const id_4x4 = zools.matrix.IdentityMatrix4x4;
+const test_utils = @import("test_utils.zig");
+pub fn sphereTest(comptime save_dir: []const u8) !void {
+    print("⚪️ Sphere Test Pattern\n", .{});
+    //NICE: This seems to follow the idiomatic pattern for arena: https://zig.guide/master/standard-library/allocators
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    const alloc = arena.allocator();
+
+    var buffer = std.array_list.Managed(u8).init(alloc);
+    defer buffer.deinit();
+    const R: u32 = 128;
+    const D: u32 = R * 2;
+    var sphere_vdb = try VDB.build(alloc);
+    const Rf: f32 = @floatFromInt(R);
+    const R2: f32 = Rf * Rf;
+    for (0..D - 1) |z| {
+        for (0..D - 1) |y| {
+            for (0..D - 1) |x| {
+                const p = toF32(.{ x, y, z });
+                const diff = subVec(p, .{ Rf, Rf, Rf });
+                if (lengthSquared(diff) < R2) {
+                    try setVoxel(&sphere_vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, 1.0, alloc);
+                }
+            }
+        }
+    }
+    try writeVDB(
+        &buffer,
+        &sphere_vdb,
+    ); // assumes compatible signature
+    const basename = "sphere_test_pattern";
+    const fmt = "{s}/{s}.vdb";
+    var save_path = try std.fmt.allocPrint(alloc, fmt, .{ save_dir, basename });
+    defer alloc.free(save_path);
+    if (std.mem.eql(u8, save_dir, "tmp") == true) {
+        var tmp_dir = std.testing.tmpDir(.{});
+        defer tmp_dir.cleanup();
+        const tmp_dir_slice = try tmp_dir.dir.realpathAlloc(alloc, ".");
+        save_path = try std.fmt.allocPrint(alloc, fmt, .{ tmp_dir_slice, basename });
+        const final_save_location = try zools.save.version(save_path, buffer, alloc);
+        print("Sphere test pattern saved to: {s}\n", .{final_save_location.items});
+    } else {
+        print("Error: custom save directory not implemented yet. 'tmp' is not given string:\n{s}", .{save_dir});
+        return test_utils.TestPatternError.PersistentSaveNotImplementedYet;
+        //TODO: Implement
+    }
+}

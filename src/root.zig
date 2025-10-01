@@ -235,10 +235,53 @@ test "timers" {
     defer print("\ntimer test:\n", .{});
     std.Thread.sleep(3333000);
 }
-const test_patterns = @import("test_patterns.zig");
-//TODO: Call test pattern functions with temp output here!
-test "test patterns" {
-    const timer_start = t.Click();
-    defer t.Stop(timer_start);
-    try test_patterns.sphere("tmp");
-}
+//TODO: Call nifti->vdb
+// test "nifti" {
+//     const timer_start = t.Click();
+//     defer t.Stop(timer_start);
+//     defer print("\n⏰nifti timer:\n", .{});
+//
+//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+//     const gpa_alloc = gpa.allocator();
+//     defer _ = gpa.deinit();
+//     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+//     defer arena.deinit();
+//     const allocator = arena.allocator();
+//
+//     var buffer = ArrayList(u8).init(allocator);
+//     defer buffer.deinit();
+//
+//     const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+//     const img = try nifti1.Image.init(path);
+//     defer img.deinit();
+//     (&img).printHeader();
+//     const dims = img.header.dim;
+//     print("\nDimensions: {any}\n", .{dims});
+//     //check to make sure it's a static 3D image:
+//     if (dims[0] != 3) {
+//         print("Warning! Not a static 3D file. Has {any} dimensions\n", .{dims[0]});
+//     }
+//     const minmax = try nifti1.MinMax3D(img);
+//     var vdb = try VDB.build(allocator);
+//
+//     print("iterating nifti file\n", .{});
+//     for (0..@as(usize, @intCast(dims[3]))) |z| {
+//         for (0..@as(usize, @intCast(dims[2]))) |x| {
+//             for (0..@as(usize, @intCast(dims[1]))) |y| {
+//                 const val = try img.getAt4D(x, y, z, 0, true, minmax);
+//                 //needs to be f16
+//                 try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), allocator);
+//             }
+//         }
+//     }
+//     const Identity4x4: [4][4]f64 = .{
+//         .{ 1.0, 0.0, 0.0, 0.0 },
+//         .{ 0.0, 1.0, 0.0, 0.0 },
+//         .{ 0.0, 0.0, 1.0, 0.0 },
+//         .{ 0.0, 0.0, 0.0, 1.0 },
+//     };
+//     try vdb543.writeVDB(&buffer, &vdb, Identity4x4); // assumes compatible signature
+//     const save_path = "./output/nifti_zig.vdb";
+//     const file_name = try zools.save.version(save_path, buffer, allocator);
+//     print("\nnifti file written to {}\n", .{file_name});
+// } //TODO: DRIED save test pattern in test_utils
