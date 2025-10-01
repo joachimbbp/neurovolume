@@ -5,7 +5,7 @@ const t = zools.timer;
 const vdb543 = @import("vdb543.zig");
 const VDB = vdb543.VDB;
 
-const TestPatternError = error{
+pub const TestPatternError = error{
     PersistentSaveNotImplementedYet,
 };
 

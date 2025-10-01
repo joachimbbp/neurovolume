@@ -422,7 +422,8 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
     try writeVDB(
         &buffer,
         &sphere_vdb,
-    ); // assumes compatible signature
+        id_4x4,
+    );
     const basename = "sphere_test_pattern";
     const fmt = "{s}/{s}.vdb";
     var save_path = try std.fmt.allocPrint(alloc, fmt, .{ save_dir, basename });
@@ -437,6 +438,8 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
     } else {
         print("Error: custom save directory not implemented yet. 'tmp' is not given string:\n{s}", .{save_dir});
         return test_utils.TestPatternError.PersistentSaveNotImplementedYet;
-        //TODO: Implement
     }
+}
+test "sphere" {
+    try sphereTest("tmp");
 }
