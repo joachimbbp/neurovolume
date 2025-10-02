@@ -1,3 +1,5 @@
+//Zig library root
+
 //_: IMPORTS
 const std = @import("std");
 const print = std.debug.print;
@@ -11,27 +13,20 @@ const vdb543 = @import("vdb543.zig");
 const id_4x4 = zools.matrix.IdentityMatrix4x4;
 const config = @import("config.zig.zon");
 
+pub const Output = struct {
+    filepath: []const u8,
+    header_csv: []const u8,
+    //TODO: Eventually we'll add an image with the normalization etc information!
+};
+
 //_: Actual functions:
 
-pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
-    //TIDY:
-    //Maybe a little computationally redundant with nifti1ToVDB
-    //Still figuring out the best lib architecture here, tbh
-    //Writes to the buffer, file saving happens on the python level
-    //DEPRECATED: later just spit out the header and get it from there
-    const filepath = std.mem.span(c_filepath);
-    const img = nifti1.Image.init(filepath) catch {
-        print("Failed to load nifti image\n", .{});
-        return 0;
-    };
-    defer img.deinit();
-    const num_frames = img.header.dim[4];
-    print("zig level dim print: {d}\n", .{num_frames});
-    return num_frames;
-}
-
 // Returns path to VDB file (or folder containing sequence if fMRI)
-pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
+pub fn nifti1ToVDB(
+    nifti_filepath: []const u8,
+    output_dir: []const u8,
+    normalize: bool,
+) !Output {
     //TODO: loud vs quiet debug, certainly some kind of loadng feature
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
@@ -40,54 +35,35 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     defer arena.deinit();
     const arena_alloc = arena.allocator();
 
-    const nifti_filepath = std.mem.span(c_nifti_filepath);
-    const output_dir = std.mem.span(c_output_dir);
-    const img_deprecated = nifti1.Image.init(nifti_filepath) catch { //DEPRECATED: img should be universal
-        return 0;
-    };
+    const img_deprecated = try nifti1.Image.init(nifti_filepath);
     defer img_deprecated.deinit();
-    (&img_deprecated).printHeader();
 
     var static = true;
     if (img_deprecated.header.dim[0] == 4) {
         static = false;
     } //TODO: coverage for any weird dim numbers
     var vdb_path: ArrayList(u8) = undefined;
-    const minmax = nifti1.MinMax3D(img_deprecated) //DEPRECATED: will live in new img
-        catch {
-            print("minmax error\n", .{});
-            return 0;
-        };
+    const minmax = try nifti1.MinMax3D(img_deprecated); //DEPRECATED: will live in new img
+
     //output folder / new filename / framename_0
     var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
     var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
     const ext = name_split.first();
     _ = ext;
     const basename = name_split.rest();
-    const base_seq_folder = std.fmt.allocPrint(gpa_alloc, "{s}/{s}", .{ output_dir, basename }) catch {
-        print("allocPrint error (in !static block)\n", .{});
-        return 0;
-    };
-
+    const base_seq_folder = try std.fmt.allocPrint(gpa_alloc, "{s}/{s}", .{ output_dir, basename });
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
 
         defer gpa_alloc.free(base_seq_folder);
-        const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, arena_alloc) catch { //EXORCISE: allocator naming convention
-            return 0;
-        };
-        //CLEAN: This feels really hacky and verbose
+        const vdb_seq_folder = try zools.save.versionFolder(base_seq_folder, arena_alloc); //CLEAN: This feels really hacky and verbose
         var buf = ArrayList(u8).init(arena_alloc);
         defer buf.deinit();
         for (vdb_seq_folder.items) |c| {
-            buf.append(c) catch {
-                return 0;
-            };
+            try buf.append(c);
         }
-        buf.append(0) catch {
-            return 0;
-        };
+        try buf.append(0);
         const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
         const frames: usize = @intCast(img_deprecated.header.dim[4]);
@@ -95,43 +71,32 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         //WARN: technically a bit unsafe, but there shouldnt be negative dimensions. Will iron out when making img univeral
         const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
         for (0..frames) |frame| {
-            const frame_path = zools.sequence.elementName(
+            const frame_path = try zools.sequence.elementName(
                 vdb_seq_folder_slice,
                 basename,
                 ".vdb",
                 frame,
                 leading_zeros,
                 arena_alloc,
-            ) catch {
-                print("Error on sequence element name\n", .{});
-                return 0;
-            };
-
+            );
             defer arena_alloc.free(frame_path);
 
             var buffer = ArrayList(u8).init(arena_alloc);
             defer buffer.deinit();
 
-            var vdb = vdb543.buildFrame(
+            var vdb = try vdb543.buildFrame(
                 arena_alloc,
                 img_deprecated,
                 minmax,
                 normalize,
                 frame,
-            ) catch {
-                print("Error on buildVDBFrame\n", .{});
-                return 0;
-            };
-            //write VDB frame
-            const versioned_vdb_filepath = vdb543.writeFrame(
+            ); //write VDB frame
+            const versioned_vdb_filepath = try vdb543.writeFrame(
                 &buffer,
                 &vdb,
                 frame_path,
                 arena_alloc,
-            ) catch {
-                print("Error on writeVDBFrame\n", .{});
-                return 0;
-            };
+            );
 
             print("new frame: {s}\n", .{versioned_vdb_filepath.items});
         }
@@ -143,101 +108,39 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         var buffer = ArrayList(u8).init(arena_alloc);
         defer buffer.deinit();
 
-        var vdb = vdb543.buildFrame(
+        var vdb = try vdb543.buildFrame(
             arena_alloc,
             img_deprecated,
             minmax,
             normalize,
             0,
-        ) catch {
-            print("Error on buildVDBFrame\n", .{});
-            return 0;
-        };
+        );
 
-        const frame_path = std.fmt.allocPrint(
+        const frame_path = try std.fmt.allocPrint(
             arena_alloc,
             "{[dir]s}/{[bn]s}.vdb",
             .{ .dir = base_seq_folder, .bn = basename },
-        ) catch {
-            print("error on allocprint\n", .{});
-            return 0;
-        };
-        const versioned_vdb_filepath = vdb543.writeFrame(
+        );
+        const versioned_vdb_filepath = try vdb543.writeFrame(
             &buffer,
             &vdb,
             frame_path,
             arena_alloc,
-        ) catch {
-            print("Error on writeVDBFrame\n", .{});
-            return 0;
-        };
+        );
         print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
     }
 
-    //NOTE: Returning the name here:
-    //LLM: inspired. More or less copypasta
-    if (out_cap == 0) return 0;
+    var header_csv: ArrayList(u8) = undefined;
+    //WIP: The idea here is that you will iterate through the header and add to this
+    //CSV. This might actually be a bit of a higher level abstraction that should
+    //live in zools?
 
-    var src = vdb_path.items;
-    const n = if (src.len + 1 <= out_cap) src.len else out_cap - 1;
-    //Q: I don't fully grasp the reason for the above code
-    @memcpy(out_buf[0..n], src[0..n]);
-    out_buf[n] = 0; //NULL terminate
-    return n;
-    //LLM END:
-}
+    //     return Output{
+    // .filepath = versioned_vdb_filepath.items,
+    // //        .header = img_deprecated.header
+    //     };
+    //
 
-//_: Debug and Test Functions
-test "echo module" {
-    print("🪾root.zig test print\n", .{});
-}
-pub export fn hello() void {
-    print("🪾 Root level print\n", .{});
-    debug.helloNeurovolume();
-    zools.debug.helloZools();
-}
-pub export fn echo(word: [*:0]const u8) [*:0]const u8 {
-    print("zig level echo print: {s}\n", .{word});
-    return word;
-}
-pub export fn echoHam(word: [*:0]const u8, output_buffer: [*]u8, buf_len: usize) usize { //LLM: Function is gpt copypasta
-    const input = std.mem.span(word);
-    const suffix = " ham";
-    const total_len = input.len + suffix.len;
-    if (total_len + 1 > buf_len) {
-        return 0;
-    }
-    @memcpy(output_buffer[0..input.len], input); //HUMAN EDIT: changed to @memcpy
-    @memcpy(output_buffer[input.len..][0..suffix.len], suffix); //HUMAN EDIT:
-    output_buffer[total_len] = 0; // Null terminate
-
-    return total_len;
-    //LLM ENDAlignManaged(u8)li:
-}
-
-pub export fn alwaysFails() usize {
-    std.testing.expect(true == false) catch
-        {
-            return 0;
-        };
-    return 1;
-}
-
-pub export fn writePathToBufC( //LLM: Function is gpt copypasta
-    path_nt: [*:0]const u8, // C string from Python
-    out_buf: [*]u8,
-    out_cap: usize,
-) usize {
-    if (out_cap == 0) return 0;
-
-    const src = std.mem.span(path_nt); // []const u8 (no NUL)
-    const want = src.len;
-    const n = if (want + 1 <= out_cap) want else out_cap - 1;
-
-    @memcpy(out_buf[0..n], src[0..n]);
-    out_buf[n] = 0; // NUL-terminate
-
-    return n; // bytes written (excludes NUL)
 }
 
 //_: Root Tests:
@@ -257,7 +160,7 @@ test "imports" {
     }
 }
 
-pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
+pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void { //Probably DEPRECATED:
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -303,6 +206,14 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
 }
 
 test "static nifti to vdb" {
-    try staticTestNifti1ToVDB("persistent");
+    //    try staticTestNifti1ToVDB("tmp");
+    //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
+    //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
+    //either that or the default persistent location in the real nifti1ToVDB function!
+    try nifti1ToVDB(
+        config.testing.files.nifti1_t1,
+        config.testing.dirs.output,
+        true,
+    );
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
 }

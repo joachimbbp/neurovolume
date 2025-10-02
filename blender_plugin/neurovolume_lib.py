@@ -17,20 +17,6 @@ def b(string):
     return string.encode("utf-8")
 
 
-def num_frames(filepath) -> int:
-    #DEPRECATED: later just use the header
-    print("filepath: ", b(filepath))
-    nvol.numFrames.argtypes = [c.c_char_p]
-    nvol.numFrames.restype = c.c_int16
-    num_frames = nvol.numFrames(b(filepath))
-    return num_frames
-
-# TODO:
-# [ ] load static file
-# [ ] load fMRI
-# def load_nifti(filepath: str) -> str:
-
-
 def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
     BUF_SIZE = 256  # somewhat arbitrary, should be big enough for file name
     nvol.nifti1ToVDB.argtypes = [c.c_char_p,
@@ -48,7 +34,6 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 # Static:
 # save_location = nifti1_to_VDB(static_testfile, True)
 # print("VDB saved to: ", save_location, "\n")
-# nf = num_frames(static_testfile)
 # print("python level num frames: ", nf)
 #
 # fMRI:
