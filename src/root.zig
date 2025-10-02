@@ -258,11 +258,6 @@ test "imports" {
 }
 
 pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
-    //TODO::
-    //- [ ] Eventually this should be integrated more tightly as to test
-    //the actual nifti1->VDB functions, not just the VDB writing as it does now?
-    //This will probably mean splitting that function out into smaller functions
-    //- [ ] Make this a bit more responsive?
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -275,7 +270,7 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
 
     const path = config.testing.files.nifti1_t1;
     //TODO: Move this test file path to
-    const img = try nifti1.Image.init(path); //DEPRECATED:
+    const img = try nifti1.Image.init(path); // nifti1.Image is DEPRECATED:
     defer img.deinit();
     (&img).printHeader();
     const dims = img.header.dim;
@@ -308,6 +303,6 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
 }
 
 test "static nifti to vdb" {
-    try staticTestNifti1ToVDB("tmp");
+    try staticTestNifti1ToVDB("persistent");
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
 }
