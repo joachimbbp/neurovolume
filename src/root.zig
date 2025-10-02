@@ -61,15 +61,15 @@ fn buildVDBFrame(
 }
 
 fn writeVDBFrame(
-    buffer: ArrayList(u8),
-    vdb: vdb543.VDB,
+    buffer: *ArrayList(u8),
+    vdb: *vdb543.VDB,
     path_string: []const u8,
     arena_alloc: std.mem.Allocator,
 ) !ArrayList(u8) {
-    try vdb543.writeVDB(&buffer, &vdb, id_4x4);
+    try vdb543.writeVDB(buffer, vdb, id_4x4);
     const vdb_filepath = try zools.save.version(
         path_string,
-        buffer,
+        buffer.*, //EXORCISE: This pointer pattern seems cursed
         arena_alloc,
     );
     return vdb_filepath;
@@ -98,20 +98,25 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         static = false;
     } //TODO: coverage for any weird dim numbers
     var vdb_path: ArrayList(u8) = undefined;
-    const minmax = try nifti1.MinMax3D(img_deprecated); //DEPRECATED: will live in new img
+    const minmax = nifti1.MinMax3D(img_deprecated) //DEPRECATED: will live in new img
+        catch {
+            print("minmax error\n", .{});
+            return 0;
+        };
+    //output folder / new filename / framename_0
+    var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
+    var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
+    const ext = name_split.first();
+    _ = ext;
+    const basename = name_split.rest();
+    const base_seq_folder = std.fmt.allocPrint(gpa_alloc, "{s}/{s}", .{ output_dir, basename }) catch {
+        print("allocPrint error (in !static block)\n", .{});
+        return 0;
+    };
+
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
-
-        //output folder / new filename / framename_0
-        var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
-        var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
-        const ext = name_split.first();
-        _ = ext;
-        const basename = name_split.rest();
-        const base_seq_folder = std.fmt.allocPrint(gpa_alloc, "{s}/{s}", .{ output_dir, basename }) catch {
-            return 0;
-        };
 
         defer gpa_alloc.free(base_seq_folder);
         const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, arena_alloc) catch { //EXORCISE: allocator naming convention
@@ -152,7 +157,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
             var buffer = ArrayList(u8).init(arena_alloc);
             defer buffer.deinit();
 
-            const vdb = buildVDBFrame(
+            var vdb = buildVDBFrame(
                 arena_alloc,
                 img_deprecated,
                 minmax,
@@ -164,8 +169,8 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
             };
             //write VDB frame
             const versioned_vdb_filepath = writeVDBFrame(
-                buffer,
-                vdb,
+                &buffer,
+                &vdb,
                 frame_path,
                 arena_alloc,
             ) catch {
@@ -183,7 +188,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         var buffer = ArrayList(u8).init(arena_alloc);
         defer buffer.deinit();
 
-        const vdb = buildVDBFrame(
+        var vdb = buildVDBFrame(
             arena_alloc,
             img_deprecated,
             minmax,
@@ -196,15 +201,15 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
 
         const frame_path = std.fmt.allocPrint(
             arena_alloc,
-            "{[dir]s}/[bn]s.vdb",
-            .{},
+            "{[dir]s}/{[bn]s}.vdb",
+            .{ .dir = base_seq_folder, .bn = basename },
         ) catch {
             print("error on allocprint\n", .{});
             return 0;
         };
         const versioned_vdb_filepath = writeVDBFrame(
-            buffer,
-            vdb,
+            &buffer,
+            &vdb,
             frame_path,
             arena_alloc,
         ) catch {
