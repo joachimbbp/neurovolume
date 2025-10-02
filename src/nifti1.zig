@@ -245,7 +245,7 @@ pub fn MinMax3D(img: Image) ![2]f32 {
 //SECTION: Tests:
 const zools = @import("zools");
 const t = zools.timer;
-
+const config = @import("config.zig.zon");
 test "echo module" {
     print("🧠 nifti1.zig module echo\n", .{});
 }
@@ -255,8 +255,7 @@ test "open and normalize nifti file" {
     const timer_start = t.Click();
     defer t.Stop(timer_start);
     defer print("\n⏰ open and normalize nifti file timer:\n", .{});
-
-    const static = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    const static = config.test_files.nifti1_t1;
     var img = try Image.init(static);
     defer img.deinit();
     (&img).printHeader();

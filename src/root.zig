@@ -9,6 +9,7 @@ const vdb543 = @import("vdb543.zig");
 
 //_: CONSTS:
 const id_4x4 = zools.matrix.IdentityMatrix4x4;
+const config = @import("config.zig.zon");
 
 //_: Actual functions:
 
@@ -236,9 +237,11 @@ test "imports" {
 }
 
 pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
-    //TODO: Eventually this should be integrated more tightly as to test
+    //TODO::
+    //- [ ] Eventually this should be integrated more tightly as to test
     //the actual nifti1->VDB functions, not just the VDB writing as it does now?
     //This will probably mean splitting that function out into smaller functions
+    //- [ ] Make this a bit more responsive?
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -249,7 +252,7 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
     var buffer = ArrayList(u8).init(arena_alloc);
     defer buffer.deinit();
 
-    const path = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii";
+    const path = config.test_files.nifti1_t1;
     //TODO: Move this test file path to
     const img = try nifti1.Image.init(path);
     defer img.deinit();
