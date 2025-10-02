@@ -30,49 +30,54 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     return num_frames;
 }
 
-// Writes and saves VDB File
-// Will version if already present
-fn writeVDBFrame(
-    alloc: std.mem.Allocator,
-    output_path: [:0]const u8,
+//QUESTION: Maybe these should go in vdb? Not root??????
+fn buildVDBFrame(
+    arena_alloc: std.mem.Allocator,
     img_deprecated: nifti1.Image,
+    minmax_deprecated: [2]f32, //DEPRECATED: will eventually live in img
     normalize: bool,
-    transform: [4][4]f64,
     frame: usize,
-) !ArrayList(u8) {
-    //TODO: This function should be universal to all possible file formats
-    //This should probably be done on the img level
-    //WARN: not sure about arena here, and your naming convention
-    //is all over the place!
-    // Writes VDB and saves it to disk
-    var buffer = ArrayList(u8).init(alloc);
-    defer buffer.deinit();
-
-    const minmax = try nifti1.MinMax3D(img_deprecated);
+) !vdb543.VDB {
     const dim = img_deprecated.header.dim;
-    var vdb = try vdb543.VDB.build(alloc);
+    var vdb = try vdb543.VDB.build(arena_alloc);
 
     print("iterating nifti file\n", .{});
     for (0..@as(usize, @intCast(dim[3]))) |z| {
         for (0..@as(usize, @intCast(dim[2]))) |x| {
             for (0..@as(usize, @intCast(dim[1]))) |y| {
-                const val = try img_deprecated.getAt4D(x, y, z, frame, normalize, minmax);
-                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), alloc);
+                const val = try img_deprecated.getAt4D(
+                    x,
+                    y,
+                    z,
+                    frame,
+                    normalize,
+                    minmax_deprecated,
+                );
+                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), arena_alloc);
             }
         }
     }
-    try vdb543.writeVDB(&buffer, &vdb, transform);
+    return vdb;
+}
+
+fn writeVDBFrame(
+    buffer: ArrayList(u8),
+    vdb: vdb543.VDB,
+    path_string: []const u8,
+    arena_alloc: std.mem.Allocator,
+) !ArrayList(u8) {
+    try vdb543.writeVDB(&buffer, &vdb, id_4x4);
     const vdb_filepath = try zools.save.version(
-        output_path,
+        path_string,
         buffer,
-        alloc,
+        arena_alloc,
     );
     return vdb_filepath;
 }
+
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
     //TODO: loud vs quiet debug, certainly some kind of loadng feature
-    //
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -93,6 +98,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         static = false;
     } //TODO: coverage for any weird dim numbers
     var vdb_path: ArrayList(u8) = undefined;
+    const minmax = try nifti1.MinMax3D(img_deprecated); //DEPRECATED: will live in new img
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
@@ -129,29 +135,83 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         //WARN: technically a bit unsafe, but there shouldnt be negative dimensions. Will iron out when making img univeral
         const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
         for (0..frames) |frame| {
-            //TODO: un-hard code leading zeros (and extension?)
-            const frame_path = zools.sequence.elementName(vdb_seq_folder_slice, basename, ".vdb", frame, leading_zeros, arena_alloc) catch {
+            const frame_path = zools.sequence.elementName(
+                vdb_seq_folder_slice,
+                basename,
+                ".vdb",
+                frame,
+                leading_zeros,
+                arena_alloc,
+            ) catch {
                 print("Error on sequence element name\n", .{});
                 return 0;
             };
 
             defer arena_alloc.free(frame_path);
-            //new_frame will include any versioning (which is -honestly- a little messy)
-            const new_frame = writeVDBFrame(arena_alloc, vdb_seq_folder_slice, img_deprecated, normalize, id_4x4, frame) catch {
-                print("Error on writeVDBFrame", .{});
+
+            var buffer = ArrayList(u8).init(arena_alloc);
+            defer buffer.deinit();
+
+            const vdb = buildVDBFrame(
+                arena_alloc,
+                img_deprecated,
+                minmax,
+                normalize,
+                frame,
+            ) catch {
+                print("Error on buildVDBFrame\n", .{});
                 return 0;
             };
-            //WARN: Free new_frame?
-            print("new frame: {s}\n", .{new_frame.items});
+            //write VDB frame
+            const versioned_vdb_filepath = writeVDBFrame(
+                buffer,
+                vdb,
+                frame_path,
+                arena_alloc,
+            ) catch {
+                print("Error on writeVDBFrame\n", .{});
+                return 0;
+            };
+
+            print("new frame: {s}\n", .{versioned_vdb_filepath.items});
         }
         vdb_path = vdb_seq_folder;
     }
     if (static) {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
-        vdb_path = writeVDBFrame(arena_alloc, output_dir, img_deprecated, normalize, id_4x4, 0) catch {
+        var buffer = ArrayList(u8).init(arena_alloc);
+        defer buffer.deinit();
+
+        const vdb = buildVDBFrame(
+            arena_alloc,
+            img_deprecated,
+            minmax,
+            normalize,
+            0,
+        ) catch {
+            print("Error on buildVDBFrame\n", .{});
             return 0;
         };
+
+        const frame_path = std.fmt.allocPrint(
+            arena_alloc,
+            "{[dir]s}/[bn]s.vdb",
+            .{},
+        ) catch {
+            print("error on allocprint\n", .{});
+            return 0;
+        };
+        const versioned_vdb_filepath = writeVDBFrame(
+            buffer,
+            vdb,
+            frame_path,
+            arena_alloc,
+        ) catch {
+            print("Error on writeVDBFrame\n", .{});
+            return 0;
+        };
+        print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
     }
 
     //NOTE: Returning the name here:
