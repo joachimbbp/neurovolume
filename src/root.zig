@@ -30,51 +30,6 @@ pub export fn numFrames(c_filepath: [*:0]const u8) i16 {
     return num_frames;
 }
 
-//QUESTION: Maybe these should go in vdb? Not root??????
-fn buildVDBFrame(
-    arena_alloc: std.mem.Allocator,
-    img_deprecated: nifti1.Image,
-    minmax_deprecated: [2]f32, //DEPRECATED: will eventually live in img
-    normalize: bool,
-    frame: usize,
-) !vdb543.VDB {
-    const dim = img_deprecated.header.dim;
-    var vdb = try vdb543.VDB.build(arena_alloc);
-
-    print("iterating nifti file\n", .{});
-    for (0..@as(usize, @intCast(dim[3]))) |z| {
-        for (0..@as(usize, @intCast(dim[2]))) |x| {
-            for (0..@as(usize, @intCast(dim[1]))) |y| {
-                const val = try img_deprecated.getAt4D(
-                    x,
-                    y,
-                    z,
-                    frame,
-                    normalize,
-                    minmax_deprecated,
-                );
-                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), arena_alloc);
-            }
-        }
-    }
-    return vdb;
-}
-
-fn writeVDBFrame(
-    buffer: *ArrayList(u8),
-    vdb: *vdb543.VDB,
-    path_string: []const u8,
-    arena_alloc: std.mem.Allocator,
-) !ArrayList(u8) {
-    try vdb543.writeVDB(buffer, vdb, id_4x4);
-    const vdb_filepath = try zools.save.version(
-        path_string,
-        buffer.*, //EXORCISE: This pointer pattern seems cursed
-        arena_alloc,
-    );
-    return vdb_filepath;
-}
-
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
     //TODO: loud vs quiet debug, certainly some kind of loadng feature
@@ -157,7 +112,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
             var buffer = ArrayList(u8).init(arena_alloc);
             defer buffer.deinit();
 
-            var vdb = buildVDBFrame(
+            var vdb = vdb543.buildFrame(
                 arena_alloc,
                 img_deprecated,
                 minmax,
@@ -168,7 +123,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
                 return 0;
             };
             //write VDB frame
-            const versioned_vdb_filepath = writeVDBFrame(
+            const versioned_vdb_filepath = vdb543.writeFrame(
                 &buffer,
                 &vdb,
                 frame_path,
@@ -188,7 +143,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         var buffer = ArrayList(u8).init(arena_alloc);
         defer buffer.deinit();
 
-        var vdb = buildVDBFrame(
+        var vdb = vdb543.buildFrame(
             arena_alloc,
             img_deprecated,
             minmax,
@@ -207,7 +162,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
             print("error on allocprint\n", .{});
             return 0;
         };
-        const versioned_vdb_filepath = writeVDBFrame(
+        const versioned_vdb_filepath = vdb543.writeFrame(
             &buffer,
             &vdb,
             frame_path,
@@ -320,7 +275,7 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
 
     const path = config.testing.files.nifti1_t1;
     //TODO: Move this test file path to
-    const img = try nifti1.Image.init(path);
+    const img = try nifti1.Image.init(path); //DEPRECATED:
     defer img.deinit();
     (&img).printHeader();
     const dims = img.header.dim;
@@ -334,24 +289,16 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
     }
     const minmax = try nifti1.MinMax3D(img);
 
-    var vdb = try vdb543.VDB.build(arena_alloc);
+    var vdb = try vdb543.buildFrame(
+        arena_alloc,
+        img,
+        minmax,
+        true,
+        0,
+    );
 
-    print("iterating nifti file\n", .{});
-    for (0..@as(usize, @intCast(dims[3]))) |z| {
-        for (0..@as(usize, @intCast(dims[2]))) |x| {
-            for (0..@as(usize, @intCast(dims[1]))) |y| {
-                const val = try img.getAt4D(x, y, z, 0, true, minmax);
-                //needs to be f16
-                try vdb543.setVoxel(
-                    &vdb,
-                    .{ @intCast(x), @intCast(y), @intCast(z) },
-                    @floatCast(val),
-                    arena_alloc,
-                );
-            }
-        }
-    }
-    try vdb543.writeVDB(&buffer, &vdb, id_4x4); // assumes compatible signature
+    //WIP: build and write VDB functions moving about
+    try vdb543.writeVDB(&buffer, &vdb, id_4x4);
     try test_utils.saveTestPattern(
         save_dir,
         "static_nifti1_test_file",
@@ -362,5 +309,5 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
 
 test "static nifti to vdb" {
     try staticTestNifti1ToVDB("tmp");
-    print("static nifti test saved\n", .{});
+    print("☁️ 🧠 static nifti test saved as VDB\n", .{});
 }

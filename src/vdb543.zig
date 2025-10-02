@@ -387,6 +387,59 @@ pub fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
 pub fn lengthSquared(v: [3]f32) f32 {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
+//SECTION: writing frames
+
+//DEPRECATED: Normally we wouldn't bring the nifti1 module in here (as
+//VDBs shouldn't be dependent on specific file formats). In the future the img
+//will be a fully universal format, so that will be fine! But for now, we do this.
+const nifti1 = @import("nifti1.zig");
+const Img = nifti1.Image;
+
+// Builds a static VDB frame
+pub fn buildFrame(
+    arena_alloc: std.mem.Allocator,
+    img_deprecated: Img,
+    minmax_deprecated: [2]f32, //DEPRECATED: will eventually live in img
+    normalize: bool,
+    frame: usize,
+) !VDB {
+    const dim = img_deprecated.header.dim;
+    var vdb = try VDB.build(arena_alloc);
+
+    print("iterating nifti file\n", .{});
+    for (0..@as(usize, @intCast(dim[3]))) |z| {
+        for (0..@as(usize, @intCast(dim[2]))) |x| {
+            for (0..@as(usize, @intCast(dim[1]))) |y| {
+                const val = try img_deprecated.getAt4D(
+                    x,
+                    y,
+                    z,
+                    frame,
+                    normalize,
+                    minmax_deprecated,
+                );
+                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), arena_alloc);
+            }
+        }
+    }
+    return vdb;
+}
+
+// Writes a static VDB frame to disk
+pub fn writeFrame(
+    buffer: *ArrayList(u8),
+    vdb: *VDB,
+    path_string: []const u8,
+    arena_alloc: std.mem.Allocator,
+) !ArrayList(u8) {
+    try writeVDB(buffer, vdb, id_4x4);
+    const vdb_filepath = try zools.save.version(
+        path_string,
+        buffer.*, //EXORCISE: This pointer pattern seems cursed
+        arena_alloc,
+    );
+    return vdb_filepath;
+}
 
 //SECTION: Tests:
 //SUBMODULE: as the UUID above, this has lots of zools. However, these are just for testing,
@@ -395,7 +448,6 @@ const id_4x4 = zools.matrix.IdentityMatrix4x4;
 const test_utils = @import("test_utils.zig");
 //Use "tmp" to use the tmp folder in zig cache
 pub fn sphereTest(comptime save_dir: []const u8) !void {
-    print("⚪️ Sphere Test Pattern\n", .{});
     //NICE: I think this is a good convention for allocators and arena allocators
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
@@ -439,7 +491,7 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
         &buffer,
     );
 }
-pub fn onePixelTest(comptime save_dir: []const u8) !void {
+pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -473,6 +525,8 @@ pub fn onePixelTest(comptime save_dir: []const u8) !void {
 }
 
 test "test patterns" {
+    print("☁️ ⚪️ Sphere Test Pattern\n", .{});
     try sphereTest("tmp");
-    try onePixelTest("tmp");
+    print("☁️ ▫️ One Voxel Test Pattern\n", .{});
+    try oneVoxelTest("tmp");
 }
