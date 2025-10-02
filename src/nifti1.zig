@@ -255,7 +255,7 @@ test "open and normalize nifti file" {
     const timer_start = t.Click();
     defer t.Stop(timer_start);
     defer print("\n⏰ open and normalize nifti file timer:\n", .{});
-    const static = config.test_files.nifti1_t1;
+    const static = config.testing.files.nifti1_t1;
     var img = try Image.init(static);
     defer img.deinit();
     (&img).printHeader();

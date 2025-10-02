@@ -1,9 +1,16 @@
+//INSTRUCTIONS:
+// replace the paths with the corresponding paths on your machine
+
+//TODO: Eventually lots of these will be generated
 .{
-    .test_files = .{
-        //SOURCE:: https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz
-        .nifti1_t1 = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii",
+    .testing = .{
+        .files = .{
+            //SOURCE:: https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz
+            .nifti1_t1 = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii",
+        },
+        .dirs = .{ .output = "/Users/joachimpfefferkorn/repos/neurovolume/output" },
     },
+
     //TODO:
-    // Persistent folder for test files
     // VDB output
 }

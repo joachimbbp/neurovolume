@@ -72,12 +72,13 @@ fn writeVDBFrame(
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]const u8, normalize: bool, out_buf: [*]u8, out_cap: usize) usize {
     //TODO: loud vs quiet debug, certainly some kind of loadng feature
+    //
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator(); //TODO: standardize these
+    const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-    const allocator = arena.allocator(); //CURSED: terrible naming convetion mismatch here
+    const arena_alloc = arena.allocator();
 
     const nifti_filepath = std.mem.span(c_nifti_filepath);
     const output_dir = std.mem.span(c_output_dir);
@@ -107,11 +108,11 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         };
 
         defer gpa_alloc.free(base_seq_folder);
-        const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, allocator) catch { //EXORCISE: allocator naming convention
+        const vdb_seq_folder = zools.save.versionFolder(base_seq_folder, arena_alloc) catch { //EXORCISE: allocator naming convention
             return 0;
         };
         //CLEAN: This feels really hacky and verbose
-        var buf = ArrayList(u8).init(allocator);
+        var buf = ArrayList(u8).init(arena_alloc);
         defer buf.deinit();
         for (vdb_seq_folder.items) |c| {
             buf.append(c) catch {
@@ -129,14 +130,14 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
         const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
         for (0..frames) |frame| {
             //TODO: un-hard code leading zeros (and extension?)
-            const frame_path = zools.sequence.elementName(vdb_seq_folder_slice, basename, ".vdb", frame, leading_zeros, allocator) catch {
+            const frame_path = zools.sequence.elementName(vdb_seq_folder_slice, basename, ".vdb", frame, leading_zeros, arena_alloc) catch {
                 print("Error on sequence element name\n", .{});
                 return 0;
             };
 
-            defer allocator.free(frame_path);
+            defer arena_alloc.free(frame_path);
             //new_frame will include any versioning (which is -honestly- a little messy)
-            const new_frame = writeVDBFrame(allocator, vdb_seq_folder_slice, img_deprecated, normalize, id_4x4, frame) catch {
+            const new_frame = writeVDBFrame(arena_alloc, vdb_seq_folder_slice, img_deprecated, normalize, id_4x4, frame) catch {
                 print("Error on writeVDBFrame", .{});
                 return 0;
             };
@@ -148,7 +149,7 @@ pub export fn nifti1ToVDB(c_nifti_filepath: [*:0]const u8, c_output_dir: [*:0]co
     if (static) {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
-        vdb_path = writeVDBFrame(allocator, output_dir, img_deprecated, normalize, id_4x4, 0) catch {
+        vdb_path = writeVDBFrame(arena_alloc, output_dir, img_deprecated, normalize, id_4x4, 0) catch {
             return 0;
         };
     }
@@ -252,7 +253,7 @@ pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void {
     var buffer = ArrayList(u8).init(arena_alloc);
     defer buffer.deinit();
 
-    const path = config.test_files.nifti1_t1;
+    const path = config.testing.files.nifti1_t1;
     //TODO: Move this test file path to
     const img = try nifti1.Image.init(path);
     defer img.deinit();

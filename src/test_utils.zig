@@ -6,7 +6,7 @@ const vdb543 = @import("vdb543.zig");
 const VDB = vdb543.VDB;
 
 pub const TestPatternError = error{
-    PersistentSaveNotImplementedYet,
+    NotYetImplemented,
     FileError,
 };
 
@@ -33,6 +33,6 @@ pub fn saveTestPattern(
     } else {
         //TODO: Implement!
         print("Error: custom save directory not implemented yet. 'tmp' is not given string:\n{s}", .{save_dir});
-        return TestPatternError.PersistentSaveNotImplementedYet;
+        return TestPatternError.NotYetImplemented;
     }
 }
