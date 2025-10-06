@@ -110,12 +110,10 @@ pub fn nifti1ToVDB(
             normalize,
             0,
         );
-        //
         // CREATE THE DIRECTORY FIRST! //ROBOT: Claude sonet 4.5 suggested this:
         if (std.fs.path.dirname(base_seq_folder)) |dir_path| {
             try std.fs.cwd().makePath(dir_path);
         }
-        //        try std.fs.cwd().makePath(base_seq_folder);
 
         const frame_path = try std.fmt.allocPrint(
             arena_alloc,
@@ -172,7 +170,10 @@ test "static nifti to vdb" {
         true,
         arena_alloc,
     );
-    _ = output;
-    //    defer arena_alloc.free(output);
+    //defer arena_alloc.free(output);
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
+    print("📜 Output header CSV:\n{s}\n🗃️ Output filepath: {s}\n", .{
+        output.header_csv,
+        output.filepath,
+    });
 }
