@@ -4,8 +4,8 @@
     .version = "0.0.0",
     .dependencies = .{
         .zools = .{
-            .url = "git+https://github.com/joachimbbp/zools#7e59cb1708dfe7d1761ad4f7b07170748263815e",
-            .hash = "zools-0.0.0-VPOS2o5TAACyba5nvFy6eTOXmC65if9olEOdOYpGxe5u",
+            .url = "git+https://github.com/joachimbbp/zools#96ad3c927e7f2d7ceed2a1563e1002e15d3861c7",
+            .hash = "zools-0.0.0-VPOS2qNbAABME-9gXe_5ni1J5AAMEHLukoFP61ybhgE7",
         },
     },
 

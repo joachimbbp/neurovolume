@@ -26,15 +26,9 @@ pub fn nifti1ToVDB(
     nifti_filepath: []const u8,
     output_dir: []const u8,
     normalize: bool,
+    arena_alloc: std.mem.Allocator,
 ) !Output {
     //TODO: loud vs quiet debug, certainly some kind of loadng feature
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
-
     const img_deprecated = try nifti1.Image.init(nifti_filepath);
     defer img_deprecated.deinit();
 
@@ -42,7 +36,6 @@ pub fn nifti1ToVDB(
     if (img_deprecated.header.dim[0] == 4) {
         static = false;
     } //TODO: coverage for any weird dim numbers
-    var vdb_path: ArrayList(u8) = undefined;
     const minmax = try nifti1.MinMax3D(img_deprecated); //DEPRECATED: will live in new img
 
     //output folder / new filename / framename_0
@@ -51,12 +44,11 @@ pub fn nifti1ToVDB(
     const ext = name_split.first();
     _ = ext;
     const basename = name_split.rest();
-    const base_seq_folder = try std.fmt.allocPrint(gpa_alloc, "{s}/{s}", .{ output_dir, basename });
+    const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
 
-        defer gpa_alloc.free(base_seq_folder);
         const vdb_seq_folder = try zools.save.versionFolder(base_seq_folder, arena_alloc); //CLEAN: This feels really hacky and verbose
         var buf = ArrayList(u8).init(arena_alloc);
         defer buf.deinit();
@@ -79,7 +71,6 @@ pub fn nifti1ToVDB(
                 leading_zeros,
                 arena_alloc,
             );
-            defer arena_alloc.free(frame_path);
 
             var buffer = ArrayList(u8).init(arena_alloc);
             defer buffer.deinit();
@@ -100,9 +91,13 @@ pub fn nifti1ToVDB(
 
             print("new frame: {s}\n", .{versioned_vdb_filepath.items});
         }
-        vdb_path = vdb_seq_folder;
-    }
-    if (static) {
+
+        const header_csv = try zools.csv.fromSimpleStruct(arena_alloc, img_deprecated.header.*);
+        return Output{
+            .filepath = vdb_seq_folder.items,
+            .header_csv = header_csv,
+        };
+    } else {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
         var buffer = ArrayList(u8).init(arena_alloc);
@@ -115,6 +110,12 @@ pub fn nifti1ToVDB(
             normalize,
             0,
         );
+        //
+        // CREATE THE DIRECTORY FIRST! //ROBOT: Claude sonet 4.5 suggested this:
+        if (std.fs.path.dirname(base_seq_folder)) |dir_path| {
+            try std.fs.cwd().makePath(dir_path);
+        }
+        //        try std.fs.cwd().makePath(base_seq_folder);
 
         const frame_path = try std.fmt.allocPrint(
             arena_alloc,
@@ -128,19 +129,12 @@ pub fn nifti1ToVDB(
             arena_alloc,
         );
         print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
+        const header_csv = try zools.csv.fromSimpleStruct(arena_alloc, img_deprecated.header.*);
+        return Output{
+            .filepath = versioned_vdb_filepath.items,
+            .header_csv = header_csv,
+        };
     }
-
-    var header_csv: ArrayList(u8) = undefined;
-    //WIP: The idea here is that you will iterate through the header and add to this
-    //CSV. This might actually be a bit of a higher level abstraction that should
-    //live in zools?
-
-    //     return Output{
-    // .filepath = versioned_vdb_filepath.items,
-    // //        .header = img_deprecated.header
-    //     };
-    //
-
 }
 
 //_: Root Tests:
@@ -160,60 +154,25 @@ test "imports" {
     }
 }
 
-pub fn staticTestNifti1ToVDB(comptime save_dir: []const u8) !void { //Probably DEPRECATED:
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    var arena_alloc = arena.allocator();
-
-    var buffer = ArrayList(u8).init(arena_alloc);
-    defer buffer.deinit();
-
-    const path = config.testing.files.nifti1_t1;
-    //TODO: Move this test file path to
-    const img = try nifti1.Image.init(path); // nifti1.Image is DEPRECATED:
-    defer img.deinit();
-    (&img).printHeader();
-    const dims = img.header.dim;
-    //check to make sure it's a static 3D image:
-    if (dims[0] != 3) {
-        print(
-            "Warning! Not a static 3D file. Has {any} dimensions\nPlease check test file source",
-            .{dims[0]},
-        );
-        return test_utils.TestPatternError.FileError;
-    }
-    const minmax = try nifti1.MinMax3D(img);
-
-    var vdb = try vdb543.buildFrame(
-        arena_alloc,
-        img,
-        minmax,
-        true,
-        0,
-    );
-
-    //WIP: build and write VDB functions moving about
-    try vdb543.writeVDB(&buffer, &vdb, id_4x4);
-    try test_utils.saveTestPattern(
-        save_dir,
-        "static_nifti1_test_file",
-        &arena_alloc,
-        &buffer,
-    );
-}
-
 test "static nifti to vdb" {
     //    try staticTestNifti1ToVDB("tmp");
     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
     //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
     //either that or the default persistent location in the real nifti1ToVDB function!
-    try nifti1ToVDB(
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
+
+    const output = try nifti1ToVDB(
         config.testing.files.nifti1_t1,
         config.testing.dirs.output,
         true,
+        arena_alloc,
     );
+    _ = output;
+    //    defer arena_alloc.free(output);
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
 }
