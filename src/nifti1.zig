@@ -1,105 +1,15 @@
 const std = @import("std");
 const print = std.debug.print;
 const AccessError = error{NotSupportedYet};
-//WIP: packed header (commented out for now)
-// pub const PackedHeader = packed struct {
-//     //SOURCE: https://brainder.org/2012/09/23/the-nifti-file-format/
-//     sizeof_hdr: enum(i32) {
-//         default = 348,
-//     } = .default,
-//     //The following are unused. they are there for compatability with the ANALYZE datatype.
-//     _1: [10]u8, //data_type
-//     _2: [18]u8, //db_name
-//     _3: [14]u8, //extents
-//     _4: [2]u8, //session_error
-//     _5: [1]u8, //regular
-//     dim_info: enum(u8) { //Encoding directions: (phase, frequency, slice) //TODO: probably more info needed here
-//         one = 1,
-//         two = 2,
-//         three = 3,
-//     },
-//     dim: packed struct { // TODO: add std.Io.Limit
-//         number_of_dimensions: i16,
-//         x: i16,
-//         y: i16,
-//         z: i16,
-//         t: i16,
-//         optional_dim_1: i16,
-//         optional_dim_2: i16,
-//         optional_dim_3: i16,
-//     },
-//     intent: packed struct {
-//         //NOTE: Might be a way to have a union here to use
-//         //different structs based on the intent code?
-//         p1: f32,
-//         p2: f32,
-//         p3: f32,
-//         code: enum(i16) { //LLM: chatgpt completed this enum
-//             // Statistical distributions and tests
-//             none = 0,
-//             correlation = 2,
-//             t_test = 3,
-//             f_test = 4,
-//             z_score = 5,
-//             chi_squared_statistic = 6,
-//             beta_distribution = 7,
-//             binomial_distribution = 8,
-//             gamma_distribution = 9,
-//             poisson_distribution = 10,
-//             normal_distribution = 11,
-//             noncentral_f_statistic = 12,
-//             noncentral_chi_squared_statistic = 13,
-//             logistic_distribution = 14,
-//             laplace_distribution = 15,
-//             uniform_distribution = 16,
-//             noncentral_t_statistic = 17,
-//             weibull_distribution = 18,
-//             chi_distribution = 19, // df parameter; p1=1 half-normal, p1=2 Rayleigh, p1=3 Maxwell-Boltzmann
-//             inverse_gaussian_distribution = 20,
-//             extreme_value_type_I_distribution = 21,
-//             p_value = 22,
-//             neg_log_p_value = 23,
-//             neg_log10_p_value = 24,
-//
-//             // Labels, estimates, and matrices
-//             estimate = 1001,
-//             label = 1002,
-//             neuro_name = 1003,
-//             generic_matrix = 1004,
-//             symmetric_matrix = 1005,
-//             displacement_vector = 1006,
-//             vector = 1007,
-//             point_set = 1008,
-//             triangle = 1009,
-//             quaternion = 1010,
-//             dimless = 1011,
-//
-//             // Timeseries and spatial data
-//             time_series = 2001,
-//             node_index = 2002,
-//             rgb_vector = 2003,
-//             rgba_vector = 2004,
-//             shape = 2005,
-//         },
-//     },
-//     datatype: i16,
-//     bitpix: i16,
-//     slice_start: i16,
-//     pixdim:
-//
-// };
-//
-// const Intent = union { //WARN: Maybe this is a better way to do it?
-//     none: [3]f32,
-// }; //all params + actual intent code
-//
+
 pub const Header = extern struct {
+    //_ signifies unused, just for ANALYZE formatting
     sizeofHdr: i32, //Must be 348
-    dataType: [10]u8,
-    dbName: [18]u8,
-    extents: i32,
-    sessionError: i16,
-    regular: u8,
+    _dataType: [10]u8,
+    _dbName: [18]u8,
+    _extents: i32,
+    _sessionError: i16,
+    _regular: u8,
     dimInfo: u8, //key for MRI slice ordering
 
     dim: [8]i16,
@@ -169,6 +79,44 @@ pub const DataType = enum(i16) {
         return @tagName(field);
     }
 };
+
+//HACK: There might be a more idiomatic way to do this with packed structs. However, writing it all out is very labor intensive so I am going with this for now. https://github.com/joachimbbp/neurovolume/blob/zig/src/nifti1.zighas the latest WIP on the packed struct front
+//Produces a human-readable header format
+pub fn jsonFromHeader(hdr: Header, alloc: std.mem.Allocator) !std.array_list.Managed(u8) {
+    //TODO: human readable stuff: ascii instead of codes, etc!
+    var out = std.io.Writer.Allocating.init(alloc);
+    defer out.deinit();
+    var stringifier = std.json.Stringify{
+        .writer = &out.writer,
+        .options = .{
+            .whitespace = .minified,
+            .emit_strings_as_arrays = false, // This keeps strings as strings, not arrays
+            .escape_unicode = true,
+            .emit_nonportable_numbers_as_strings = true,
+        },
+    };
+
+    try stringifier.write(hdr);
+    const json_string = out.writer.buffered();
+    std.debug.print("JSON string:\n{s}\n", .{json_string});
+    //ROBOT: Claude wrote this to clean up the JSON
+    var clean_json = std.array_list.Managed(u8).init(alloc);
+    defer clean_json.deinit();
+
+    var i: usize = 0;
+    while (i < json_string.len) {
+        if (i + 5 < json_string.len and
+            std.mem.eql(u8, json_string[i .. i + 6], "\\u0000"))
+        {
+            i += 6; // Skip the \u0000
+        } else {
+            try clean_json.append(json_string[i]);
+            i += 1;
+        }
+    }
+    std.debug.print("cleaned JSON string:\n{s}\n", .{clean_json.items});
+    return clean_json;
+}
 
 //DEPRECATED: Image should be universal to all input formats, not just nifti 1
 pub const Image = struct {
