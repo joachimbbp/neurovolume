@@ -6,8 +6,8 @@ const print = std.debug.print;
 const zools = @import("zools");
 const debug = @import("debug.zig");
 const nifti1 = @import("nifti1.zig");
-const ArrayList = std.array_list.Managed;
 const vdb543 = @import("vdb543.zig");
+const volume = @import("volume.zig");
 
 //_: CONSTS:
 const id_4x4 = zools.matrix.IdentityMatrix4x4;
@@ -15,7 +15,7 @@ const config = @import("config.zig.zon");
 
 pub const Output = struct {
     filepath: []const u8,
-    header_csv: []const u8,
+    header_json: []u8,
     //TODO: Eventually we'll add an image with the normalization etc information!
 };
 
@@ -50,7 +50,7 @@ pub fn nifti1ToVDB(
         static = false;
 
         const vdb_seq_folder = try zools.save.versionFolder(base_seq_folder, arena_alloc); //CLEAN: This feels really hacky and verbose
-        var buf = ArrayList(u8).init(arena_alloc);
+        var buf = std.array_list.Managed(u8).init(arena_alloc);
         defer buf.deinit();
         for (vdb_seq_folder.items) |c| {
             try buf.append(c);
@@ -72,7 +72,7 @@ pub fn nifti1ToVDB(
                 arena_alloc,
             );
 
-            var buffer = ArrayList(u8).init(arena_alloc);
+            var buffer = std.array_list.Managed(u8).init(arena_alloc);
             defer buffer.deinit();
 
             var vdb = try vdb543.buildFrame(
@@ -92,15 +92,15 @@ pub fn nifti1ToVDB(
             print("new frame: {s}\n", .{versioned_vdb_filepath.items});
         }
 
-        const header_csv = try zools.csv.fromSimpleStruct(arena_alloc, img_deprecated.header.*);
+        //TODO: You could probably DRY this!
         return Output{
             .filepath = vdb_seq_folder.items,
-            .header_csv = header_csv,
+            .header_json = header_json_string,
         };
     } else {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
-        var buffer = ArrayList(u8).init(arena_alloc);
+        var buffer = std.array_list.Managed(u8).init(arena_alloc);
         defer buffer.deinit();
 
         var vdb = try vdb543.buildFrame(
@@ -127,10 +127,10 @@ pub fn nifti1ToVDB(
             arena_alloc,
         );
         print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
-        const header_csv = try zools.csv.fromSimpleStruct(arena_alloc, img_deprecated.header.*);
+
         return Output{
             .filepath = versioned_vdb_filepath.items,
-            .header_csv = header_csv,
+            .header_json = header_json_string,
         };
     }
 }
@@ -172,8 +172,8 @@ test "static nifti to vdb" {
     );
     //defer arena_alloc.free(output);
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-    print("📜 Output header CSV:\n{s}\n🗃️ Output filepath: {s}\n", .{
-        output.header_csv,
+    print("📜 Output header JSON:\n{s}\n🗃️ Output filepath: {s}\n", .{
+        output.header_json,
         output.filepath,
     });
 }

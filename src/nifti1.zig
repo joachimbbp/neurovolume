@@ -1,7 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
 const AccessError = error{NotSupportedYet};
-
 //WIP: packed header (commented out for now)
 // pub const PackedHeader = packed struct {
 //     //SOURCE: https://brainder.org/2012/09/23/the-nifti-file-format/
@@ -285,8 +284,6 @@ pub fn MinMax3D(img: Image) ![2]f32 {
 }
 
 //SECTION: Tests:
-const zools = @import("zools");
-const t = zools.timer;
 const config = @import("config.zig.zon");
 test "echo module" {
     print("🧠 nifti1.zig module echo\n", .{});
@@ -294,9 +291,6 @@ test "echo module" {
 
 test "open and normalize nifti file" {
     print("🧠 Opening and normalizing nifti1 file\n", .{});
-    const timer_start = t.Click();
-    defer t.Stop(timer_start);
-    defer print("\n⏰ open and normalize nifti file timer:\n", .{});
     const static = config.testing.files.nifti1_t1;
     var img = try Image.init(static);
     defer img.deinit();
