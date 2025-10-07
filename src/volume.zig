@@ -4,7 +4,7 @@ const config = @import("config.zig.zon");
 
 //This is a WIP, universal replacement for Nifti1/Image
 name: []const u8,
-//header: []const u8,
+//json_hdr: []const u8,
 resolution: [3]u64, //Should be more than enough for most scientific data
 //frames
 //FPS
@@ -21,13 +21,49 @@ pub fn init(
     alloc: std.mem.Allocator,
 ) !@This() {
     //WARN: This might be specific to Nifti, so don't be afraid to move this logic into the switch!
-    const file = try std.fs.cwd().openFile(filepath, .{});
-    const reader = std.fs.File.deprecatedReader(file); //DEPRECATED:
-    const hdr_ptr = try alloc.create(Header);
-    //BUG: memory is leaked here. Claude thinks we should
-    //store this but I'm not sure that's the best idea
-    hdr_ptr.* = try reader.readStruct(Header);
 
+    //SOURCE: Thank's Robbie!
+
+    const file = try std.fs.cwd().openFile(filepath, .{});
+    var buf: [4096]u8 = undefined;
+    var file_reader = file.reader(&buf);
+    const reader = &file_reader.interface;
+    const hdr_ptr = try reader.takeStructPointer(Header);
+    //
+    //_:JSON
+    var out = std.io.Writer.Allocating.init(alloc);
+    defer out.deinit();
+    var stringifier = std.json.Stringify{
+        .writer = &out.writer,
+        .options = .{
+            .whitespace = .minified,
+            .emit_strings_as_arrays = false, // This keeps strings as strings, not arrays
+            .escape_unicode = true,
+            .emit_nonportable_numbers_as_strings = true,
+        },
+    };
+
+    try stringifier.write(hdr_ptr.*);
+    const json_string = out.writer.buffered();
+    std.debug.print("JSON string:\n{s}\n", .{json_string});
+    //ROBOT: Claude wrote this to clean up the JSON
+    var clean_json = std.array_list.Managed(u8).init(alloc);
+    defer clean_json.deinit();
+
+    var i: usize = 0;
+    while (i < json_string.len) {
+        if (i + 5 < json_string.len and
+            std.mem.eql(u8, json_string[i .. i + 6], "\\u0000"))
+        {
+            i += 6; // Skip the \u0000
+        } else {
+            try clean_json.append(json_string[i]);
+            i += 1;
+        }
+    }
+    //END LLM:
+    std.debug.print("cleaned JSON string:\n{s}\n", .{clean_json.items});
+    //_:JSON end
     const name = try nameFromPath(filepath, alloc);
     switch (format) {
         Format.NIfTI_1 => {
