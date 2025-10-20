@@ -14,7 +14,6 @@
 // This is an external UUID writing dependency (written by me, Joachim)
 // If you don't want to deal with imports feel free to hard code a
 // UUID down under the comment "write UUID"
-// Note it is a git submodule!
 const zools = @import("zools");
 
 //DEPRECATED: remove this abstraction eventually
@@ -422,6 +421,8 @@ pub fn buildFrame(
             }
         }
     }
+    print("🐛 DEBUG PRINTY: frame {d} build\n", .{frame});
+
     return vdb;
 }
 
@@ -433,11 +434,14 @@ pub fn writeFrame(
     arena_alloc: std.mem.Allocator,
 ) !ArrayList(u8) {
     try writeVDB(buffer, vdb, id_4x4);
+    print("🐛 DEBUG PRINTY: path_string in writeFrame: {s}\n", .{path_string});
+
     const vdb_filepath = try zools.save.version(
         path_string,
         buffer.*, //EXORCISE: This pointer pattern seems cursed
         arena_alloc,
     );
+    print("🐛 DEBUG PRINTY:\nvdb_filepath: {s}\n", .{vdb_filepath.items});
     return vdb_filepath;
 }
 

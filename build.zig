@@ -17,12 +17,17 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
+    nvol_mod.addImport("zools", zools);
+
     const libneurovolume = b.addLibrary(.{
         .name = "neurovolume",
         .linkage = .dynamic,
         .root_module = nvol_mod,
     });
+
     libneurovolume.root_module.addImport("zools", zools);
+
     //NOTE: This doesn't really do much at the moment
     const exe = b.addExecutable(.{
         .name = "demo",

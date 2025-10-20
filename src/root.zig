@@ -4,7 +4,6 @@
 const std = @import("std");
 const print = std.debug.print;
 const zools = @import("zools");
-const debug = @import("debug.zig");
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
 const volume = @import("volume.zig");
@@ -15,8 +14,8 @@ const config = @import("config.zig.zon");
 
 pub const Output = struct {
     filepath: []const u8,
-    header_json: []u8,
-    //TODO: Eventually we'll add an image with the normalization etc information!
+    header_csv: []const u8,
+    metadata: []const u8, //TODO: probably will be datatype specific
 };
 
 //_: Actual functions:
@@ -45,6 +44,7 @@ pub fn nifti1ToVDB(
     _ = ext;
     const basename = name_split.rest();
     const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
+    var filepath: []const u8 = undefined;
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
@@ -92,11 +92,7 @@ pub fn nifti1ToVDB(
             print("new frame: {s}\n", .{versioned_vdb_filepath.items});
         }
 
-        //TODO: You could probably DRY this!
-        return Output{
-            .filepath = vdb_seq_folder.items,
-            .header_json = header_json_string,
-        };
+        filepath = vdb_seq_folder.items;
     } else {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
@@ -118,8 +114,10 @@ pub fn nifti1ToVDB(
         const frame_path = try std.fmt.allocPrint(
             arena_alloc,
             "{[dir]s}/{[bn]s}.vdb",
-            .{ .dir = base_seq_folder, .bn = basename },
+            .{ .dir = output_dir, .bn = basename },
         );
+        print("🐛 DEBUG PRINTY: frame_path: {s} \n", .{frame_path});
+
         const versioned_vdb_filepath = try vdb543.writeFrame(
             &buffer,
             &vdb,
@@ -127,12 +125,14 @@ pub fn nifti1ToVDB(
             arena_alloc,
         );
         print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
-
-        return Output{
-            .filepath = versioned_vdb_filepath.items,
-            .header_json = header_json_string,
-        };
     }
+
+    const header_csv = try zools.csv.fromSimpleStruct(arena_alloc, img_deprecated.header.*);
+    return Output{
+        .filepath = filepath,
+        .header_csv = header_csv,
+        .metadata = "not implemented yet",
+    };
 }
 
 //_: Root Tests:
@@ -170,10 +170,10 @@ test "static nifti to vdb" {
         true,
         arena_alloc,
     );
-    //defer arena_alloc.free(output);
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-    print("📜 Output header JSON:\n{s}\n🗃️ Output filepath: {s}\n", .{
-        output.header_json,
+    print("📜 Output header JSON:\n{s}\n🗃️ Output filepath: {s}\n📊 Output Metadata: {s}\n", .{
+        output.header_csv,
         output.filepath,
+        output.metadata,
     });
 }
