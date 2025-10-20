@@ -171,7 +171,7 @@ test "static nifti to vdb" {
         arena_alloc,
     );
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-    print("📜 Output header JSON:\n{s}\n🗃️ Output filepath: {s}\n📊 Output Metadata: {s}\n", .{
+    print("📜 Output header CSV:\n{s}\n🗃️ Output filepath: {s}\n📊 Output Metadata: {s}\n", .{
         output.header_csv,
         output.filepath,
         output.metadata,
