@@ -19,11 +19,11 @@ def b(string):
 
 def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
     BUF_SIZE = 256  # somewhat arbitrary, should be big enough for file name
-    nvol.nifti1ToVDB.argtypes = [c.c_char_p,
-                                 c.c_char_p,
-                                 c.c_bool,
-                                 c.POINTER(c.c_char),
-                                 c.c_size_t]
+    nvol.nifti1ToVDB_c.argtypes = [c.c_char_p,
+                                   c.c_char_p,
+                                   c.c_bool,
+                                   c.POINTER(c.c_char),
+                                   c.c_size_t]
     nvol.nifti1ToVDB.restype = c.c_size_t
     save_location = c.create_string_buffer(BUF_SIZE)
     nvol.nifti1ToVDB(b(filepath), b(output_dir), True, save_location, BUF_SIZE)

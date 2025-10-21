@@ -128,6 +128,7 @@ pub fn nifti1ToVDB(
 //_: C library:
 pub export fn nifti1ToVDB_c(
     c_nifti1_fpath_ptr: [*:0]const u8,
+    output_dir: [*:0]const u8,
     normalize: bool,
     fpath_buff: [*]u8,
     fpath_cap: usize,
@@ -140,9 +141,10 @@ pub export fn nifti1ToVDB_c(
     const arena_alloc = arena.allocator();
 
     const fpath_slice: []const u8 = std.mem.span(c_nifti1_fpath_ptr); //LLM: suggested line
+    const output_dir_slice: []const u8 = std.mem.span(output_dir);
     const filepath = nifti1ToVDB(
         fpath_slice,
-        config.paths.vdb_output_dir,
+        output_dir_slice,
         normalize,
         arena_alloc,
     ) catch {
@@ -170,6 +172,7 @@ test "static nifti to vdb - c level" {
 
     const fpath_len = nifti1ToVDB_c(
         config.testing.files.nifti1_t1,
+        config.paths.vdb_output_dir,
         true,
         &fpath_buff,
         fpath_buff.len,
