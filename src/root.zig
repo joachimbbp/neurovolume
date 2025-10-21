@@ -9,14 +9,8 @@ const vdb543 = @import("vdb543.zig");
 const volume = @import("volume.zig");
 
 //_: CONSTS:
-const id_4x4 = zools.matrix.IdentityMatrix4x4;
+const id_4x4 = zools.matrix.IdentityMatrix4x4; //DEPRECATED: transform should derrive from the actual nifti file
 const config = @import("config.zig.zon");
-
-pub const Output = struct {
-    filepath: []const u8,
-    header_csv: []const u8,
-    metadata: []const u8, //TODO: probably will be datatype specific
-};
 
 //_: Actual functions:
 
@@ -26,7 +20,7 @@ pub fn nifti1ToVDB(
     output_dir: []const u8,
     normalize: bool,
     arena_alloc: std.mem.Allocator,
-) !Output {
+) ![]const u8 {
     //TODO: loud vs quiet debug, certainly some kind of loadng feature
     const img_deprecated = try nifti1.Image.init(nifti_filepath);
     defer img_deprecated.deinit();
@@ -127,12 +121,7 @@ pub fn nifti1ToVDB(
         print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
     }
 
-    const header_csv = try zools.csv.fromSimpleStruct(arena_alloc, img_deprecated.header.*);
-    return Output{
-        .filepath = filepath,
-        .header_csv = header_csv,
-        .metadata = "not implemented yet",
-    };
+    return filepath;
 }
 
 //_: Root Tests:
@@ -150,30 +139,4 @@ test "imports" {
     for (0..5) |_| {
         print("random uuid: {s}\n", .{zools.uuid.v4()});
     }
-}
-
-test "static nifti to vdb" {
-    //    try staticTestNifti1ToVDB("tmp");
-    //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
-    //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
-    //either that or the default persistent location in the real nifti1ToVDB function!
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
-
-    const output = try nifti1ToVDB(
-        config.testing.files.nifti1_t1,
-        config.testing.dirs.output,
-        true,
-        arena_alloc,
-    );
-    print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-    print("📜 Output header CSV:\n{s}\n🗃️ Output filepath: {s}\n📊 Output Metadata: {s}\n", .{
-        output.header_csv,
-        output.filepath,
-        output.metadata,
-    });
 }

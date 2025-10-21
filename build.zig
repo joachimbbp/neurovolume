@@ -1,9 +1,8 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    //TODO: reintroduce testing options here,
-    //possibly package that in the demo?
-
+    //TODO:
+    // - [ ] test the c_root level
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -26,7 +25,7 @@ pub fn build(b: *std.Build) void {
         .root_module = nvol_mod,
     });
 
-    libneurovolume.root_module.addImport("zools", zools);
+    //libneurovolume.root_module.addImport("zools", zools);
 
     //NOTE: This doesn't really do much at the moment
     const exe = b.addExecutable(.{
