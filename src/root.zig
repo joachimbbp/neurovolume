@@ -12,7 +12,7 @@ const volume = @import("volume.zig");
 const id_4x4 = zools.matrix.IdentityMatrix4x4; //DEPRECATED: transform should derrive from the actual nifti file
 const config = @import("config.zig.zon");
 
-//_: Actual functions:
+//_: Zig Library:
 
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub fn nifti1ToVDB(
@@ -100,7 +100,7 @@ pub fn nifti1ToVDB(
             normalize,
             0,
         );
-        // CREATE THE DIRECTORY FIRST! //ROBOT: Claude sonet 4.5 suggested this:
+        //ROBOT: Claude sonet 4.5 suggested this:
         if (std.fs.path.dirname(base_seq_folder)) |dir_path| {
             try std.fs.cwd().makePath(dir_path);
         }
@@ -119,24 +119,61 @@ pub fn nifti1ToVDB(
             arena_alloc,
         );
         print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
+        filepath = versioned_vdb_filepath.items;
     }
 
     return filepath;
 }
 
-//_: Root Tests:
-// Each module has it's own test suite. The root module contains tests that must
-// incorportate multiple modules (such as nifti->vdb), as well as general import
-// tests for zools ("imports");
+//_: C library:
+pub export fn nifti1ToVDB_c(
+    c_nifti1_fpath_ptr: [*:0]const u8,
+    normalize: bool,
+    fpath_buff: [*]u8,
+    fpath_cap: usize,
+) usize {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
 
-const t = zools.timer;
-const test_utils = @import("test_utils.zig");
-test "imports" {
-    const timer_start = t.Click();
-    defer t.Stop(timer_start);
-    defer print("\nUUID Timer test:\n", .{});
-    zools.debug.helloZools();
-    for (0..5) |_| {
-        print("random uuid: {s}\n", .{zools.uuid.v4()});
-    }
+    const fpath_slice: []const u8 = std.mem.span(c_nifti1_fpath_ptr); //LLM: suggested line
+    const filepath = nifti1ToVDB(
+        fpath_slice,
+        config.paths.vdb_output_dir,
+        normalize,
+        arena_alloc,
+    ) catch {
+        return 0;
+    };
+    defer arena_alloc.free(filepath);
+    const n = if (filepath.len + 1 <= fpath_cap) filepath.len else fpath_cap - 1;
+    @memcpy(fpath_buff[0..n], filepath[0..n]);
+    return n;
+}
+
+//TODO:
+//let's have other functions (probably in root)
+//that grab the header csv etc from the file
+
+test "static nifti to vdb - c level" {
+    //    try staticTestNifti1ToVDB("tmp");
+    //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
+    //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
+    //either that or the default persistent location in the real nifti1ToVDB function!
+    print("🌊 c level nifti to vdb\n", .{});
+
+    var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
+    //TODO: make the lenght a bit more robust. What should it be???
+
+    const fpath_len = nifti1ToVDB_c(
+        config.testing.files.nifti1_t1,
+        true,
+        &fpath_buff,
+        fpath_buff.len,
+    );
+    print("☁️ 🧠 static nifti test saved as VDB\n", .{});
+    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
