@@ -18,26 +18,26 @@ def b(string):
 
 
 def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
-    BUF_SIZE = 256  # somewhat arbitrary, should be big enough for file name
+    BUF_SIZE = 4096  # somewhat arbitrary, should be big enough for file name
+    save_location = c.create_string_buffer(BUF_SIZE)
     nvol.nifti1ToVDB_c.argtypes = [c.c_char_p,
                                    c.c_char_p,
                                    c.c_bool,
                                    c.POINTER(c.c_char),
                                    c.c_size_t]
-    nvol.nifti1ToVDB.restype = c.c_size_t
-    save_location = c.create_string_buffer(BUF_SIZE)
-    nvol.nifti1ToVDB(b(filepath), b(output_dir), True, save_location, BUF_SIZE)
+    nvol.nifti1ToVDB_c.restype = c.c_size_t
+    nvol.nifti1ToVDB_c(b(filepath),
+                       b(output_dir),
+                       normalize,
+                       save_location,
+                       BUF_SIZE)
     return save_location.value.decode()
 
 
 # SECTION: Testing:
 # Static:
-# save_location = nifti1_to_VDB(static_testfile, True)
-# print("VDB saved to: ", save_location, "\n")
-# print("python level num frames: ", nf)
-#
+save_location = nifti1_to_VDB(static_testfile, True)
+print("VDB saved to: ", save_location, "\n")
 # fMRI:
-
-# fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
-# print("VDB fmri saved to: ", fmri_save_location, "\n")
-# print("python level num frames: ", num_frames(fmri_testfile))
+fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+print("VDB fmri saved to: ", fmri_save_location, "\n")
