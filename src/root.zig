@@ -209,5 +209,5 @@ test "header" {
         ftype,
         &hdr_buff,
     );
-    print("🌊🧠 c level nifti header:\n{any}\n", .{hdr_buff[0..hdr_len]});
+    print("🌊🧠 c level nifti header of len {d}:\n{any}\n", .{ hdr_len, hdr_buff[0..hdr_len] });
 }
