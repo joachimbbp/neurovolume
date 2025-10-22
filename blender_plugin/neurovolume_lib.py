@@ -29,37 +29,35 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
                                    c.POINTER(c.c_char),
                                    c.c_size_t]
     nvol.nifti1ToVDB_c.restype = c.c_size_t
-    hdr_size = nvol.nifti1ToVDB_c(b(filepath),
-                                  b(output_dir),
-                                  normalize,
-                                  save_location,
-                                  BUF_SIZE)
+    nvol.nifti1ToVDB_c(b(filepath),
+                       b(output_dir),
+                       normalize,
+                       save_location,
+                       BUF_SIZE)
 
     return save_location.value.decode()
 
-# DEPRECATED: replace with human readable metadata
-# def get_raw_hdr(filepath: str, filetype: str) -> str:
-#     match filetype:  # HACK: this is repeated in root.zig, ugh
-#         case "NIfTI1":
-#             hdr = c.create_string_buffer(348)
-#             nvol.getHdr_c.argtypes = [c.c_char_p,
-#                                       c.c_char_p,
-#                                       c.POINTER(c.c_char)]
-#             nvol.getHdr_c.restype = c.c_size_t
-#             hdr_size = nvol.getHdr_c(b(filepath), b(filetype), hdr)
-#             return hdr.raw[:hdr_size]
-#         case _:
-#             err_msg = f"{filetype} is unsupported"
-#             print(err_msg)
-#             return err_msg
-#
+
+def num_frames(filepath: str, filetype: str) -> int:
+    match filetype:
+        case "NIfTI1":
+            # hdr = c.create_string_buffer(348)
+            nvol.numFrames_c.argtypes = [c.c_char_p, c.c_char_p,]
+            nvol.numFrames_c.restype = c.c_size_t
+            num_frames = nvol.numFrames_c(b(filepath), b(filetype))
+            return num_frames
+        case _:
+            err_msg = f"{filetype} is unsupported for num_frames access"
+            print(err_msg)
+            # TODO: Error handling
 
 # _: Testing:
 
 
 # Static:
-save_location = nifti1_to_VDB(static_testfile, True)
-print("🐍VVVV VB ed to: ", save_location, "\n")
+t1_save_location = nifti1_to_VDB(static_testfile, True)
+
+print("🐍VVVVDB to: ", t1_save_location, "\n
 # fMRI:
-fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+fmri_save_location=nifti1_to_VDB(fmri_testfile, True)
 print("🐍 VDB fmri saved to: ", fmri_save_location, "\n")

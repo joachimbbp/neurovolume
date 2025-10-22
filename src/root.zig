@@ -156,7 +156,7 @@ pub export fn nifti1ToVDB_c(
     return n;
 }
 
-pub export fn getNumFrames_c(
+pub export fn numFrames_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
 ) usize {
@@ -198,13 +198,13 @@ test "static nifti to vdb - c level" {
 
 test "header data extraction to C" {
     const ftype = "NIfTI1";
-    const num_frames_static = getNumFrames_c(
+    const num_frames_static = numFrames_c(
         config.testing.files.nifti1_t1,
         ftype,
     );
     try std.testing.expect(num_frames_static == 1);
     print("🧠📷🌊 c level num frames for static is: {d}\n", .{num_frames_static});
-    const num_frames_bold = getNumFrames_c(
+    const num_frames_bold = numFrames_c(
         config.testing.files.bold,
         ftype,
     );
