@@ -157,23 +157,31 @@ pub export fn nifti1ToVDB_c(
 }
 
 //WIP: *writes* a pointer to a c-allocated spot in memory
-pub export fn nifti1Header_c(
-    c_nifti_fpath_ptr: [*:0]const u8,
+pub export fn getHdr_c(
+    fpath: [*:0]const u8,
+    filetype: [*:0]const u8,
     hdr_buff: [*]u8,
-    hdr_cap: usize,
 ) usize {
-    const fpath_slice: []const u8 = std.mem.span(c_nifti_fpath_ptr);
-    const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+    const fpath_slice: []const u8 = std.mem.span(fpath);
+    if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
+        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+            return 0;
+        };
+        //LLM:
+        const hdr_size = @sizeOf(nifti1.Header); // Should be 348
+        print("🐛debuggy, hdr_size is {d}, expected: {d}\n", .{ hdr_size, 348 }); //HUMAN EDIT:
+        const hdr_bytes = std.mem.asBytes(hdr_ptr);
+        @memcpy(hdr_buff[0..hdr_size], hdr_bytes);
+
+        return hdr_size;
+        //LLMEND:
+    } else {
+        print("⚠️📂 Unsuported header filetype: {s}\n", .{filetype});
         return 0;
-    };
+    }
 }
 
-//TODO:
-//let's have other functions (probably in root)
-//that grab the header csv etc from the file
-
 test "static nifti to vdb - c level" {
-    //    try staticTestNifti1ToVDB("tmp");
     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
     //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
     //either that or the default persistent location in the real nifti1ToVDB function!
@@ -194,6 +202,12 @@ test "static nifti to vdb - c level" {
 }
 
 test "header" {
-    const hdr = nifti1Header_c(config.testing.files.nifti1_t1);
-    print("🌊🧠 c level nifti header:\n{any}\n", .{hdr});
+    var hdr_buff: [348]u8 = undefined;
+    const ftype = "NIfTI1";
+    const hdr_len = getHdr_c(
+        config.testing.files.nifti1_t1,
+        ftype,
+        &hdr_buff,
+    );
+    print("🌊🧠 c level nifti header:\n{any}\n", .{hdr_buff[0..hdr_len]});
 }
