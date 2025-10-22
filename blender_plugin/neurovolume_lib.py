@@ -53,10 +53,10 @@ def num_frames(filepath: str, filetype: str) -> int:
 
 # _: Testing:
 
-t1_save_location = nifti1_to_VDB(static_testfile, True)
-t1_nf = num_frames(static_testfile, "NIfTI1")
-print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
+# t1_save_location = nifti1_to_VDB(static_testfile, True)
+# t1_nf = num_frames(static_testfile, "NIfTI1")
+# print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
 
-fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
-bold_nf = num_frames(fmri_testfile, "NIfTI1")
-print("🐍 bold VDB saved to: ", fmri_save_location, " with ", bold_nf, " frames\n")
+# fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+# bold_nf = num_frames(fmri_testfile, "NIfTI1")
+# print("🐍 bold VDB saved to: ", fmri_save_location, " with ", bold_nf, " frames\n")

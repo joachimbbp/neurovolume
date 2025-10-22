@@ -55,9 +55,7 @@ def load_nifti1(filepath: str, normalize: bool = True):
         nv.nifti1_to_VDB(filepath, normalize))
     print("vdb path: ", vdb_path)
 
-    # BUG: I have deleted this function. see deprecated comment below to fix
-    n_frames = nv.num_frames(filepath)
-    # DEPRECATED: num_frames is clunky, just load from header dims in future
+    n_frames = nv.num_frames(filepath, "NIfTI1")
     if n_frames == 1:
         bpy.ops.object.volume_import(filepath=vdb_path,
                                      relative_path=False,
@@ -75,8 +73,13 @@ def load_nifti1(filepath: str, normalize: bool = True):
                 continue
             vdb_sequence.sort(key=vdb_frames_sort)
             print(f"loading in VDB sequence:\n{vdb_sequence}")
-        bpy.ops.object.volume_import(filepath=filepath, directory=vdb_path, files=vdb_sequence,
-                                     relative_path=True, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+        bpy.ops.object.volume_import(filepath=filepath,
+                                     directory=vdb_path,
+                                     files=vdb_sequence,
+                                     relative_path=True,
+                                     align='WORLD',
+                                     location=(0, 0, 0),
+                                     scale=(1, 1, 1))
         return "VDB sequence loaded into scene"
 # :_: ------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
