@@ -80,45 +80,9 @@ pub const DataType = enum(i16) {
     }
 };
 
-//HACK: There might be a more idiomatic way to do this with packed structs. However, writing it all out is very labor intensive so I am going with this for now. https://github.com/joachimbbp/neurovolume/blob/zig/src/nifti1.zighas the latest WIP on the packed struct front
-//Produces a human-readable header format
-pub fn jsonFromHeader(hdr: Header, alloc: std.mem.Allocator) !std.array_list.Managed(u8) {
-    //TODO: human readable stuff: ascii instead of codes, etc!
-    var out = std.io.Writer.Allocating.init(alloc);
-    defer out.deinit();
-    var stringifier = std.json.Stringify{
-        .writer = &out.writer,
-        .options = .{
-            .whitespace = .minified,
-            .emit_strings_as_arrays = false, // This keeps strings as strings, not arrays
-            .escape_unicode = true,
-            .emit_nonportable_numbers_as_strings = true,
-        },
-    };
-
-    try stringifier.write(hdr);
-    const json_string = out.writer.buffered();
-    std.debug.print("JSON string:\n{s}\n", .{json_string});
-    //ROBOT: Claude wrote this to clean up the JSON
-    var clean_json = std.array_list.Managed(u8).init(alloc);
-    defer clean_json.deinit();
-
-    var i: usize = 0;
-    while (i < json_string.len) {
-        if (i + 5 < json_string.len and
-            std.mem.eql(u8, json_string[i .. i + 6], "\\u0000"))
-        {
-            i += 6; // Skip the \u0000
-        } else {
-            try clean_json.append(json_string[i]);
-            i += 1;
-        }
-    }
-    std.debug.print("cleaned JSON string:\n{s}\n", .{clean_json.items});
-    return clean_json;
-}
-
 //DEPRECATED: Image should be universal to all input formats, not just nifti 1
+//header extraction has to become it's own thing too, so there's lots of
+//stuff that will neeed DRYing in the future
 pub const Image = struct {
     header: *const Header,
     data: []const u8,
@@ -212,6 +176,30 @@ pub const Image = struct {
         self.allocator.free(self.data);
     }
 };
+
+pub fn getHeader(filepath: []const u8) !*const Header {
+    const allocator = &std.heap.page_allocator;
+    //Load File
+    const file = try std.fs.cwd().openFile(filepath, .{});
+    defer file.close();
+
+    //Load Header
+    const reader = std.fs.File.deprecatedReader(file);
+
+    const header_ptr = try allocator.create(Header);
+    header_ptr.* = try reader.readStruct(Header);
+
+    //Load Data
+    const vox_offset = @as(u32, @intFromFloat(header_ptr.voxOffset));
+    try file.seekTo(vox_offset);
+    const file_size = try file.getEndPos();
+
+    const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
+    _ = try file.readAll(raw_data);
+
+    return header_ptr;
+}
+
 pub fn MinMax3D(img: Image) ![2]f32 {
     var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
     //dim is [num dimensions, x, y, z, time ...]

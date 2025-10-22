@@ -156,6 +156,18 @@ pub export fn nifti1ToVDB_c(
     return n;
 }
 
+//WIP: *writes* a pointer to a c-allocated spot in memory
+pub export fn nifti1Header_c(
+    c_nifti_fpath_ptr: [*:0]const u8,
+    hdr_buff: [*]u8,
+    hdr_cap: usize,
+) usize {
+    const fpath_slice: []const u8 = std.mem.span(c_nifti_fpath_ptr);
+    const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+        return 0;
+    };
+}
+
 //TODO:
 //let's have other functions (probably in root)
 //that grab the header csv etc from the file
@@ -179,4 +191,9 @@ test "static nifti to vdb - c level" {
     );
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
     print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+}
+
+test "header" {
+    const hdr = nifti1Header_c(config.testing.files.nifti1_t1);
+    print("🌊🧠 c level nifti header:\n{any}\n", .{hdr});
 }
