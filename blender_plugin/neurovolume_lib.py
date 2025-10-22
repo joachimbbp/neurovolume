@@ -41,7 +41,6 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 def num_frames(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
-            # hdr = c.create_string_buffer(348)
             nvol.numFrames_c.argtypes = [c.c_char_p, c.c_char_p,]
             nvol.numFrames_c.restype = c.c_size_t
             num_frames = nvol.numFrames_c(b(filepath), b(filetype))
@@ -50,6 +49,21 @@ def num_frames(filepath: str, filetype: str) -> int:
             err_msg = f"{filetype} is unsupported for num_frames access"
             print(err_msg)
             # TODO: Error handling
+
+
+def fps(filepath: str, filetype: str) -> int:
+    match filetype:
+        case "NIfTI1":
+            # TODO:
+            # this will have to include measurement units (xyzt_units) as
+            # well as slice_duration, both of which need their own
+            # `pub export fn`s in root.zig
+            print("not implemented yet")
+        case _:
+            err_msg = f"{filetype} is unsupported for num_frames access"
+            print(err_msg)
+            # TODO: Error handling
+
 
 # _: Testing:
 

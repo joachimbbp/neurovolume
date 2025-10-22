@@ -127,7 +127,7 @@ pub fn nifti1ToVDB(
 
 //_: C library:
 pub export fn nifti1ToVDB_c(
-    c_nifti1_fpath_ptr: [*:0]const u8,
+    fpath: [*:0]const u8,
     output_dir: [*:0]const u8,
     normalize: bool,
     fpath_buff: [*]u8,
@@ -140,7 +140,7 @@ pub export fn nifti1ToVDB_c(
     defer arena.deinit();
     const arena_alloc = arena.allocator();
 
-    const fpath_slice: []const u8 = std.mem.span(c_nifti1_fpath_ptr); //LLM: suggested line
+    const fpath_slice: []const u8 = std.mem.span(fpath); //LLM: suggested line
     const output_dir_slice: []const u8 = std.mem.span(output_dir);
     const filepath = nifti1ToVDB(
         fpath_slice,
@@ -156,6 +156,35 @@ pub export fn nifti1ToVDB_c(
     return n;
 }
 
+//WRITE to a buff!
+pub export fn measurementUnits_c(
+    fpath: [*:0]const u8,
+    filetype: [*:0]const u8,
+    dim: u8,
+    fpath_buff: [*]u8,
+    fpath_cap: usize,
+) usize {
+    const fpath_slice: []const u8 = std.mem.span(fpath);
+    if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
+        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+            return 0;
+        };
+
+        const xyzt_units = hdr_ptr.xyztUnits;
+        //LLM: these codes were built by claude
+        // Spatial units are in bits 0-2 (mask: 0x07 = 0b00000111)
+        const spatial_code = xyzt_units & 0x07;
+        // Temporal units are in bits 3-5 (mask: 0x38 = 0b00111000)
+        const temporal_code = (xyzt_units & 0x38) >> 3;
+
+        switch (xyzt_units) {}
+        // WIP: Ended here!
+
+    } else {
+        print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
+        return 0;
+    }
+}
 pub export fn numFrames_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
@@ -169,12 +198,9 @@ pub export fn numFrames_c(
         return num_frames;
     } else {
         print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
-        print("     supported filetypes are:\n'NIfTI1'\n", .{});
         return 0;
     }
 }
-
-//TODO: getFPS_c
 
 test "static nifti to vdb - c level" {
     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
