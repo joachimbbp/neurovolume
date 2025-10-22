@@ -177,6 +177,7 @@ pub export fn getHdr_c(
         //LLMEND:
     } else {
         print("⚠️📂 Unsuported header filetype: {s}\n", .{filetype});
+        print("     supported filetypes are:\n'NIfTI1'\n", .{});
         return 0;
     }
 }
