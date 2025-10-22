@@ -156,31 +156,25 @@ pub export fn nifti1ToVDB_c(
     return n;
 }
 
-//WIP: *writes* a pointer to a c-allocated spot in memory
-pub export fn getHdr_c(
+pub export fn getNumFrames_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
-    hdr_buff: [*]u8,
 ) usize {
     const fpath_slice: []const u8 = std.mem.span(fpath);
     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
         const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
             return 0;
         };
-        //LLM:
-        const hdr_size = @sizeOf(nifti1.Header); // Should be 348
-        print("🐛debuggy, hdr_size is {d}, expected: {d}\n", .{ hdr_size, 348 }); //HUMAN EDIT:
-        const hdr_bytes = std.mem.asBytes(hdr_ptr);
-        @memcpy(hdr_buff[0..hdr_size], hdr_bytes);
-
-        return hdr_size;
-        //LLMEND:
+        const num_frames: usize = @intCast(hdr_ptr.dim[4]);
+        return num_frames;
     } else {
-        print("⚠️📂 Unsuported header filetype: {s}\n", .{filetype});
+        print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
         print("     supported filetypes are:\n'NIfTI1'\n", .{});
         return 0;
     }
 }
+
+//TODO: getFPS_c
 
 test "static nifti to vdb - c level" {
     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
@@ -202,13 +196,18 @@ test "static nifti to vdb - c level" {
     print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
 
-test "header" {
-    var hdr_buff: [348]u8 = undefined;
+test "header data extraction to C" {
     const ftype = "NIfTI1";
-    const hdr_len = getHdr_c(
+    const num_frames_static = getNumFrames_c(
         config.testing.files.nifti1_t1,
         ftype,
-        &hdr_buff,
     );
-    print("🌊🧠 c level nifti header of len {d}:\n{any}\n", .{ hdr_len, hdr_buff[0..hdr_len] });
+    try std.testing.expect(num_frames_static == 1);
+    print("🧠📷🌊 c level num frames for static is: {d}\n", .{num_frames_static});
+    const num_frames_bold = getNumFrames_c(
+        config.testing.files.bold,
+        ftype,
+    );
+    try std.testing.expect(num_frames_bold != 1); // FIX: yeaaaah this should be exact!
+    print("🧠🎞️🌊 c level num frames for Bold: {d}\n", .{num_frames_bold});
 }
