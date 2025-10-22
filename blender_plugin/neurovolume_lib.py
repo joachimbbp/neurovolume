@@ -1,5 +1,5 @@
 import ctypes as c
-
+print("running library")
 # _: Things that will eventually live in a config file:
 
 lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
@@ -53,11 +53,10 @@ def num_frames(filepath: str, filetype: str) -> int:
 
 # _: Testing:
 
-
-# Static:
 t1_save_location = nifti1_to_VDB(static_testfile, True)
+t1_nf = num_frames(static_testfile, "NIfTI1")
+print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
 
-print("🐍VVVVDB to: ", t1_save_location, "\n
-# fMRI:
-fmri_save_location=nifti1_to_VDB(fmri_testfile, True)
-print("🐍 VDB fmri saved to: ", fmri_save_location, "\n")
+fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+bold_nf = num_frames(fmri_testfile, "NIfTI1")
+print("🐍 bold VDB saved to: ", fmri_save_location, " with ", bold_nf, " frames\n")
