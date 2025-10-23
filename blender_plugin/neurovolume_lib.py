@@ -35,6 +35,8 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
     return save_location.value.decode()
 
 
+# FIX: almost all of these `case "NIfTI1"` switches are redundant,
+# the same logic is following in the zig code
 def num_frames(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
@@ -48,15 +50,26 @@ def num_frames(filepath: str, filetype: str) -> int:
             # TODO: Error handling
 
 
+# Not really used, tbh! #WARN: never tested
+def slice_duration(filepath: str, filetype: str) -> int:
+    match filetype:
+        case "NIfTI1":
+            nvol.sliceDuration_c.argtypes = [c.c_char_p, c.c_char_p,]
+            nvol.sliceDuration_c.restype = c.c_size_t
+            slice_duration = nvol.sliceDuration_c(b(filepath), b(filetype))
+            return slice_duration
+        case _:
+            err_msg = f"{filetype} is unsupported for slice_duration access"
+            print(err_msg)
+            # TODO: Error handling
+
+
 def fps(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
-            # TODO:
-            # this will have to include measurement units (xyzt_units) as
-            # well as slice_duration, and both of which need their own
-            # `pub export fn`s in root.zig
-            # WIP: ended here!
-            print("not implemented yet")
+            if num_frames(filepath, filetype) == 0:
+                print("staic file, frames per second of zero!")
+                return 0
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
             print(err_msg)

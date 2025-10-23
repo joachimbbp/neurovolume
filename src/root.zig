@@ -221,6 +221,7 @@ pub export fn unit_c(
     @memcpy(unitName_buff[0..n], name[0..n]);
     return n;
 }
+
 pub export fn numFrames_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
@@ -232,6 +233,41 @@ pub export fn numFrames_c(
         };
         const num_frames: usize = @intCast(hdr_ptr.dim[4]);
         return num_frames;
+    } else {
+        print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
+        return 0;
+    }
+}
+
+pub export fn sliceDuration_c( //WARN: not really used, tbh. Test file has 0 slice duration for no reason
+    fpath: [*:0]const u8,
+    filetype: [*:0]const u8,
+) f32 {
+    const fpath_slice: []const u8 = std.mem.span(fpath);
+    if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
+        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+            return 0;
+        };
+        const slice_duration = hdr_ptr.sliceDuration;
+        return slice_duration;
+    } else {
+        print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
+        return 0;
+    }
+}
+
+pub export fn pixdim_c( //WARN: not really used, tbh. Test file has 0 slice duration for no reason
+    fpath: [*:0]const u8,
+    filetype: [*:0]const u8,
+    dim: u8,
+) f32 {
+    const fpath_slice: []const u8 = std.mem.span(fpath);
+    if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
+        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+            return 0;
+        };
+        const pixdim = hdr_ptr.pixdim; //probably should error handle here tbh!
+        return pixdim[dim];
     } else {
         print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
         return 0;
@@ -273,6 +309,14 @@ test "header data extraction to C" {
     );
     try std.testing.expect(num_frames_bold != 1); // FIX: yeaaaah this should be exact to the known testfile len!
     print("🧠🎞️🌊 c level num frames for Bold: {d}\n", .{num_frames_bold});
+
+    //_: slice duration
+    const slice_duration = sliceDuration_c(
+        config.testing.files.bold,
+        ftype,
+    );
+    print("🧠🍕🌊 c level slice duration: {d}\n", .{slice_duration}); //WARN: our testfiles just have zero slice duration. Oh well!
+
     //_: Measurement units
     var t_unit_buff: [20]u8 = undefined;
     const t_unit_len = unit_c(
@@ -293,5 +337,16 @@ test "header data extraction to C" {
     );
     print("📐 🧠 spatial units: {s}\n", .{s_unit_buff[0..s_unit_len]});
 
-    //TODO: more tests
+    //_: Pixel dimensions
+    const bold_time = pixdim_c(config.testing.files.bold, "NIfTI1", 4);
+    const bold_x = pixdim_c(config.testing.files.bold, "NIfTI1", 1);
+
+    print("⏰ Bold time dim: {d:.10}\n", .{bold_time});
+    print(" Bold x dim: {d:.10}\n", .{bold_x});
+
+    const t1_time = pixdim_c(config.testing.files.nifti1_t1, "NIfTI1", 4);
+    const t1_x = pixdim_c(config.testing.files.nifti1_t1, "NIfTI1", 1);
+
+    print("⏰ t1 time dim: {d:.10}\n", .{t1_time});
+    print(" t1 x dim: {d:.10}\n", .{t1_x});
 }
