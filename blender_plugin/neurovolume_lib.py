@@ -66,19 +66,30 @@ def fps(filepath: str, filetype: str) -> int:
             # TODO: Error handling
 
 
-def real_size():
-    # TODO: will need to get measurement units and as well as the pixdim
+def units(filepath: str, filetype: str, unit_kind: str) -> str:
+    BUF_SIZE = 64  # generously padded, tbh
+    unit_name = c.create_string_buffer(BUF_SIZE)
+    nvol.units_c.argtypes = [c.c_char_p, c.c_char_p,
+                             c.c_char_p, c.POINTER(c.c_char), c.c_size_t]
+    nvol.units_c.restype = c.c_size_t
+    nvol.units_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
+    return unit_name.value.decode()
 
-    # TODO: def runtime
-    # which will include a lot fo the stuff in fps as well as temporal_offset
-
+#
+# def real_size():
+#     # TODO: will need to get measurement units and as well as the pixdim
+#
+#     # TODO: def runtime
+#     # which will include a lot fo the stuff in fps as well as temporal_offset
+#
     # _: Testing:
 
-    # t1_save_location = nifti1_to_VDB(static_testfile, True)
-    # t1_nf = num_frames(static_testfile, "NIfTI1")
-    # print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
-    #
-    # fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
-    # bold_nf = num_frames(fmri_testfile, "NIfTI1")
-    # print("🐍 bold VDB saved to: ", fmri_save_location,
-    #       " with ", bold_nf, " frames\n")
+    t1_save_location = nifti1_to_VDB(static_testfile, True)
+    t1_nf = num_frames(static_testfile, "NIfTI1")
+    print("🐍 static VDB saved to: ", t1_save_location,
+          " with ", t1_nf, " frames\n")
+
+    fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+    bold_nf = num_frames(fmri_testfile, "NIfTI1")
+    print("🐍 bold VDB saved to: ", fmri_save_location,
+          " with ", bold_nf, " frames\n")

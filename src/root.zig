@@ -192,7 +192,6 @@ pub export fn units_c(
 
         const field = hdr_ptr.xyztUnits;
         print("🐛 field binary: {b:0>8} field decimal: {d} field type: {any}\n", .{ field, field, @TypeOf(field) });
-        //BUG: issue here: time is read as meters!
         //LLM:
         const spatial_code = field & 0x07;
         print("🐛 spatial_code binary: {b:0>8} decimal: {d} (mask: 0x07 = {b:0>8})\n", .{ spatial_code, spatial_code, @as(u8, 0x07) });
