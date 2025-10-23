@@ -157,7 +157,7 @@ pub export fn nifti1ToVDB_c(
 }
 
 //gets the xyzt_units from nifti
-pub export fn units_c(
+pub export fn unit_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
     unit_kind: [*:0]const u8, //"time" or "space", can be "na" or other types for other file formats
@@ -275,7 +275,7 @@ test "header data extraction to C" {
     print("🧠🎞️🌊 c level num frames for Bold: {d}\n", .{num_frames_bold});
     //_: Measurement units
     var t_unit_buff: [20]u8 = undefined;
-    const t_unit_len = units_c(
+    const t_unit_len = unit_c(
         config.testing.files.bold,
         "NIfTI1",
         "time",
@@ -284,7 +284,7 @@ test "header data extraction to C" {
     );
     print("🕰️ 🧠 temporal units: {s}\n", .{t_unit_buff[0..t_unit_len]});
     var s_unit_buff: [20]u8 = undefined;
-    const s_unit_len = units_c(
+    const s_unit_len = unit_c(
         config.testing.files.bold,
         "NIfTI1",
         "space",
