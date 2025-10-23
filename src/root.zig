@@ -156,11 +156,11 @@ pub export fn nifti1ToVDB_c(
     return n;
 }
 
-//WRITE to a buff!
-pub export fn xyztUnits_c(
+//gets the xyzt_units from nifti
+pub export fn units_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
-    dim: u8,
+    unit_kind: [*:0]const u8, //"temporal" or "spatial", can be "na" or other types for other file formats
     unitName_buff: [*]u8,
     unitName_cap: usize, //currently the largest is 18
 ) usize {
@@ -168,6 +168,7 @@ pub export fn xyztUnits_c(
 
     var name: []const u8 = undefined;
     const fpath_slice: []const u8 = std.mem.span(fpath);
+    const unit_kind_slice: []const u8 = std.mem.span(unit_kind);
     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
         const Unit = enum(u8) {
             Unknown = 0,
@@ -189,36 +190,30 @@ pub export fn xyztUnits_c(
         };
 
         const field = hdr_ptr.xyztUnits;
-        switch (dim) {
-            1...3 => {
-                //LLM: Spatial units are in bits 0-2 (mask: 0x07 = 0b00000111)
-                const spatial_code = field & 0x07;
-                if (spatial_code > 3 or spatial_code >= 0) {
-                    print("⚠️ ERROR: spatial code {d} corresponds to a non-spatial unit\n", .{spatial_code});
-                    return 0;
-                }
-                const unit: Unit = @enumFromInt(spatial_code);
-                name = @tagName(unit);
-            },
-            4 => {
-                //LLM: Temporal units are in bits 3-5 (mask: 0x38 = 0b00111000)
-                const temporal_code = (field & 0x38) >> 3;
-                if (temporal_code < 8 or temporal_code >= 48) {
-                    print("⚠️ ERROR: temporal code {d} corresponds to a non-temporal unit\n", .{temporal_code});
-                    return 0;
-                }
-                const unit: Unit = @enumFromInt(temporal_code);
-                name = @tagName(unit);
-            },
-            else => {
-                print("⚠️ ERROR: dim {d} invalid for NIfTI1 files\n", .{dim});
-                return 0;
-            },
+        print("🐛 field binary: {b:0>8} field decimal: {d} field type: {any}\n", .{ field, field, @TypeOf(field) });
+        //LLM:
+        const spatial_code = field & 0x07;
+        print("🐛 spatial_code binary: {b:0>8} decimal: {d} (mask: 0x07 = {b:0>8})\n", .{ spatial_code, spatial_code, @as(u8, 0x07) });
+        const temporal_code = (field & 0x38) >> 3;
+        print("🐛 temporal_code binary: {b:0>8} decimal: {d} (mask: 0x38 = {b:0>8})\n", .{ temporal_code, temporal_code, @as(u8, 0x38) });
+        //LLMEND:
+        if (std.mem.eql(u8, unit_kind_slice, "temporal") == true) {
+            const unit: Unit = @enumFromInt(temporal_code);
+            name = @tagName(unit);
+            print("🐛 temporal unit: {s}\n", .{name});
+        } else if (std.mem.eql(u8, unit_kind_slice, "spatial") == true) {
+            const unit: Unit = @enumFromInt(spatial_code);
+            name = @tagName(unit);
+            print("🐛 spatial unit: {s}\n", .{name});
+        } else {
+            print("⚠️📜 Unsuported unit kind: {s}\n", .{unit_kind_slice});
+            return 0;
         }
     } else {
         print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
         return 0;
     }
+
     print("🐛 deubggy name of unit: {s}\n", .{name});
     const n = if (name.len + 1 <= unitName_cap) name.len else name.len - 1;
     @memcpy(unitName_buff[0..n], name[0..n]);
@@ -278,10 +273,10 @@ test "header data extraction to C" {
     print("🧠🎞️🌊 c level num frames for Bold: {d}\n", .{num_frames_bold});
     //_: Measurement units
     var t_unit_buff: [20]u8 = undefined;
-    const t_unit_len = xyztUnits_c(
+    const t_unit_len = units_c(
         config.testing.files.bold,
         "NIfTI1",
-        4,
+        "temporal",
         &t_unit_buff,
         t_unit_buff.len,
     );
