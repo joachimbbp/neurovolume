@@ -16,4 +16,9 @@ print("🐍 bold VDB saved to: ", fmri_save_location,
 
 time_unit_type = nv.unit(fmri_testfile, "NIfTI1", "time")
 space_unit_type = nv.unit(fmri_testfile, "NIfTI1", "space")
-print("time unit: ", time_unit_type, " space unit: ", space_unit_type, "\n")
+print("time unit: ", time_unit_type, " space unit: ", space_unit_type)
+
+
+dimension_x = nv.pixdim(fmri_testfile, "NIfTI1", 1)
+dimension_time = nv.pixdim(fmri_testfile, "NIfTI1", 4)
+print("time dim: ", dimension_time, " x dim: ", dimension_x)

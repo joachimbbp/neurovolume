@@ -50,7 +50,20 @@ def num_frames(filepath: str, filetype: str) -> int:
             # TODO: Error handling
 
 
-# Not really used, tbh! #WARN: never tested
+def pixdim(filepath: str, filetype: str, dim: int) -> float:
+    match filetype:
+        case "NIfTI1":
+            nvol.pixdim_c.argtypes = [c.c_char_p, c.c_char_p, c.c_int]
+            nvol.pixdim_c.restype = c.c_float
+            pixdim = nvol.pixdim_c(b(filepath), b(filetype), dim)
+            return pixdim
+        case _:
+            err_msg = f"{filetype} is unsupported for pixdim access"
+            print(err_msg)
+            # TODO: Error handling
+
+
+# Not really used, tbh! #WARN: never tested and test file just puts this as 0 for some reason
 def slice_duration(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
@@ -70,6 +83,8 @@ def fps(filepath: str, filetype: str) -> int:
             if num_frames(filepath, filetype) == 0:
                 print("staic file, frames per second of zero!")
                 return 0
+            # WIP: needs pixdim
+
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
             print(err_msg)
