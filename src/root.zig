@@ -160,10 +160,11 @@ pub export fn nifti1ToVDB_c(
 pub export fn units_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
-    unit_kind: [*:0]const u8, //"temporal" or "spatial", can be "na" or other types for other file formats
+    unit_kind: [*:0]const u8, //"time" or "space", can be "na" or other types for other file formats
     unitName_buff: [*]u8,
     unitName_cap: usize, //currently the largest is 18
 ) usize {
+    //WARN: this leaned way to heavily on LLMs, I definately can't explain exactly why or how a lot of this works!
     print("🐛 checkpoint: running xyztUnits_c\n", .{});
 
     var name: []const u8 = undefined;
@@ -191,17 +192,19 @@ pub export fn units_c(
 
         const field = hdr_ptr.xyztUnits;
         print("🐛 field binary: {b:0>8} field decimal: {d} field type: {any}\n", .{ field, field, @TypeOf(field) });
+        //BUG: issue here: time is read as meters!
         //LLM:
         const spatial_code = field & 0x07;
         print("🐛 spatial_code binary: {b:0>8} decimal: {d} (mask: 0x07 = {b:0>8})\n", .{ spatial_code, spatial_code, @as(u8, 0x07) });
         const temporal_code = (field & 0x38) >> 3;
         print("🐛 temporal_code binary: {b:0>8} decimal: {d} (mask: 0x38 = {b:0>8})\n", .{ temporal_code, temporal_code, @as(u8, 0x38) });
         //LLMEND:
-        if (std.mem.eql(u8, unit_kind_slice, "temporal") == true) {
-            const unit: Unit = @enumFromInt(temporal_code);
+
+        if (std.mem.eql(u8, unit_kind_slice, "time") == true) {
+            const unit: Unit = @enumFromInt(temporal_code << 3); //LLM: has to shift back
             name = @tagName(unit);
             print("🐛 temporal unit: {s}\n", .{name});
-        } else if (std.mem.eql(u8, unit_kind_slice, "spatial") == true) {
+        } else if (std.mem.eql(u8, unit_kind_slice, "space") == true) {
             const unit: Unit = @enumFromInt(spatial_code);
             name = @tagName(unit);
             print("🐛 spatial unit: {s}\n", .{name});
@@ -276,10 +279,20 @@ test "header data extraction to C" {
     const t_unit_len = units_c(
         config.testing.files.bold,
         "NIfTI1",
-        "temporal",
+        "time",
         &t_unit_buff,
         t_unit_buff.len,
     );
-    print("📐 🧠 temporal units: {s}\n", .{t_unit_buff[0..t_unit_len]});
+    print("🕰️ 🧠 temporal units: {s}\n", .{t_unit_buff[0..t_unit_len]});
+    var s_unit_buff: [20]u8 = undefined;
+    const s_unit_len = units_c(
+        config.testing.files.bold,
+        "NIfTI1",
+        "space",
+        &s_unit_buff,
+        s_unit_buff.len,
+    );
+    print("📐 🧠 spatial units: {s}\n", .{s_unit_buff[0..s_unit_len]});
+
     //TODO: more tests
 }
