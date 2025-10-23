@@ -54,6 +54,7 @@ pub const Header = extern struct {
 
     magic: [4]u8,
 };
+//Maybe move to root? follow same pattern as measurementUnits_c
 pub const DataType = enum(i16) {
     unknown = 0,
     bool = 1,

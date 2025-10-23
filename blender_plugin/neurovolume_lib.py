@@ -56,8 +56,9 @@ def fps(filepath: str, filetype: str) -> int:
         case "NIfTI1":
             # TODO:
             # this will have to include measurement units (xyzt_units) as
-            # well as slice_duration, both of which need their own
+            # well as slice_duration, and both of which need their own
             # `pub export fn`s in root.zig
+            # WIP: ended here!
             print("not implemented yet")
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
@@ -65,12 +66,19 @@ def fps(filepath: str, filetype: str) -> int:
             # TODO: Error handling
 
 
-# _: Testing:
+def real_size():
+    # TODO: will need to get measurement units and as well as the pixdim
 
-# t1_save_location = nifti1_to_VDB(static_testfile, True)
-# t1_nf = num_frames(static_testfile, "NIfTI1")
-# print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
+    # TODO: def runtime
+    # which will include a lot fo the stuff in fps as well as temporal_offset
 
-# fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
-# bold_nf = num_frames(fmri_testfile, "NIfTI1")
-# print("🐍 bold VDB saved to: ", fmri_save_location, " with ", bold_nf, " frames\n")
+    # _: Testing:
+
+    # t1_save_location = nifti1_to_VDB(static_testfile, True)
+    # t1_nf = num_frames(static_testfile, "NIfTI1")
+    # print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
+    #
+    # fmri_save_location = nifti1_to_VDB(fmri_testfile, True)
+    # bold_nf = num_frames(fmri_testfile, "NIfTI1")
+    # print("🐍 bold VDB saved to: ", fmri_save_location,
+    #       " with ", bold_nf, " frames\n")

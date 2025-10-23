@@ -150,40 +150,79 @@ pub export fn nifti1ToVDB_c(
     ) catch {
         return 0;
     };
-    defer arena_alloc.free(filepath);
+    defer arena_alloc.free(filepath); //needed????
     const n = if (filepath.len + 1 <= fpath_cap) filepath.len else fpath_cap - 1;
     @memcpy(fpath_buff[0..n], filepath[0..n]);
     return n;
 }
 
 //WRITE to a buff!
-pub export fn measurementUnits_c(
+pub export fn xyztUnits_c(
     fpath: [*:0]const u8,
     filetype: [*:0]const u8,
     dim: u8,
-    fpath_buff: [*]u8,
-    fpath_cap: usize,
+    unitName_buff: [*]u8,
+    unitName_cap: usize, //currently the largest is 18
 ) usize {
+    print("🐛 checkpoint: running xyztUnits_c\n", .{});
+
+    var name: []const u8 = undefined;
     const fpath_slice: []const u8 = std.mem.span(fpath);
     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
+        const Unit = enum(u8) {
+            Unknown = 0,
+            //spatial
+            Meter = 1,
+            Milimeter = 2,
+            Micron = 3,
+            //temporal
+            Seconds = 8,
+            Miliseconds = 16,
+            Microseconds = 24,
+            Hertz = 32,
+            Parts_per_million = 40,
+            Radians_per_second = 48,
+        };
+
         const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
             return 0;
         };
 
-        const xyzt_units = hdr_ptr.xyztUnits;
-        //LLM: these codes were built by claude
-        // Spatial units are in bits 0-2 (mask: 0x07 = 0b00000111)
-        const spatial_code = xyzt_units & 0x07;
-        // Temporal units are in bits 3-5 (mask: 0x38 = 0b00111000)
-        const temporal_code = (xyzt_units & 0x38) >> 3;
-
-        switch (xyzt_units) {}
-        // WIP: Ended here!
-
+        const field = hdr_ptr.xyztUnits;
+        switch (dim) {
+            1...3 => {
+                //LLM: Spatial units are in bits 0-2 (mask: 0x07 = 0b00000111)
+                const spatial_code = field & 0x07;
+                if (spatial_code > 3 or spatial_code >= 0) {
+                    print("⚠️ ERROR: spatial code {d} corresponds to a non-spatial unit\n", .{spatial_code});
+                    return 0;
+                }
+                const unit: Unit = @enumFromInt(spatial_code);
+                name = @tagName(unit);
+            },
+            4 => {
+                //LLM: Temporal units are in bits 3-5 (mask: 0x38 = 0b00111000)
+                const temporal_code = (field & 0x38) >> 3;
+                if (temporal_code < 8 or temporal_code >= 48) {
+                    print("⚠️ ERROR: temporal code {d} corresponds to a non-temporal unit\n", .{temporal_code});
+                    return 0;
+                }
+                const unit: Unit = @enumFromInt(temporal_code);
+                name = @tagName(unit);
+            },
+            else => {
+                print("⚠️ ERROR: dim {d} invalid for NIfTI1 files\n", .{dim});
+                return 0;
+            },
+        }
     } else {
         print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
         return 0;
     }
+    print("🐛 deubggy name of unit: {s}\n", .{name});
+    const n = if (name.len + 1 <= unitName_cap) name.len else name.len - 1;
+    @memcpy(unitName_buff[0..n], name[0..n]);
+    return n;
 }
 pub export fn numFrames_c(
     fpath: [*:0]const u8,
@@ -202,27 +241,28 @@ pub export fn numFrames_c(
     }
 }
 
-test "static nifti to vdb - c level" {
-    //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
-    //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
-    //either that or the default persistent location in the real nifti1ToVDB function!
-    print("🌊 c level nifti to vdb\n", .{});
-
-    var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
-    //TODO: make the lenght a bit more robust. What should it be???
-
-    const fpath_len = nifti1ToVDB_c(
-        config.testing.files.nifti1_t1,
-        config.paths.vdb_output_dir,
-        true,
-        &fpath_buff,
-        fpath_buff.len,
-    );
-    print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
-}
+// test "static nifti to vdb - c level" {
+//     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
+//     //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
+//     //either that or the default persistent location in the real nifti1ToVDB function!
+//     print("🌊 c level nifti to vdb\n", .{});
+//
+//     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
+//     //TODO: make the lenght a bit more robust. What should it be???
+//
+//     const fpath_len = nifti1ToVDB_c(
+//         config.testing.files.nifti1_t1,
+//         config.paths.vdb_output_dir,
+//         true,
+//         &fpath_buff,
+//         fpath_buff.len,
+//     );
+//     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
+//     print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+// }
 
 test "header data extraction to C" {
+    //_: num frames
     const ftype = "NIfTI1";
     const num_frames_static = numFrames_c(
         config.testing.files.nifti1_t1,
@@ -234,6 +274,17 @@ test "header data extraction to C" {
         config.testing.files.bold,
         ftype,
     );
-    try std.testing.expect(num_frames_bold != 1); // FIX: yeaaaah this should be exact!
+    try std.testing.expect(num_frames_bold != 1); // FIX: yeaaaah this should be exact to the known testfile len!
     print("🧠🎞️🌊 c level num frames for Bold: {d}\n", .{num_frames_bold});
+    //_: Measurement units
+    var t_unit_buff: [20]u8 = undefined;
+    const t_unit_len = xyztUnits_c(
+        config.testing.files.bold,
+        "NIfTI1",
+        4,
+        &t_unit_buff,
+        t_unit_buff.len,
+    );
+    print("📐 🧠 temporal units: {s}\n", .{t_unit_buff[0..t_unit_len]});
+    //TODO: more tests
 }
