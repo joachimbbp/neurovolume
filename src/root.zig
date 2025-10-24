@@ -27,7 +27,6 @@ pub fn nifti1ToVDB(
     defer img_deprecated.deinit();
     //NICE: like this:
     const hdr = try nifti1.getHeader(nifti_filepath);
-    const transform = try nifti1.getTransform(hdr.*);
     var static = true;
     if (img_deprecated.header.dim[0] == 4) {
         static = false;
@@ -45,7 +44,7 @@ pub fn nifti1ToVDB(
     if (!static) {
         print("non static fmri!\n", .{});
         static = false;
-
+        const transform = zools.matrix.IdentityMatrix4x4; // HACK: native transform doesn't work with bold as of right now!
         const vdb_seq_folder = try zools.save.versionFolder(base_seq_folder, arena_alloc); //CLEAN: This feels really hacky and verbose
         var buf = std.array_list.Managed(u8).init(arena_alloc);
         defer buf.deinit();
@@ -94,6 +93,7 @@ pub fn nifti1ToVDB(
     } else {
         //Signifies a static, 3D MRI
         print("Static MRI\n", .{});
+        const transform = try nifti1.getTransform(hdr.*);
         var buffer = std.array_list.Managed(u8).init(arena_alloc);
         defer buffer.deinit();
 
@@ -298,7 +298,25 @@ test "static nifti to vdb - c level" {
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
     print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
+test "bold nifti to vdb - c level" {
+    print("🌊 c level BOLD nifti to vdb\n", .{});
 
+    var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
+    //TODO: make the lenght a bit more robust. What should it be???
+
+    const fpath_len = nifti1ToVDB_c(
+        config.testing.files.bold,
+        config.paths.vdb_output_dir,
+        true,
+        &fpath_buff,
+        fpath_buff.len,
+    );
+    print("☁️🩸🧠 BOLD nifti test saved as VDB\n", .{});
+    const bhdr = try nifti1.getHeader(config.testing.files.bold);
+    const b_trans = try nifti1.getTransform(bhdr.*);
+    print("         transform: {any}\n", .{b_trans});
+    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+}
 test "header data extraction to C" {
     //_: num frames
     const ftype = "NIfTI1";
