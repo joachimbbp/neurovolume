@@ -97,9 +97,9 @@ class Neurovolume(bpy.types.Panel):
     def draw(self, context):
         self.layout.prop(context.scene, "path_input")
         self.layout.operator("load.volume", text="Load VDB from NIfTI")
-        #LLM:
+
         if hasattr(context.scene, "volume_info_text"):
-            self.layout.label(text="🧠 Last Loaded Volume Info:")
+            self.layout.label(text="🧠 Last Loaded Volume:")
             text = context.scene.volume_info_text
             for line in text.split("\n"):
                   self.layout.label(text=f"     {line}")
@@ -111,12 +111,17 @@ class LoadVolume(bpy.types.Operator):
     bl_idname = "load.volume"
     bl_label = "Load Volume"
     def execute(self, context):
-        report = load_nifti1(context.scene.path_input)
-        data = build_volume_data(context.scene.path_input)
-        context.scene.volume_info_text = f"{data}"
-        self.report({'INFO'}, report)
-        return {"FINISHED"}
+        if os.path.exists(context.scene.path_input) == False:
+            context.scene.volume_info_text = f"     ⚠️ file '{context.scene.path_input}' does not exist"
+            self.report({'INFO'}, "file does not exist")
+            return {"FINISHED"}
+        else:
+            report = load_nifti1(context.scene.path_input)
 
+            data = build_volume_data(context.scene.path_input)
+            context.scene.volume_info_text = f"{data}"
+            self.report({'INFO'}, report)
+            return {"FINISHED"}
 
 # :_: ------------------------------------------------------------------------
 #                               Property Registration
