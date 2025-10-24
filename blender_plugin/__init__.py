@@ -99,7 +99,7 @@ class Neurovolume(bpy.types.Panel):
         self.layout.operator("load.volume", text="Load VDB from NIfTI")
         #LLM:
         if hasattr(context.scene, "volume_info_text"):
-            self.layout.label(text="🧠 Loaded Volume Info:")
+            self.layout.label(text="🧠 Last Loaded Volume Info:")
             text = context.scene.volume_info_text
             for line in text.split("\n"):
                   self.layout.label(text=f"     {line}")
@@ -116,18 +116,7 @@ class LoadVolume(bpy.types.Operator):
         context.scene.volume_info_text = f"{data}"
         self.report({'INFO'}, report)
         return {"FINISHED"}
-    
-# class VolumeData(bpy.types.Panel):
-#     """Volume Data will Go Here"""
-#     bl_label = "Volume Data"
-#     bl_idname = "VIEW3D_PT_volume_data"
-#     bl_space_type = "VIEW_3D"  # in the 3D viewport
-#     bl_region_type = "UI"  # in the UI panel
-#     bl_category = "Volume Data"  # name of panel
-#     def draw(self, context):
-#         layout = self.layout
-#         for line in build_volume_data(user_set_default_nifti): #temp
-#             layout.label(text=line)
+
 
 # :_: ------------------------------------------------------------------------
 #                               Property Registration
@@ -145,12 +134,6 @@ def register_properties():
         description="",
         default="   not loaded yet"
         )
-    # #LLM:
-    # bpy.types.Scene.volume_status = bpy.props.StringProperty(
-    #    name="Volume Status",
-    #     description="Current volume loading status",
-    #     default="Click above to load file..."
-    #     )
 
 
 def unregister_properties():
