@@ -49,8 +49,7 @@ def num_frames(filepath: str, filetype: str) -> int:
             return num_frames
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
-            print(err_msg)
-            # TODO: Error handling
+            raise ValueError(err_msg)
 
 
 def pixdim(filepath: str, filetype: str, dim: int) -> float:
@@ -62,8 +61,7 @@ def pixdim(filepath: str, filetype: str, dim: int) -> float:
             return pixdim
         case _:
             err_msg = f"{filetype} is unsupported for pixdim access"
-            print(err_msg)
-            # TODO: Error handling
+            raise ValueError(err_msg)
 
 
 # Not really used, tbh! #WARN: never tested and test file just puts this as 0 for some reason
@@ -76,8 +74,7 @@ def slice_duration(filepath: str, filetype: str) -> int:
             return slice_duration
         case _:
             err_msg = f"{filetype} is unsupported for slice_duration access"
-            print(err_msg)
-            # TODO: Error handling
+            raise ValueError(err_msg)
 
 
 def unit(filepath: str, filetype: str, unit_kind: str) -> str:
@@ -90,7 +87,7 @@ def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     return unit_name.value.decode()
 
 
-def fps(filepath: str, filetype: str) -> int:
+def source_fps(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
             if num_frames(filepath, filetype) == 1:
@@ -122,7 +119,6 @@ def fps(filepath: str, filetype: str) -> int:
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
             raise ValueError(err_msg)
-            # TODO: Error handling
 
 
 #
