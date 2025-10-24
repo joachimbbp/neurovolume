@@ -1,5 +1,5 @@
 import ctypes as c
-print("running library")
+print("running neurovolume library")
 # _: Things that will eventually live in a config file:
 
 lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
@@ -37,12 +37,15 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 
 # FIX: almost all of these `case "NIfTI1"` switches are redundant,
 # the same logic is following in the zig code
+
+
 def num_frames(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
             nvol.numFrames_c.argtypes = [c.c_char_p, c.c_char_p,]
             nvol.numFrames_c.restype = c.c_size_t
             num_frames = nvol.numFrames_c(b(filepath), b(filetype))
+            print("DEBUGGY NUM FRAMES: ", num_frames)
             return num_frames
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
@@ -77,20 +80,6 @@ def slice_duration(filepath: str, filetype: str) -> int:
             # TODO: Error handling
 
 
-def fps(filepath: str, filetype: str) -> int:
-    match filetype:
-        case "NIfTI1":
-            if num_frames(filepath, filetype) == 0:
-                print("staic file, frames per second of zero!")
-                return 0
-            # WIP: needs pixdim
-
-        case _:
-            err_msg = f"{filetype} is unsupported for num_frames access"
-            print(err_msg)
-            # TODO: Error handling
-
-
 def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     BUF_SIZE = 64  # generously padded, tbh
     unit_name = c.create_string_buffer(BUF_SIZE)
@@ -99,6 +88,42 @@ def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     nvol.unit_c.restype = c.c_size_t
     nvol.unit_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
     return unit_name.value.decode()
+
+
+def fps(filepath: str, filetype: str) -> int:
+    match filetype:
+        case "NIfTI1":
+            if num_frames(filepath, filetype) == 1:
+                print(filepath, " is a staic file, frames per second of zero!")
+                return 0
+
+            time_unit = unit(filepath, filetype, "time")
+            time_value = pixdim(filepath, filetype, 4)
+            match time_unit:
+                # time_in_seconds / time_value
+                case "Seconds":
+                    return 1 / time_value
+                case "Miliseconds":
+                    return 0.001 / time_value
+                case "Microseconds":
+                    return 0.000001 / time_value
+
+                # These will probably be different
+                case "Hertz":
+                    raise ValueError("hz not implemented yet")
+                case "Parts_per_million":
+                    raise ValueError("ppm not implemented yet")
+                case "Radians_per_second":
+                    raise ValueError("rpm not implemented yet")
+                case _:
+                    raise ValueError(
+                        unit, "is an unknown unit, not implemented yet")
+
+        case _:
+            err_msg = f"{filetype} is unsupported for num_frames access"
+            raise ValueError(err_msg)
+            # TODO: Error handling
+
 
 #
 # def real_size():
