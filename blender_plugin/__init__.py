@@ -102,14 +102,15 @@ class Neurovolume(bpy.types.Panel):
             self.layout.label(text="🧠 Last Loaded Volume:")
             text = context.scene.volume_info_text
             for line in text.split("\n"):
-                  self.layout.label(text=f"     {line}")
+                self.layout.label(text=f"     {line}")
         else:
             self.layout.label(text="no info")
 
-class LoadVolume(bpy.types.Operator): #LLM: drop-in rewrite for reactive loading
+
+class LoadVolume(bpy.types.Operator):  # LLM: drop-in rewrite for reactive loading
     bl_idname = "load.volume"
     bl_label = "Load Volume"
-    
+
     _timer = None
     _path = None
     _step = 0
@@ -126,7 +127,8 @@ class LoadVolume(bpy.types.Operator): #LLM: drop-in rewrite for reactive loading
         wm.modal_handler_add(self)
         return {"RUNNING_MODAL"}
 
-    def modal(self, context, event): # BUG: volume info does not display until you click away!
+    def modal(self, context, event):
+        # BUG: volume info does not display until you click away!
         if event.type == 'TIMER':
             if self._step == 0:
                 context.scene.volume_info_text = "⏳ Parsing header..."
@@ -158,7 +160,7 @@ def register_properties():
         name="Volume Info",
         description="",
         default="   not loaded yet"
-        )
+    )
 
 
 def unregister_properties():

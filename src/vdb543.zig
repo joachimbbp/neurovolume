@@ -432,8 +432,9 @@ pub fn writeFrame(
     vdb: *VDB,
     path_string: []const u8,
     arena_alloc: std.mem.Allocator,
+    transform: [4][4]f64,
 ) !ArrayList(u8) {
-    try writeVDB(buffer, vdb, id_4x4);
+    try writeVDB(buffer, vdb, transform);
     print("🐛 DEBUG PRINTY: path_string in writeFrame: {s}\n", .{path_string});
 
     const vdb_filepath = try zools.save.version(

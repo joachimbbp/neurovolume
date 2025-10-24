@@ -201,6 +201,15 @@ pub fn getHeader(filepath: []const u8) !*const Header {
     return header_ptr;
 }
 
+pub fn getTransform(h: Header) ![4][4]f64 {
+    return .{
+        .{ h.srowX[0], h.srowX[1], h.srowX[2], h.srowX[3] },
+        .{ h.srowY[0], h.srowY[1], h.srowY[2], h.srowY[3] },
+        .{ h.srowZ[0], h.srowZ[1], h.srowZ[2], h.srowZ[3] },
+        .{ 0.0, 0.0, 0.0, 1.0 },
+    };
+}
+
 pub fn MinMax3D(img: Image) ![2]f32 {
     var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
     //dim is [num dimensions, x, y, z, time ...]
@@ -249,4 +258,13 @@ test "open and normalize nifti file" {
     print("Min Max: {any}\n", .{minmax});
     const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
     print("Normalized mid value: {any}\n", .{normalized_mid_value});
+}
+
+test "non deprecated header techniques" {
+    const static = config.testing.files.nifti1_t1;
+    const hdr = try getHeader(static);
+    const trans = try getTransform(hdr.*);
+    //HACK: i feel like it would be better to pass the pointer
+    print("🧙‍♂️🧠 Non deprecated header extraction {any}: \n", .{hdr.*});
+    print("     extracted transform: {any}\n", .{trans});
 }

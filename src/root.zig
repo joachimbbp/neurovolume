@@ -9,7 +9,6 @@ const vdb543 = @import("vdb543.zig");
 const volume = @import("volume.zig");
 
 //_: CONSTS:
-const id_4x4 = zools.matrix.IdentityMatrix4x4; //DEPRECATED: transform should derrive from the actual nifti file
 const config = @import("config.zig.zon");
 
 //_: Zig Library:
@@ -22,9 +21,13 @@ pub fn nifti1ToVDB(
     arena_alloc: std.mem.Allocator,
 ) ![]const u8 {
     //TODO: loud vs quiet debug, certainly some kind of loadng feature
+    //DEPRECATED:
+    //instead these img we'll just get the relevant info from the header called below...
     const img_deprecated = try nifti1.Image.init(nifti_filepath);
     defer img_deprecated.deinit();
-
+    //NICE: like this:
+    const hdr = try nifti1.getHeader(nifti_filepath);
+    const transform = try nifti1.getTransform(hdr.*);
     var static = true;
     if (img_deprecated.header.dim[0] == 4) {
         static = false;
@@ -81,6 +84,7 @@ pub fn nifti1ToVDB(
                 &vdb,
                 frame_path,
                 arena_alloc,
+                transform,
             );
 
             print("new frame: {s}\n", .{versioned_vdb_filepath.items});
@@ -117,6 +121,7 @@ pub fn nifti1ToVDB(
             &vdb,
             frame_path,
             arena_alloc,
+            transform,
         );
         print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
         filepath = versioned_vdb_filepath.items;
@@ -274,25 +279,25 @@ pub export fn pixdim_c( //WARN: not really used, tbh. Test file has 0 slice dura
     }
 }
 
-// test "static nifti to vdb - c level" {
-//     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
-//     //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
-//     //either that or the default persistent location in the real nifti1ToVDB function!
-//     print("🌊 c level nifti to vdb\n", .{});
-//
-//     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
-//     //TODO: make the lenght a bit more robust. What should it be???
-//
-//     const fpath_len = nifti1ToVDB_c(
-//         config.testing.files.nifti1_t1,
-//         config.paths.vdb_output_dir,
-//         true,
-//         &fpath_buff,
-//         fpath_buff.len,
-//     );
-//     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-//     print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
-// }
+test "static nifti to vdb - c level" {
+    //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
+    //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
+    //either that or the default persistent location in the real nifti1ToVDB function!
+    print("🌊 c level nifti to vdb\n", .{});
+
+    var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
+    //TODO: make the lenght a bit more robust. What should it be???
+
+    const fpath_len = nifti1ToVDB_c(
+        config.testing.files.nifti1_t1,
+        config.paths.vdb_output_dir,
+        true,
+        &fpath_buff,
+        fpath_buff.len,
+    );
+    print("☁️ 🧠 static nifti test saved as VDB\n", .{});
+    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+}
 
 test "header data extraction to C" {
     //_: num frames
