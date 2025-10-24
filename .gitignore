@@ -6,3 +6,4 @@ __pycache__
 *.vdb
 .zig-cache
 zig-out
+.vscode

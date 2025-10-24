@@ -35,19 +35,18 @@ print("Neurovolume is running")
 # ------------------------------------------------------------------------------
 # THOUGHT: Not sure if these first two should go into the neurovolume_lib?
 
-def get_basename(path):
-    hierarchy = path.split("/")
-    return hierarchy[-1].split(".")[0]
-
-
-def get_folder(path):
-    """Returns the folder in which the path points to"""
-    hiearchy = path.split("/")
-    return "/".join(hiearchy[:-1])
-
-
 def vdb_frames_sort(entry: dict):
     return int(entry["name"].split(".")[0].split("_")[-1])
+
+
+def volume_data(filepath) -> str:
+    path_parts = filepath.split("/")
+    filename = nv.get_basename(filepath)
+    fps = nv.source_fps(filepath, "NIfTI1")
+    if fps == 0:
+        return f"{filename}\nStatic Volume"
+    else:
+        return f"{filename}\nFPS: {fps}"
 
 
 def load_nifti1(filepath: str, normalize: bool = True):
@@ -62,7 +61,7 @@ def load_nifti1(filepath: str, normalize: bool = True):
                                      align='WORLD',
                                      location=(0, 0, 0),
                                      scale=(1, 1, 1))
-        return "Static VDB loaded into scene"
+        return volume_data(filepath)
     elif n_frames > 1:
         vdb_sequence = []
 
@@ -80,7 +79,7 @@ def load_nifti1(filepath: str, normalize: bool = True):
                                      align='WORLD',
                                      location=(0, 0, 0),
                                      scale=(1, 1, 1))
-        return "VDB sequence loaded into scene"
+        return volume_data(filepath)
 # :_: ------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 #                               GUI Functions
@@ -101,8 +100,7 @@ class Neurovolume(bpy.types.Panel):
         self.layout.operator("load.volume", text="Load VDB from NIfTI")
 
 
-class Volume(bpy.types.Operator):
-    """Load in NPY file and convert it to VDB"""
+class LoadVolume(bpy.types.Operator):
     bl_idname = "load.volume"
     bl_label = "Load Volume"
 
@@ -127,7 +125,7 @@ def unregister_properties():
     del bpy.types.Scene.path_input
 
 
-classes = [Neurovolume, Volume]
+classes = [Neurovolume, LoadVolume]
 
 
 def register():

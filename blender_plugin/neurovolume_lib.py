@@ -17,6 +17,17 @@ def b(string):
     return string.encode("utf-8")
 
 
+def get_basename(path):
+    hierarchy = path.split("/")
+    return hierarchy[-1].split(".")[0]
+
+def get_folder(path):
+    """Returns the folder in which the path points to"""
+    hiearchy = path.split("/")
+    return "/".join(hiearchy[:-1])
+
+
+
 def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
     BUF_SIZE = 4096  # somewhat arbitrary, should be big enough for file name
     save_location = c.create_string_buffer(BUF_SIZE)
