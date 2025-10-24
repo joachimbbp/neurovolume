@@ -42,7 +42,6 @@ pub fn nifti1ToVDB(
     const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
     var filepath: []const u8 = undefined;
     if (!static) {
-        print("non static fmri!\n", .{});
         static = false;
         const transform = zools.matrix.IdentityMatrix4x4; // HACK: native transform doesn't work with bold as of right now!
         const vdb_seq_folder = try zools.save.versionFolder(base_seq_folder, arena_alloc); //CLEAN: This feels really hacky and verbose
@@ -78,21 +77,18 @@ pub fn nifti1ToVDB(
                 normalize,
                 frame,
             ); //write VDB frame
-            const versioned_vdb_filepath = try vdb543.writeFrame(
+            _ = try vdb543.writeFrame(
                 &buffer,
                 &vdb,
                 frame_path,
                 arena_alloc,
                 transform,
             );
-
-            print("new frame: {s}\n", .{versioned_vdb_filepath.items});
         }
 
         filepath = vdb_seq_folder.items;
     } else {
         //Signifies a static, 3D MRI
-        print("Static MRI\n", .{});
         const transform = try nifti1.getTransform(hdr.*);
         var buffer = std.array_list.Managed(u8).init(arena_alloc);
         defer buffer.deinit();
@@ -114,7 +110,6 @@ pub fn nifti1ToVDB(
             "{[dir]s}/{[bn]s}.vdb",
             .{ .dir = output_dir, .bn = basename },
         );
-        print("🐛 DEBUG PRINTY: frame_path: {s} \n", .{frame_path});
 
         const versioned_vdb_filepath = try vdb543.writeFrame(
             &buffer,
@@ -123,7 +118,6 @@ pub fn nifti1ToVDB(
             arena_alloc,
             transform,
         );
-        print("new vdb file: {s}\n", .{versioned_vdb_filepath.items});
         filepath = versioned_vdb_filepath.items;
     }
 
@@ -170,7 +164,6 @@ pub export fn unit_c(
     unitName_cap: usize, //currently the largest is 18
 ) usize {
     //WARN: this leaned way to heavily on LLMs, I definately can't explain exactly why or how a lot of this works!
-    print("🐛 checkpoint: running xyztUnits_c\n", .{});
 
     var name: []const u8 = undefined;
     const fpath_slice: []const u8 = std.mem.span(fpath);
@@ -196,22 +189,17 @@ pub export fn unit_c(
         };
 
         const field = hdr_ptr.xyztUnits;
-        print("🐛 field binary: {b:0>8} field decimal: {d} field type: {any}\n", .{ field, field, @TypeOf(field) });
         //LLM:
         const spatial_code = field & 0x07;
-        print("🐛 spatial_code binary: {b:0>8} decimal: {d} (mask: 0x07 = {b:0>8})\n", .{ spatial_code, spatial_code, @as(u8, 0x07) });
         const temporal_code = (field & 0x38) >> 3;
-        print("🐛 temporal_code binary: {b:0>8} decimal: {d} (mask: 0x38 = {b:0>8})\n", .{ temporal_code, temporal_code, @as(u8, 0x38) });
         //LLMEND:
 
         if (std.mem.eql(u8, unit_kind_slice, "time") == true) {
             const unit: Unit = @enumFromInt(temporal_code << 3); //LLM: has to shift back
             name = @tagName(unit);
-            print("🐛 temporal unit: {s}\n", .{name});
         } else if (std.mem.eql(u8, unit_kind_slice, "space") == true) {
             const unit: Unit = @enumFromInt(spatial_code);
             name = @tagName(unit);
-            print("🐛 spatial unit: {s}\n", .{name});
         } else {
             print("⚠️📜 Unsuported unit kind: {s}\n", .{unit_kind_slice});
             return 0;
@@ -221,7 +209,6 @@ pub export fn unit_c(
         return 0;
     }
 
-    print("🐛 deubggy name of unit: {s}\n", .{name});
     const n = if (name.len + 1 <= unitName_cap) name.len else name.len - 1;
     @memcpy(unitName_buff[0..n], name[0..n]);
     return n;

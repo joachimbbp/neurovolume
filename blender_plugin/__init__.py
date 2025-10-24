@@ -51,7 +51,6 @@ def build_volume_data(filepath) -> str:
 def load_nifti1(filepath: str, normalize: bool = True):
     vdb_path = os.path.abspath(
         nv.nifti1_to_VDB(filepath, normalize))
-    print("vdb path: ", vdb_path)
 
     n_frames = nv.num_frames(filepath, "NIfTI1")
     if n_frames == 1:
@@ -70,7 +69,6 @@ def load_nifti1(filepath: str, normalize: bool = True):
             else:
                 continue
             vdb_sequence.sort(key=vdb_frames_sort)
-            print(f"loading in VDB sequence:\n{vdb_sequence}")
         bpy.ops.object.volume_import(filepath=filepath,
                                      directory=vdb_path,
                                      files=vdb_sequence,

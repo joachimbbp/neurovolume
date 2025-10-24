@@ -179,10 +179,6 @@ pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f32, allocator: std.mem.Allo
     node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & (64 - 1));
 
     node_3.data[bit_index_0] = value;
-    // print("value at setVoxel: {d}\n", .{value});
-    // print("bit index 4: {d}\n", .{bit_index_4});
-    // print("bit index 3: {d}\n", .{bit_index_3});
-    // print("bit index 0: {d}\n", .{bit_index_0});
 }
 
 fn writeNode5Header(buffer: *ArrayList(u8), node: *Node5) !void {
@@ -279,7 +275,6 @@ fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) !void {
             }
         }
     }
-    //    print("end of tree writing function\n", .{});
 }
 
 fn writeMetadata(buffer: *ArrayList(u8)) !void {
@@ -405,7 +400,6 @@ pub fn buildFrame(
     const dim = img_deprecated.header.dim;
     var vdb = try VDB.build(arena_alloc);
 
-    print("iterating nifti file\n", .{});
     for (0..@as(usize, @intCast(dim[3]))) |z| {
         for (0..@as(usize, @intCast(dim[2]))) |x| {
             for (0..@as(usize, @intCast(dim[1]))) |y| {
@@ -421,7 +415,6 @@ pub fn buildFrame(
             }
         }
     }
-    print("🐛 DEBUG PRINTY: frame {d} build\n", .{frame});
 
     return vdb;
 }
@@ -435,14 +428,12 @@ pub fn writeFrame(
     transform: [4][4]f64,
 ) !ArrayList(u8) {
     try writeVDB(buffer, vdb, transform);
-    print("🐛 DEBUG PRINTY: path_string in writeFrame: {s}\n", .{path_string});
 
     const vdb_filepath = try zools.save.version(
         path_string,
         buffer.*, //EXORCISE: This pointer pattern seems cursed
         arena_alloc,
     );
-    print("🐛 DEBUG PRINTY:\nvdb_filepath: {s}\n", .{vdb_filepath.items});
     return vdb_filepath;
 }
 

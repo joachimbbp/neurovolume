@@ -50,26 +50,10 @@ pub const Data = struct {
     }
 
     pub fn deinit(self: *Data, alloc: std.mem.Allocator) void {
-        //TODO: loop through fields
         alloc.free(self.name);
-        //        alloc.free(self.json_hdr);
-        //res is comptime so no need to destroy
-        //alloc.destroy(self.resolution);
     }
 };
-//TODO:- deinit
-// pub fn deinit(self: *const Image) void {
-//       //TODO: everything else
-//       //why did robbie put this as destroy for one and free for the other?
-//       self.allocator.destroy(self.header);
-//       self.allocator.free(self.data);
-//   }
-//
-//TODO: - JSON printing:
-//if frames = 1, just print that it's static and omit FPS etc
-//TODO: Get at and Min Max
-//
-//
+
 //_: Utils:
 fn nameFromPath(filepath: []const u8, alloc: std.mem.Allocator) ![]const u8 {
     const filename = std.fs.path.basename(filepath);

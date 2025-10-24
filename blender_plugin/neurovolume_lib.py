@@ -56,7 +56,6 @@ def num_frames(filepath: str, filetype: str) -> int:
             nvol.numFrames_c.argtypes = [c.c_char_p, c.c_char_p,]
             nvol.numFrames_c.restype = c.c_size_t
             num_frames = nvol.numFrames_c(b(filepath), b(filetype))
-            print("DEBUGGY NUM FRAMES: ", num_frames)
             return num_frames
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
@@ -102,7 +101,7 @@ def source_fps(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
             if num_frames(filepath, filetype) == 1:
-                print(filepath, " is a staic file, frames per second of zero!")
+                #staic file, frames per second is zero
                 return 0
 
             time_unit = unit(filepath, filetype, "time")
