@@ -33,20 +33,19 @@ print("Neurovolume is running")
 # :_: ------------------------------------------------------------------------
 #                               Backend Functions
 # ------------------------------------------------------------------------------
-# THOUGHT: Not sure if these first two should go into the neurovolume_lib?
 
 def vdb_frames_sort(entry: dict):
     return int(entry["name"].split(".")[0].split("_")[-1])
 
 
-def volume_data(filepath) -> str:
+def build_volume_data(filepath) -> tuple:
     path_parts = filepath.split("/")
     filename = nv.get_basename(filepath)
     fps = nv.source_fps(filepath, "NIfTI1")
     if fps == 0:
-        return f"{filename}\nStatic Volume"
+        return filename, "Static Volume"
     else:
-        return f"{filename}\nFPS: {fps}"
+        return filename, f"FPS: {fps}"
 
 
 def load_nifti1(filepath: str, normalize: bool = True):
@@ -61,7 +60,7 @@ def load_nifti1(filepath: str, normalize: bool = True):
                                      align='WORLD',
                                      location=(0, 0, 0),
                                      scale=(1, 1, 1))
-        return volume_data(filepath)
+        return build_volume_data(filepath)
     elif n_frames > 1:
         vdb_sequence = []
 
@@ -79,7 +78,7 @@ def load_nifti1(filepath: str, normalize: bool = True):
                                      align='WORLD',
                                      location=(0, 0, 0),
                                      scale=(1, 1, 1))
-        return volume_data(filepath)
+        return build_volume_data(filepath)
 # :_: ------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 #                               GUI Functions
@@ -99,7 +98,6 @@ class Neurovolume(bpy.types.Panel):
         self.layout.prop(context.scene, "path_input")
         self.layout.operator("load.volume", text="Load VDB from NIfTI")
 
-
 class LoadVolume(bpy.types.Operator):
     bl_idname = "load.volume"
     bl_label = "Load Volume"
@@ -108,6 +106,19 @@ class LoadVolume(bpy.types.Operator):
         report = load_nifti1(context.scene.path_input)
         self.report({'INFO'}, report)
         return {"FINISHED"}
+    
+class VolumeData(bpy.types.Panel):
+    """Volume Data will Go Here"""
+    bl_label = "Volume Data"
+    bl_idname = "VIEW3D_PT_volume_data"
+    bl_space_type = "VIEW_3D"  # in the 3D viewport
+    bl_region_type = "UI"  # in the UI panel
+    bl_category = "Volume Data"  # name of panel
+    def draw(self, context):
+        layout = self.layout
+        for line in build_volume_data(user_set_default_nifti): #temp
+            layout.label(text=line)
+
 # :_: ------------------------------------------------------------------------
 #                               Property Registration
 # ------------------------------------------------------------------------------
@@ -119,13 +130,19 @@ def register_properties():
         description="Enter path to folder containing .npy files",
         default=user_set_default_nifti
     )
+    bpy.types.Scene.volume_info_text = bpy.props.StringProperty(
+        name="Volume Info",
+        description="",
+        default=""
+        )
 
 
 def unregister_properties():
     del bpy.types.Scene.path_input
+    del bpy.types.Scene.volume_info_text
 
 
-classes = [Neurovolume, LoadVolume]
+classes = [Neurovolume, LoadVolume, VolumeData]
 
 
 def register():
