@@ -6,7 +6,6 @@ const print = std.debug.print;
 const zools = @import("zools");
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
-const volume = @import("volume.zig");
 
 //_: CONSTS:
 const config = @import("config.zig.zon");

@@ -10,7 +10,8 @@
 // [ ] Arbitrary input data
 // [ ]  setVoxels one 3-node at a time to reduce syscalls
 // [ ] Improve error handling
-//SUBMODULE:
+
+//DEPENCENCY:
 // This is an external UUID writing dependency (written by me, Joachim)
 // If you don't want to deal with imports feel free to hard code a
 // UUID down under the comment "write UUID"
