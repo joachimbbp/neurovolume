@@ -106,22 +106,42 @@ class Neurovolume(bpy.types.Panel):
         else:
             self.layout.label(text="no info")
 
-
-class LoadVolume(bpy.types.Operator):
+class LoadVolume(bpy.types.Operator): #LLM: drop-in rewrite for reactive loading
     bl_idname = "load.volume"
     bl_label = "Load Volume"
+    
+    _timer = None
+    _path = None
+    _step = 0
+
     def execute(self, context):
-        if os.path.exists(context.scene.path_input) == False:
-            context.scene.volume_info_text = f"     ⚠️ file '{context.scene.path_input}' does not exist"
+        self._path = context.scene.path_input
+        if not os.path.exists(self._path):
+            context.scene.volume_info_text = f"⚠️ file '{self._path}' does not exist"
             self.report({'INFO'}, "file does not exist")
             return {"FINISHED"}
-        else:
-            report = load_nifti1(context.scene.path_input)
+        context.scene.volume_info_text = "⏳ Loading..."
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        wm.modal_handler_add(self)
+        return {"RUNNING_MODAL"}
 
-            data = build_volume_data(context.scene.path_input)
-            context.scene.volume_info_text = f"{data}"
-            self.report({'INFO'}, report)
-            return {"FINISHED"}
+    def modal(self, context, event): # BUG: volume info does not display until you click away!
+        if event.type == 'TIMER':
+            if self._step == 0:
+                context.scene.volume_info_text = "⏳ Parsing header..."
+            elif self._step == 1:
+                report = load_nifti1(self._path)
+                context.scene.volume_info_text = "📊 Building VDB data..."
+            elif self._step == 2:
+                data = build_volume_data(self._path)
+                context.scene.volume_info_text = data
+                self.report({'INFO'}, "Volume loaded")
+                wm = context.window_manager
+                wm.event_timer_remove(self._timer)
+                return {'FINISHED'}
+            self._step += 1
+        return {'RUNNING_MODAL'}
 
 # :_: ------------------------------------------------------------------------
 #                               Property Registration
