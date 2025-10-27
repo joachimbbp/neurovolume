@@ -83,7 +83,7 @@ pub const DataType = enum(i16) {
     fn name(field: DataType) [:0]const u8 {
         return @tagName(field);
     }
-    pub fn get(hdr_ptr: *Header) !DataType {
+    pub fn getName(hdr_ptr: *Header) ![:0]const u8 {
         const data_type_tag: DataType = @enumFromInt(hdr_ptr.*.datatype);
         return DataType.name(data_type_tag);
     }
@@ -99,17 +99,19 @@ pub fn loadHeaderPointer(filepath: []const u8, alloc: std.mem.Allocator) !*Heade
 }
 
 pub fn getRawData(filepath: []const u8) ![]u8 {
-    const alloc = &std.heap.page_allocator; //WARN: why page_allocator?
+    const alloc = &std.heap.page_allocator;
+    //WARN: why a pointer to a page_allocator?
 
     const file = try std.fs.cwd().openFile(filepath, .{});
     defer file.close();
-    const hdr_ptr = loadHeaderPointer(filepath, alloc);
+    const hdr_ptr = try loadHeaderPointer(filepath, alloc.*);
     const vox_offset = @as(u32, @intFromFloat(hdr_ptr.voxOffset));
     try file.seekTo(vox_offset);
     const file_size = try file.getEndPos();
 
     const raw_data = try alloc.alloc(u8, (file_size - vox_offset)); //wow, CURSED: naming!
-    try file.readAll(raw_data);
+    const idx = try file.readAll(raw_data);
+    _ = idx;
     return raw_data;
 }
 
@@ -119,17 +121,17 @@ pub fn getAt4D(
     zpos: usize,
     tpos: usize,
     data: []u8,
-    header_pointer: Header,
+    header_pointer: *Header,
     normalize: bool,
     minmax: [2]f32,
 ) !f32 {
-    const nx: usize = @intCast(header_pointer.*.dim[1]);
-    const ny: usize = @intCast(header_pointer.*.dim[2]);
-    const nz: usize = @intCast(header_pointer.*.dim[3]);
+    const nx: usize = @intCast(header_pointer.dim[1]);
+    const ny: usize = @intCast(header_pointer.dim[2]);
+    const nz: usize = @intCast(header_pointer.dim[3]);
 
     const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
 
-    const bytes_per_voxel: u16 = @intCast(@divTrunc(header_pointer.*.bitpix, 8));
+    const bytes_per_voxel: u16 = @intCast(@divTrunc(header_pointer.bitpix, 8));
     const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
     const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
 
@@ -144,8 +146,8 @@ pub fn getAt4D(
     //the whole shebang with Jan's get_at logic, so I'm not going to focus
     //on optimizing this temporary code
     var post_slope = raw_value;
-    if (header_pointer.*.sclSlope != 0) {
-        post_slope = header_pointer.*.sclSlope * raw_value + header_pointer.*.sclInter;
+    if (header_pointer.sclSlope != 0) {
+        post_slope = header_pointer.*.sclSlope * raw_value + header_pointer.sclInter;
     }
 
     if (normalize) {
@@ -212,13 +214,26 @@ pub fn getTransform(h: Header) ![4][4]f64 {
     };
 }
 
-pub fn getMinMax3D(dim: [4]usize) ![2]f32 {
+pub fn getMinMax3D(
+    dim: [4]usize,
+    data_ptr: *[]u8,
+    hdr_ptr: *Header,
+) ![2]f32 {
     //OPTIMIZE: this could probably mimic Jan's eventual logic in getAt4D
     var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
     for (0..@as(usize, @intCast(dim[3]))) |z| {
         for (0..@as(usize, @intCast(dim[2]))) |y| {
             for (0..@as(usize, @intCast(dim[1]))) |x| {
-                const val = try getAt4D(x, y, z, 0, false, .{ 0, 0 });
+                const val = try getAt4D(
+                    x,
+                    y,
+                    z,
+                    0,
+                    data_ptr.*,
+                    hdr_ptr,
+                    false,
+                    .{ 0, 0 },
+                );
                 if (val < minmax[0]) {
                     minmax[0] = val;
                 }
@@ -242,16 +257,22 @@ test "open and normalize nifti file" {
     const static = config.testing.files.nifti1_t1;
     const hdr_ptr = try getHeader(static);
     printHeader(hdr_ptr);
-    print("\ndatatype: {s}\n", .{DataType.get(hdr_ptr)});
+    const dt_name = try DataType.getName(hdr_ptr);
+    print("\ndatatype: {s}\n", .{dt_name});
     const bpv = try getBytesPerVoxel(hdr_ptr);
     print("bytes per voxel: {any}\n", .{bpv});
 
-    const mid_x: usize = @divFloor(@as(usize, @intCast(hdr_ptr.*.img.header.dim[1])), 2);
-    const mid_y: usize = @divFloor(@as(usize, @intCast(hdr_ptr.*.img.header.dim[2])), 2);
+    const mid_x: usize = @divFloor(@as(usize, @intCast(hdr_ptr.*.dim[1])), 2);
+    const mid_y: usize = @divFloor(@as(usize, @intCast(hdr_ptr.*.dim[2])), 2);
     const mid_z: usize = @divFloor(@as(usize, @intCast(hdr_ptr.*.dim[3])), 2);
     const mid_t: usize = @divFloor(@as(usize, @intCast(hdr_ptr.*.dim[4])), 2);
-    const minmax = try getMinMax3D(mid_x, mid_y, mid_z, mid_t);
-    const raw_data = try getRawData(static);
+    const mid_dims: [4]usize = .{ mid_x, mid_y, mid_z, mid_t };
+    var raw_data = try getRawData(static);
+    const minmax = try getMinMax3D(
+        mid_dims,
+        &raw_data,
+        hdr_ptr,
+    );
 
     const mid_value = try getAt4D(
         mid_x,
@@ -273,6 +294,8 @@ test "open and normalize nifti file" {
         mid_y,
         mid_z,
         mid_t,
+        raw_data,
+        hdr_ptr,
         true,
         minmax,
     );
