@@ -1,0 +1,23 @@
+.{
+    .name = .neurovolume,
+
+    .version = "0.0.0",
+    .dependencies = .{
+        .zools = .{
+            .url = "git+https://github.com/joachimbbp/zools#c7ecc7db344f81292083e51c58d17473893f419a",
+            .hash = "zools-0.0.0-VPOS2hpkAAAl0i4tSI-9e8Yv_-ptpBLlEyXQ9pcpiqNz",
+        },
+    },
+
+    .fingerprint = 0x7f0c83e043c37613, // Changing this has security and trust implications.
+
+    .minimum_zig_version = "0.15.1",
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}

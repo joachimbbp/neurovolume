@@ -1,0 +1,21 @@
+//INSTRUCTIONS:
+// replace the paths with the corresponding paths on your machine
+
+//TODO: Eventually lots of these will be generated
+.{
+    .paths = .{
+        .vdb_output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output",
+    },
+    .testing = .{
+        //SOURCE: from study: https://openneuro.org/datasets/ds003548/versions/1.0.1
+        .files = .{
+            //SOURCE:: https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz
+            .nifti1_t1 = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii",
+            //SOURCE: https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q
+            .bold = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii",
+        },
+        .dirs = .{
+            .output = "/Users/joachimpfefferkorn/repos/neurovolume/output", //same as the vdb output dir for now
+        },
+    },
+}
