@@ -52,7 +52,7 @@ For more information on VDBs, see the [openVDB website](https://www.openvdb.org/
 While a comprehensive road-map will be published soon, there are a few important considerations to take into account now.
 - Neurovolume currently only supports `NIfTI1` files (and only some variants). Full coverage and `NIfTI2` will be supported soon.
 - Presently the VDB writer isn't sparse. Tiles are in development.
-- Frame interpolation (present in the original Go prototype and shown below) is currently under development on this branch. I will link to the original code in a sec. #TODO
+- Frame interpolation (present in the original Go prototype and shown below) is currently under development on this branch. If you wish to access the old, Go code, check out [the archive](https://github.com/joachimbbp/neurovolume_archive)
 ![Loop of a BOLD image using the method of subtraction, motion extraction, and frame cross-dissolve frame interpolation](readme_media/bold_mos_me_loop.gif)
 
 
