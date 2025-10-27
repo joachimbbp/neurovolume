@@ -21,11 +21,11 @@ def get_basename(path):
     hierarchy = path.split("/")
     return hierarchy[-1].split(".")[0]
 
+
 def get_folder(path):
     """Returns the folder in which the path points to"""
     hiearchy = path.split("/")
     return "/".join(hiearchy[:-1])
-
 
 
 def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
@@ -74,7 +74,7 @@ def pixdim(filepath: str, filetype: str, dim: int) -> float:
             raise ValueError(err_msg)
 
 
-# Not really used, tbh! #WARN: never tested and test file just puts this as 0 for some reason
+# WARN: never tested or used and test file just puts this as 0 for some reason
 def slice_duration(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
@@ -101,7 +101,7 @@ def source_fps(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
             if num_frames(filepath, filetype) == 1:
-                #staic file, frames per second is zero
+                # staic file, frames per second is zero
                 return 0
 
             time_unit = unit(filepath, filetype, "time")

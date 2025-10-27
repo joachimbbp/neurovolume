@@ -435,6 +435,7 @@ pub fn writeFrame(
         buffer.*, //EXORCISE: This pointer pattern seems cursed
         arena_alloc,
     );
+
     return vdb_filepath;
 }
 

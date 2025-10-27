@@ -60,7 +60,7 @@ pub fn nifti1ToVDB(
             const frame_path = try zools.sequence.elementName(
                 vdb_seq_folder_slice,
                 basename,
-                ".vdb",
+                "vdb",
                 frame,
                 leading_zeros,
                 arena_alloc,
