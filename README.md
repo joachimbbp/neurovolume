@@ -19,6 +19,7 @@ After installing Zig, Blender, and Python, run `zig build` from the project repo
 
 ## 🗃️ Test Files
 If you wish to run tests, download the [T1](https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz) and [BOLD](https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q) images to `./media`
+Unzip both of these `.gz` files before running the tests.
 
 ## 🛤️ Change Hard-Coded paths
 `./src/config.zig.zon` includes full, hard-coded paths to these files as well as your VDB output directory. Set these to the corresponding paths on your machine (they will be `./output` and the filepaths in `./media` respectively).

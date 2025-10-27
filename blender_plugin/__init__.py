@@ -131,7 +131,7 @@ class LoadVolume(bpy.types.Operator):  # LLM: drop-in rewrite for reactive loadi
             if self._step == 0:
                 context.scene.volume_info_text = "⏳ Parsing header..."
             elif self._step == 1:
-                report = load_nifti1(self._path)
+                load_nifti1(self._path)
                 context.scene.volume_info_text = "📊 Building VDB data..."
             elif self._step == 2:
                 data = build_volume_data(self._path)
