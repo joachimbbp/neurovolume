@@ -384,21 +384,21 @@ pub fn lengthSquared(v: [3]f32) f32 {
 }
 //SECTION: writing frames
 
-//DEPRECATED: Normally we wouldn't bring the nifti1 module in here (as
-//VDBs shouldn't be dependent on specific file formats). In the future the img
-//will be a fully universal format, so that will be fine! But for now, we do this.
-const nifti1 = @import("nifti1.zig");
-const Img = nifti1.Image;
+const getAtOp = *const fn(
+
+//TODO:
+//function pointer for getAt in buildFrame
+//universalize getAt function in nifti1.zig so you can mimic it in other function types
 
 // Builds a static VDB frame
 pub fn buildFrame(
     arena_alloc: std.mem.Allocator,
-    img_deprecated: Img,
-    minmax_deprecated: [2]f32, //DEPRECATED: will eventually live in img
+    minmax: [2]f32, //DEPRECATED: will eventually live in img
+    dim: [8]usize,
     normalize: bool,
     frame: usize,
+    
 ) !VDB {
-    const dim = img_deprecated.header.dim;
     var vdb = try VDB.build(arena_alloc);
 
     for (0..@as(usize, @intCast(dim[3]))) |z| {

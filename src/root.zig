@@ -19,18 +19,13 @@ pub fn nifti1ToVDB(
     normalize: bool,
     arena_alloc: std.mem.Allocator,
 ) ![]const u8 {
-    //TODO: loud vs quiet debug, certainly some kind of loadng feature
-    //DEPRECATED:
-    //instead these img we'll just get the relevant info from the header called below...
-    const img_deprecated = try nifti1.Image.init(nifti_filepath);
-    defer img_deprecated.deinit();
-    //NICE: like this:
     const hdr = try nifti1.getHeader(nifti_filepath);
     var static = true;
-    if (img_deprecated.header.dim[0] == 4) {
+    if (hdr.dim[0] == 4) {
         static = false;
     } //TODO: coverage for any weird dim numbers
-    const minmax = try nifti1.MinMax3D(img_deprecated); //DEPRECATED: will live in new img
+    const raw_data = try nifti1.getRawData(nifti_filepath);
+    const minmax = try nifti1.getMinmax(.{ hdr.dim[1], hdr.dim[2], hdr.dim[3] }, &raw_data, hdr);
 
     //output folder / new filename / framename_0
     var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
