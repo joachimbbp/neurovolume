@@ -384,42 +384,6 @@ pub fn lengthSquared(v: [3]f32) f32 {
 }
 //SECTION: writing frames
 
-const getAtOp = *const fn(
-
-//TODO:
-//function pointer for getAt in buildFrame
-//universalize getAt function in nifti1.zig so you can mimic it in other function types
-
-// Builds a static VDB frame
-pub fn buildFrame(
-    arena_alloc: std.mem.Allocator,
-    minmax: [2]f32, //DEPRECATED: will eventually live in img
-    dim: [8]usize,
-    normalize: bool,
-    frame: usize,
-    
-) !VDB {
-    var vdb = try VDB.build(arena_alloc);
-
-    for (0..@as(usize, @intCast(dim[3]))) |z| {
-        for (0..@as(usize, @intCast(dim[2]))) |x| {
-            for (0..@as(usize, @intCast(dim[1]))) |y| {
-                const val = try img_deprecated.getAt4D(
-                    x,
-                    y,
-                    z,
-                    frame,
-                    normalize,
-                    minmax_deprecated,
-                );
-                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), arena_alloc);
-            }
-        }
-    }
-
-    return vdb;
-}
-
 // Writes a static VDB frame to disk
 pub fn writeFrame(
     buffer: *ArrayList(u8),

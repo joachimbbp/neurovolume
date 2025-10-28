@@ -11,7 +11,37 @@ const vdb543 = @import("vdb543.zig");
 const config = @import("config.zig.zon");
 
 //_: Zig Library:
+pub fn buildNifti1Frame(
+    arena_alloc: std.mem.Allocator,
+    frame: usize,
+    data_ptr: *const []u8,
+    normalize: bool,
+    minmax: [2]f32,
+    hdr_ptr: *nifti1.Header,
+    bytes_per_voxel: u16,
+) !vdb543.VDB {
+    //NOTE: you might be able to sue this and getAt4D for NIfTI2
+    // provided you break out the data from the header
+    var vdb = try vdb543.VDB.build(arena_alloc);
 
+    for (0..@as(usize, @intCast(hdr_ptr.dim[3]))) |z| {
+        for (0..@as(usize, @intCast(hdr_ptr.dim[2]))) |x| {
+            for (0..@as(usize, @intCast(hdr_ptr.dim[1]))) |y| {
+                const val = try nifti1.getAt4D(
+                    .{ x, y, z, frame },
+                    data_ptr,
+                    bytes_per_voxel,
+                    normalize,
+                    minmax,
+                    hdr_ptr,
+                );
+                try vdb543.setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), arena_alloc);
+            }
+        }
+    }
+
+    return vdb;
+}
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub fn nifti1ToVDB(
     nifti_filepath: []const u8,
@@ -25,7 +55,13 @@ pub fn nifti1ToVDB(
         static = false;
     } //TODO: coverage for any weird dim numbers
     const raw_data = try nifti1.getRawData(nifti_filepath);
-    const minmax = try nifti1.getMinmax(.{ hdr.dim[1], hdr.dim[2], hdr.dim[3] }, &raw_data, hdr);
+    const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.bitpix, 8));
+
+    const minmax = try nifti1.getMinMax(
+        &raw_data,
+        hdr,
+        bytes_per_voxel,
+    );
 
     //output folder / new filename / framename_0
     var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
@@ -35,10 +71,12 @@ pub fn nifti1ToVDB(
     const basename = name_split.rest();
     const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
     var filepath: []const u8 = undefined;
+
     if (!static) {
         static = false;
         const transform = zools.matrix.IdentityMatrix4x4; // HACK: native transform doesn't work with bold as of right now!
         const vdb_seq_folder = try zools.save.versionFolder(base_seq_folder, arena_alloc); //CLEAN: This feels really hacky and verbose
+
         var buf = std.array_list.Managed(u8).init(arena_alloc);
         defer buf.deinit();
         for (vdb_seq_folder.items) |c| {
@@ -47,10 +85,10 @@ pub fn nifti1ToVDB(
         try buf.append(0);
         const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
-        const frames: usize = @intCast(img_deprecated.header.dim[4]);
+        const frames: usize = @intCast(hdr.dim[4]);
 
         //WARN: technically a bit unsafe, but there shouldnt be negative dimensions. Will iron out when making img univeral
-        const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
+        const leading_zeros = zools.math.numDigitsShort(@bitCast(hdr.dim[4]));
         for (0..frames) |frame| {
             const frame_path = try zools.sequence.elementName(
                 vdb_seq_folder_slice,
@@ -63,13 +101,14 @@ pub fn nifti1ToVDB(
 
             var buffer = std.array_list.Managed(u8).init(arena_alloc);
             defer buffer.deinit();
-
-            var vdb = try vdb543.buildFrame(
+            var vdb = try buildNifti1Frame(
                 arena_alloc,
-                img_deprecated,
-                minmax,
-                normalize,
                 frame,
+                &raw_data,
+                normalize,
+                minmax,
+                hdr,
+                bytes_per_voxel,
             ); //write VDB frame
             _ = try vdb543.writeFrame(
                 &buffer,
@@ -86,14 +125,16 @@ pub fn nifti1ToVDB(
         const transform = try nifti1.getTransform(hdr.*);
         var buffer = std.array_list.Managed(u8).init(arena_alloc);
         defer buffer.deinit();
-
-        var vdb = try vdb543.buildFrame(
+        var vdb = try buildNifti1Frame(
             arena_alloc,
-            img_deprecated,
-            minmax,
-            normalize,
             0,
+            &buffer.items,
+            normalize,
+            minmax,
+            hdr,
+            bytes_per_voxel,
         );
+
         //ROBOT: Claude sonet 4.5 suggested this:
         if (std.fs.path.dirname(base_seq_folder)) |dir_path| {
             try std.fs.cwd().makePath(dir_path);
