@@ -521,9 +521,12 @@ pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
         &buffer,
     );
 }
-
+const t = zools.timer;
 test "test patterns" {
+    const s = t.Click();
     print("☁️ ⚪️ Sphere Test Pattern\n", .{});
+    _ = t.Lap(s, "Sphere Test Pattern Timer");
+
     try sphereTest("tmp");
     print("☁️ ▫️ One Voxel Test Pattern\n", .{});
     try oneVoxelTest("tmp");
