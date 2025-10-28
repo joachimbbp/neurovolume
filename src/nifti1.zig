@@ -231,11 +231,14 @@ pub fn MinMax3D(img: Image) ![2]f32 {
 
 //SECTION: Tests:
 const config = @import("config.zig.zon");
+const zools = @import("zools");
+const t = zools.timer;
 test "echo module" {
     print("🧠 nifti1.zig module echo\n", .{});
 }
 
 test "open and normalize nifti file" {
+    const s = t.Click();
     print("🧠 Opening and normalizing nifti1 file\n", .{});
     const static = config.testing.files.nifti1_t1;
     var img = try Image.init(static);
@@ -258,6 +261,7 @@ test "open and normalize nifti file" {
     print("Min Max: {any}\n", .{minmax});
     const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
     print("Normalized mid value: {any}\n", .{normalized_mid_value});
+    _ = t.Lap(s, "nifti1.zig open and normalize timer");
 }
 
 test "non deprecated header techniques" {

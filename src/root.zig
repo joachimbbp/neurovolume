@@ -265,15 +265,19 @@ pub export fn pixdim_c( //WARN: not really used, tbh. Test file has 0 slice dura
     }
 }
 
+const t = zools.timer;
+
 test "static nifti to vdb - c level" {
     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
-    //TODO: reconcile these by bringing the tmp save out of the function itself and then calling
+    //perhaps: reconcile these by bringing the tmp save out of the function itself and then calling
     //either that or the default persistent location in the real nifti1ToVDB function!
+
     print("🌊 c level nifti to vdb\n", .{});
 
     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
     //TODO: make the lenght a bit more robust. What should it be???
 
+    const start = t.Click();
     const fpath_len = nifti1ToVDB_c(
         config.testing.files.nifti1_t1,
         config.paths.vdb_output_dir,
@@ -281,6 +285,7 @@ test "static nifti to vdb - c level" {
         &fpath_buff,
         fpath_buff.len,
     );
+    _ = t.Lap(start, "Static Nifti1 to VDB Timer");
     print("☁️ 🧠 static nifti test saved as VDB\n", .{});
     print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
@@ -290,6 +295,7 @@ test "bold nifti to vdb - c level" {
     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
     //TODO: make the lenght a bit more robust. What should it be???
 
+    const start = t.Click();
     const fpath_len = nifti1ToVDB_c(
         config.testing.files.bold,
         config.paths.vdb_output_dir,
@@ -297,6 +303,7 @@ test "bold nifti to vdb - c level" {
         &fpath_buff,
         fpath_buff.len,
     );
+    _ = t.Lap(start, "BOLD nifti timer");
     print("☁️🩸🧠 BOLD nifti test saved as VDB\n", .{});
     const bhdr = try nifti1.getHeader(config.testing.files.bold);
     const b_trans = try nifti1.getTransform(bhdr.*);
