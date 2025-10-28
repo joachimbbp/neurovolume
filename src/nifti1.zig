@@ -158,7 +158,12 @@ pub fn printHeader(hdr_ptr: *Header) void {
     print("🧠 Nifti Header:\n-------- \n{any}\n--------\n", .{hdr_ptr});
 }
 
-fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {
+fn byteToFloat(
+    raw_data: []const u8,
+    bytes_per_voxel: u16,
+    bit_start: usize,
+    bit_end: usize,
+) !f32 {
     const raw_value = switch (bytes_per_voxel) {
         2 => btf2(raw_data[bit_start..bit_end]),
         //TODO: all of the other byte to float functions!

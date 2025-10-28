@@ -128,7 +128,7 @@ pub fn nifti1ToVDB(
         var vdb = try buildNifti1Frame(
             arena_alloc,
             0,
-            &buffer.items,
+            &raw_data,
             normalize,
             minmax,
             hdr,
