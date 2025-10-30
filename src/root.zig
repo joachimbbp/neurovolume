@@ -4,6 +4,8 @@
 const std = @import("std");
 const print = std.debug.print;
 const zools = @import("zools");
+const zip = zools.zip.pairs;
+const rev = zools.slice.reverse;
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
 
@@ -45,43 +47,37 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            const tpos: usize = 0; //static
-            for (0..@as(usize, @intCast(hdr.dim[3]))) |z| {
-                for (0..@as(usize, @intCast(hdr.dim[2]))) |x| {
-                    for (0..@as(usize, @intCast(hdr.dim[1]))) |y| {
-                        //
-                        const nx: usize = @intCast(hdr.dim[1]);
-                        const ny: usize = @intCast(hdr.dim[2]);
-                        const nz: usize = @intCast(hdr.dim[3]);
-
-                        const idx: usize = tpos * nx * ny * nz + z * nx * ny + y * nx + x;
-
-                        const bit_start: usize = idx * @as(usize, @intCast(img.bytes_per_voxel));
-                        const bit_end: usize = (idx + 1) * @as(usize, @intCast(img.bytes_per_voxel));
-
-                        const bytes_input = img.data[bit_start..bit_end];
-                        const raw_value: f32 = @floatFromInt(std.mem.readInt(
-                            i16,
-                            bytes_input[0..2],
-                            .little,
-                        ));
-
-                        var res_value = raw_value;
-                        if (hdr.sclSlope != 0) {
-                            res_value = hdr.sclSlope * raw_value + hdr.sclInter;
-                        }
-
-                        if (normalize) {
-                            res_value = (res_value - minmax[0]) / minmax_diff;
-                        }
-                        try vdb543.setVoxel(
-                            &vdb,
-                            .{ @intCast(x), @intCast(y), @intCast(z) },
-                            @floatCast(res_value),
-                            arena_alloc,
-                        );
-                    }
+            //Jan's linear_to_cartesian
+            const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
+            for (0..num_voxels) |voxel_idx| {
+                var cart: [3]usize = @splat(0);
+                for (0.., img.header.dim[1..4]) |i, di| {
+                    cart[i] = @rem(voxel_idx, @as(usize, @intCast(di)));
                 }
+
+                const bit_start: usize = voxel_idx * @as(usize, @intCast(img.bytes_per_voxel));
+                const bit_end: usize = (voxel_idx + 1) * @as(usize, @intCast(img.bytes_per_voxel));
+                const bytes_input = img.data[bit_start..bit_end];
+                const raw_value: f32 = @floatFromInt(std.mem.readInt(
+                    i16,
+                    bytes_input[0..2],
+                    .little,
+                ));
+
+                var res_value = raw_value;
+                if (hdr.sclSlope != 0) {
+                    res_value = hdr.sclSlope * raw_value + hdr.sclInter;
+                }
+
+                if (normalize) {
+                    res_value = (res_value - minmax[0]) / minmax_diff;
+                }
+                try vdb543.setVoxel(
+                    &vdb,
+                    .{ @intCast(cart[0]), @intCast(cart[1]), @intCast(cart[2]) },
+                    @floatCast(res_value),
+                    arena_alloc,
+                );
             }
 
             //ROBOT: Claude sonet 4.5 suggested this:
