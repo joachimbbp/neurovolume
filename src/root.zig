@@ -9,6 +9,9 @@ const vdb543 = @import("vdb543.zig");
 
 //_: CONSTS:
 const config = @import("config.zig.zon");
+const SupportError = error{
+    Dimensions,
+};
 
 //_: Zig Library:
 
@@ -26,10 +29,6 @@ pub fn nifti1ToVDB(
     defer img_deprecated.deinit();
     //NICE: like this:
     const hdr = try nifti1.getHeader(nifti_filepath);
-    var static = true;
-    if (img_deprecated.header.dim[0] == 4) {
-        static = false;
-    } //TODO: coverage for any weird dim numbers
     const minmax = try nifti1.MinMax3D(img_deprecated); //DEPRECATED: will live in new img
 
     //output folder / new filename / framename_0
@@ -40,32 +39,12 @@ pub fn nifti1ToVDB(
     const basename = name_split.rest();
     const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
     var filepath: []const u8 = undefined;
-    if (!static) {
-        static = false;
-        const transform = zools.matrix.IdentityMatrix4x4; // HACK: native transform doesn't work with bold as of right now!
-        const vdb_seq_folder = try zools.save.versionFolder(base_seq_folder, arena_alloc); //CLEAN: This feels really hacky and verbose
-        var buf = std.array_list.Managed(u8).init(arena_alloc);
-        defer buf.deinit();
-        for (vdb_seq_folder.items) |c| {
-            try buf.append(c);
-        }
-        try buf.append(0);
-        const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
-        const frames: usize = @intCast(img_deprecated.header.dim[4]);
-
-        //WARN: technically a bit unsafe, but there shouldnt be negative dimensions. Will iron out when making img univeral
-        const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
-        for (0..frames) |frame| {
-            const frame_path = try zools.sequence.elementName(
-                vdb_seq_folder_slice,
-                basename,
-                "vdb",
-                frame,
-                leading_zeros,
-                arena_alloc,
-            );
-
+    switch (img_deprecated.header.dim[0]) {
+        //_:Static Image
+        3 => {
+            //Signifies a static, 3D MRI
+            const transform = try nifti1.getTransform(hdr.*);
             var buffer = std.array_list.Managed(u8).init(arena_alloc);
             defer buffer.deinit();
 
@@ -74,50 +53,83 @@ pub fn nifti1ToVDB(
                 img_deprecated,
                 minmax,
                 normalize,
-                frame,
-            ); //write VDB frame
-            _ = try vdb543.writeFrame(
+                0,
+            );
+            //ROBOT: Claude sonet 4.5 suggested this:
+            if (std.fs.path.dirname(base_seq_folder)) |dir_path| {
+                try std.fs.cwd().makePath(dir_path);
+            }
+
+            const frame_path = try std.fmt.allocPrint(
+                arena_alloc,
+                "{[dir]s}/{[bn]s}.vdb",
+                .{ .dir = output_dir, .bn = basename },
+            );
+
+            const versioned_vdb_filepath = try vdb543.writeFrame(
                 &buffer,
                 &vdb,
                 frame_path,
                 arena_alloc,
                 transform,
             );
-        }
+            filepath = versioned_vdb_filepath.items;
+        },
+        //_: Time sequence
 
-        filepath = vdb_seq_folder.items;
-    } else {
-        //Signifies a static, 3D MRI
-        const transform = try nifti1.getTransform(hdr.*);
-        var buffer = std.array_list.Managed(u8).init(arena_alloc);
-        defer buffer.deinit();
+        4 => {
+            const transform = zools.matrix.IdentityMatrix4x4;
+            //FIX: native transform doesn't work with bold as of right now!
+            const vdb_seq_folder = try zools.save.versionFolder(
+                base_seq_folder,
+                arena_alloc,
+            );
+            var buf = std.array_list.Managed(u8).init(arena_alloc);
+            defer buf.deinit();
+            for (vdb_seq_folder.items) |c| {
+                try buf.append(c);
+            }
+            try buf.append(0);
+            const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
-        var vdb = try vdb543.buildFrame(
-            arena_alloc,
-            img_deprecated,
-            minmax,
-            normalize,
-            0,
-        );
-        //ROBOT: Claude sonet 4.5 suggested this:
-        if (std.fs.path.dirname(base_seq_folder)) |dir_path| {
-            try std.fs.cwd().makePath(dir_path);
-        }
+            const frames: usize = @intCast(img_deprecated.header.dim[4]);
 
-        const frame_path = try std.fmt.allocPrint(
-            arena_alloc,
-            "{[dir]s}/{[bn]s}.vdb",
-            .{ .dir = output_dir, .bn = basename },
-        );
+            const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
+            for (0..frames) |frame| {
+                const frame_path = try zools.sequence.elementName(
+                    vdb_seq_folder_slice,
+                    basename,
+                    "vdb",
+                    frame,
+                    leading_zeros,
+                    arena_alloc,
+                );
 
-        const versioned_vdb_filepath = try vdb543.writeFrame(
-            &buffer,
-            &vdb,
-            frame_path,
-            arena_alloc,
-            transform,
-        );
-        filepath = versioned_vdb_filepath.items;
+                var buffer = std.array_list.Managed(u8).init(arena_alloc);
+                defer buffer.deinit();
+
+                var vdb = try vdb543.buildFrame(
+                    arena_alloc,
+                    img_deprecated,
+                    minmax,
+                    normalize,
+                    frame,
+                ); //write VDB frame
+                _ = try vdb543.writeFrame(
+                    &buffer,
+                    &vdb,
+                    frame_path,
+                    arena_alloc,
+                    transform,
+                );
+            }
+
+            filepath = vdb_seq_folder.items;
+        },
+        else => {
+            std.debug.print("ERROR: {d} unsupported dimension type\n", .{img_deprecated.header.dim[0]});
+            return SupportError.Dimensions;
+        },
     }
 
     return filepath;
