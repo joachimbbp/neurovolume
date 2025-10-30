@@ -17,6 +17,23 @@ const SupportError = error{
 
 //_: Zig Library:
 
+fn linear_to_cartesian(
+    linear_index: usize,
+    comptime num_dims: comptime_int, //number of dimensions
+    comptime DimensionType: type,
+    dims: *const [num_dims]DimensionType,
+) [num_dims]usize {
+    var cartesian_index: [num_dims]usize = @splat(0);
+    var idx = linear_index;
+    //LLM: mostly a Claude translation of Jan's linear_to_cartesian python illustration:
+    for (0.., dims[0..num_dims]) |i, di| {
+        const di_usize: usize = @intCast(di);
+        cartesian_index[i] = idx % di_usize;
+        idx = idx / di_usize;
+    }
+    return cartesian_index;
+}
+
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub fn nifti1ToVDB(
     nifti_filepath: []const u8,
@@ -51,13 +68,20 @@ pub fn nifti1ToVDB(
 
             for (0..num_voxels) |voxel_idx| {
                 //LLM: Claude's translation of Jan's linear_to_cartesian:
-                var cart: [3]usize = @splat(0);
-                var idx = voxel_idx;
-                for (0.., hdr.dim[1..4]) |i, di| {
-                    const di_usize: usize = @intCast(di);
-                    cart[i] = idx % di_usize;
-                    idx = idx / di_usize;
-                }
+                // var cart: [3]usize = @splat(0);
+                // var idx = voxel_idx;
+                // for (0.., hdr.dim[1..4]) |i, di| {
+                //     const di_usize: usize = @intCast(di);
+                //     cart[i] = idx % di_usize;
+                //     idx = idx / di_usize;
+                // }
+                //
+                const cart = linear_to_cartesian(
+                    voxel_idx,
+                    3,
+                    i16,
+                    hdr.dim[1..4],
+                );
 
                 const bit_start: usize = voxel_idx * @as(usize, @intCast(img.bytes_per_voxel));
                 const bit_end: usize = (voxel_idx + 1) * @as(usize, @intCast(img.bytes_per_voxel));
