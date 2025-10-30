@@ -47,17 +47,17 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            //Jan's linear_to_cartesian
             const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
-            const nx: usize = @intCast(hdr.dim[1]);
-            const ny: usize = @intCast(hdr.dim[2]);
-            //  const nz: usize = @intCast(hdr.dim[3]);
 
             for (0..num_voxels) |voxel_idx| {
-                //LLM:
-                const x = voxel_idx % nx;
-                const y = (voxel_idx / nx) % ny;
-                const z = voxel_idx / (nx * ny);
+                //LLM: Claude's translation of Jan's linear_to_cartesian:
+                var cart: [3]usize = @splat(0);
+                var idx = voxel_idx;
+                for (0.., hdr.dim[1..4]) |i, di| {
+                    const di_usize: usize = @intCast(di);
+                    cart[i] = idx % di_usize;
+                    idx = idx / di_usize;
+                }
 
                 const bit_start: usize = voxel_idx * @as(usize, @intCast(img.bytes_per_voxel));
                 const bit_end: usize = (voxel_idx + 1) * @as(usize, @intCast(img.bytes_per_voxel));
@@ -78,7 +78,11 @@ pub fn nifti1ToVDB(
                 }
                 try vdb543.setVoxel(
                     &vdb,
-                    .{ @intCast(x), @intCast(y), @intCast(z) },
+                    .{
+                        @intCast(cart[0]),
+                        @intCast(cart[1]),
+                        @intCast(cart[2]),
+                    },
                     @floatCast(res_value),
                     arena_alloc,
                 );
