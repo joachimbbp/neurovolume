@@ -22,15 +22,11 @@ pub fn nifti1ToVDB(
     normalize: bool,
     arena_alloc: std.mem.Allocator,
 ) ![]const u8 {
-    //TODO: loud vs quiet debug, certainly some kind of loadng feature
-    //DEPRECATED:
-    //instead these img we'll just get the relevant info from the header called below...
-    const img_deprecated = try nifti1.Image.init(nifti_filepath);
-    defer img_deprecated.deinit();
-    //NICE: like this:
+    const img = try nifti1.Image.init(nifti_filepath);
+    defer img.deinit();
     const hdr = try nifti1.getHeader(nifti_filepath);
-    const minmax = try nifti1.MinMax3D(img_deprecated); //DEPRECATED: will live in new img
-
+    const minmax = try nifti1.MinMax3D(img);
+    const minmax_diff = minmax[1] - minmax[0];
     //output folder / new filename / framename_0
     var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
     var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
@@ -40,21 +36,54 @@ pub fn nifti1ToVDB(
     const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
     var filepath: []const u8 = undefined;
 
-    switch (img_deprecated.header.dim[0]) {
+    switch (img.header.dim[0]) {
         //_:Static Image
         3 => {
             //Signifies a static, 3D MRI
             const transform = try nifti1.getTransform(hdr.*);
             var buffer = std.array_list.Managed(u8).init(arena_alloc);
             defer buffer.deinit();
+            var vdb = try vdb543.VDB.build(arena_alloc);
 
-            var vdb = try vdb543.buildFrame(
-                arena_alloc,
-                img_deprecated,
-                minmax,
-                normalize,
-                0,
-            );
+            const tpos: usize = 0; //static
+            for (0..@as(usize, @intCast(hdr.dim[3]))) |z| {
+                for (0..@as(usize, @intCast(hdr.dim[2]))) |x| {
+                    for (0..@as(usize, @intCast(hdr.dim[1]))) |y| {
+                        //
+                        const nx: usize = @intCast(hdr.dim[1]);
+                        const ny: usize = @intCast(hdr.dim[2]);
+                        const nz: usize = @intCast(hdr.dim[3]);
+
+                        const idx: usize = tpos * nx * ny * nz + z * nx * ny + y * nx + x;
+
+                        const bit_start: usize = idx * @as(usize, @intCast(img.bytes_per_voxel));
+                        const bit_end: usize = (idx + 1) * @as(usize, @intCast(img.bytes_per_voxel));
+
+                        const bytes_input = img.data[bit_start..bit_end];
+                        const raw_value: f32 = @floatFromInt(std.mem.readInt(
+                            i16,
+                            bytes_input[0..2],
+                            .little,
+                        ));
+
+                        var res_value = raw_value;
+                        if (hdr.sclSlope != 0) {
+                            res_value = hdr.sclSlope * raw_value + hdr.sclInter;
+                        }
+
+                        if (normalize) {
+                            res_value = (res_value - minmax[0]) / minmax_diff;
+                        }
+                        try vdb543.setVoxel(
+                            &vdb,
+                            .{ @intCast(x), @intCast(y), @intCast(z) },
+                            @floatCast(res_value),
+                            arena_alloc,
+                        );
+                    }
+                }
+            }
+
             //ROBOT: Claude sonet 4.5 suggested this:
             if (std.fs.path.dirname(base_seq_folder)) |dir_path| {
                 try std.fs.cwd().makePath(dir_path);
@@ -92,9 +121,9 @@ pub fn nifti1ToVDB(
             try buf.append(0);
             const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
-            const frames: usize = @intCast(img_deprecated.header.dim[4]);
+            const frames: usize = @intCast(img.header.dim[4]);
 
-            const leading_zeros = zools.math.numDigitsShort(@bitCast(img_deprecated.header.dim[4]));
+            const leading_zeros = zools.math.numDigitsShort(@bitCast(img.header.dim[4]));
             for (0..frames) |frame| {
                 const frame_path = try zools.sequence.elementName(
                     vdb_seq_folder_slice,
@@ -110,7 +139,7 @@ pub fn nifti1ToVDB(
 
                 var vdb = try vdb543.buildFrame(
                     arena_alloc,
-                    img_deprecated,
+                    img,
                     minmax,
                     normalize,
                     frame,
@@ -127,7 +156,7 @@ pub fn nifti1ToVDB(
             filepath = vdb_seq_folder.items;
         },
         else => {
-            std.debug.print("ERROR: {d} unsupported dimension type\n", .{img_deprecated.header.dim[0]});
+            std.debug.print("ERROR: {d} unsupported dimension type\n", .{img.header.dim[0]});
             return SupportError.Dimensions;
         },
     }

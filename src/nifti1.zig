@@ -91,7 +91,15 @@ pub const Image = struct {
     data_type: DataType,
     bytes_per_voxel: u16,
 
-    pub fn getAt4D(self: *const Image, xpos: usize, ypos: usize, zpos: usize, tpos: usize, normalize: bool, minmax: [2]f32) !f32 {
+    pub fn getAt4D(
+        self: *const Image,
+        xpos: usize,
+        ypos: usize,
+        zpos: usize,
+        tpos: usize,
+        normalize: bool,
+        minmax: [2]f32,
+    ) !f32 {
         const nx: usize = @intCast(self.header.dim[1]);
         const ny: usize = @intCast(self.header.dim[2]);
         const nz: usize = @intCast(self.header.dim[3]);
