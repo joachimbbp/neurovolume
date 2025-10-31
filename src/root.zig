@@ -216,8 +216,11 @@ pub fn nifti1ToVDB(
 
             const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
             const num_frames: usize = @intCast(img.header.dim[4]);
-            //            const vpf = num_voxels / num_frames;
-            const vpf: usize = @intCast(@as(u16, @intCast(hdr.dim[1] * hdr.dim[2] * hdr.dim[3])) * img.bytes_per_voxel); //LLM: fix
+            const vpf = @as(usize, @intCast(hdr.dim[1])) *
+                @as(usize, @intCast(hdr.dim[2])) *
+                @as(usize, @intCast(hdr.dim[3])) *
+                @as(usize, @intCast(img.bytes_per_voxel));
+
             print("🔎 INSPECT: Voxels Per Frame: {d}/{d}={d}\n", .{ num_voxels, num_frames, vpf });
             //this should always be an int!
             const leading_zeros = zools.math.numDigitsShort(@bitCast(img.header.dim[4]));
