@@ -156,7 +156,6 @@ pub fn nifti1ToVDB(
     switch (img.header.dim[0]) {
         //_:Static Image
         3 => {
-            //Signifies a static, 3D MRI
             const transform = try nifti1.getTransform(hdr.*);
             var buffer = std.array_list.Managed(u8).init(arena_alloc);
             defer buffer.deinit();
@@ -253,17 +252,26 @@ pub fn nifti1ToVDB(
                 const frame_start = frame * vpf;
                 const frame_end = frame_start + vpf;
                 const frame_data = img.data[frame_start..frame_end]; //its late, i think exclusive zig?
-                const num_frame_voxels = frame_data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
                 var vdb = try vdb543.VDB.build(arena_alloc);
 
-                for (0..num_frame_voxels) |idx| {
-                    const cart = linear_to_cartesian(
-                        idx,
-                        3,
-                        i16,
-                        hdr.dim[1..4],
-                    );
+                //CLEAN: these magic numbers are probably not great?
+                //I guess I could clean up this code with splatting or something...
+                //It would be nice to capture the case (3 and 4) and then use that to build the num_dims,
+                //splat from there, etc!
+                var cart = [_]usize{ 0, 0, 0, 0 };
+                var idx: usize = 0;
+                const dim_list: [4]usize = .{
+                    @intCast(hdr.dim[1]),
+                    @intCast(hdr.dim[2]),
+                    @intCast(hdr.dim[3]),
+                    @intCast(hdr.dim[4]),
+                }; //is this the most performant type?
 
+                while (true) {
+                    if (increment_cartesian(4, &cart, dim_list) == false) {
+                        break;
+                    }
+                    idx += 1;
                     const res_value = getValue(
                         &frame_data, //LLM: caught this eroneously left as `img.data`
                         idx,
