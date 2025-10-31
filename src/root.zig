@@ -158,10 +158,11 @@ pub fn nifti1ToVDB(
                     i16,
                     f32,
                     .little,
-                    2,
+                    //WARN: Hard coded for this particular nifti test file:
+                    2, //QUESTION: I believe this is the byte to float val?
                     hdr.sclSlope,
                     hdr.sclInter,
-                    true,
+                    normalize,
                     minmax,
                 );
                 try vdb543.setVoxel(
@@ -213,10 +214,52 @@ pub fn nifti1ToVDB(
             try buf.append(0);
             const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
-            const frames: usize = @intCast(img.header.dim[4]);
-
+            const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
+            const num_frames: usize = @intCast(img.header.dim[4]);
+            const vpf = num_voxels / num_frames;
+            print("🔎 INSPECT: Voxels Per Frame: {d}/{d}={d}\n", .{ num_voxels, num_frames, vpf });
+            //this should always be an int!
             const leading_zeros = zools.math.numDigitsShort(@bitCast(img.header.dim[4]));
-            for (0..frames) |frame| {
+
+            for (0..num_frames) |frame| {
+                const frame_start = frame * vpf;
+                const frame_end = frame_start + vpf;
+                const frame_data = img.data[frame_start..frame_end]; //its late, i think exclusive zig?
+                const num_frame_voxels = frame_data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
+                var vdb = try vdb543.VDB.build(arena_alloc);
+
+                for (0..num_frame_voxels) |idx| {
+                    const cart = linear_to_cartesian(
+                        idx,
+                        3,
+                        i16,
+                        hdr.dim[1..4],
+                    );
+                    const res_value = getValue(
+                        &img.data,
+                        idx,
+                        img.bytes_per_voxel,
+                        i16,
+                        f32,
+                        .little,
+                        //WARN: Hard coded for this particular nifti test file:
+                        2, //QUESTION: I believe this is the byte to float val?
+                        hdr.sclSlope,
+                        hdr.sclInter,
+                        normalize,
+                        minmax,
+                    );
+                    try vdb543.setVoxel(
+                        &vdb,
+                        .{
+                            @intCast(cart[0]),
+                            @intCast(cart[1]),
+                            @intCast(cart[2]),
+                        },
+                        @floatCast(res_value),
+                        arena_alloc,
+                    );
+                }
                 const frame_path = try zools.sequence.elementName(
                     vdb_seq_folder_slice,
                     basename,
@@ -229,13 +272,6 @@ pub fn nifti1ToVDB(
                 var buffer = std.array_list.Managed(u8).init(arena_alloc);
                 defer buffer.deinit();
 
-                var vdb = try vdb543.buildFrame(
-                    arena_alloc,
-                    img,
-                    .{ minmax[0], minmax[1] },
-                    normalize,
-                    frame,
-                ); //write VDB frame
                 _ = try vdb543.writeFrame(
                     &buffer,
                     &vdb,

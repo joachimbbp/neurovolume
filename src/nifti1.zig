@@ -218,6 +218,7 @@ pub fn getTransform(h: Header) ![4][4]f64 {
     };
 }
 
+//DEPRECATED: in favor of root.MinMax
 pub fn MinMax3D(img: Image) ![2]f32 {
     var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
     //dim is [num dimensions, x, y, z, time ...]
