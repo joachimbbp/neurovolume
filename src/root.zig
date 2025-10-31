@@ -19,7 +19,7 @@ const SupportError = error{
 
 fn linear_to_cartesian(
     linear_index: usize,
-    comptime num_dims: comptime_int, //number of dimensions
+    comptime num_dims: comptime_int, //number of dimensions //HACK: feels redundant?
     comptime DimensionType: type,
     dims: *const [num_dims]DimensionType,
 ) [num_dims]usize {
@@ -216,7 +216,8 @@ pub fn nifti1ToVDB(
 
             const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
             const num_frames: usize = @intCast(img.header.dim[4]);
-            const vpf = num_voxels / num_frames;
+            //            const vpf = num_voxels / num_frames;
+            const vpf: usize = @intCast(@as(u16, @intCast(hdr.dim[1] * hdr.dim[2] * hdr.dim[3])) * img.bytes_per_voxel); //LLM: fix
             print("🔎 INSPECT: Voxels Per Frame: {d}/{d}={d}\n", .{ num_voxels, num_frames, vpf });
             //this should always be an int!
             const leading_zeros = zools.math.numDigitsShort(@bitCast(img.header.dim[4]));
@@ -236,7 +237,7 @@ pub fn nifti1ToVDB(
                         hdr.dim[1..4],
                     );
                     const res_value = getValue(
-                        &img.data,
+                        &frame_data, //LLM: caught this eroneously left as `img.data`
                         idx,
                         img.bytes_per_voxel,
                         i16,
