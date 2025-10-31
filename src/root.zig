@@ -19,12 +19,8 @@ const SupportError = error{
 
 // implementation of Jan's increment_cartesian suggestion
 fn increment_cartesian(
-    //    comptime num_dims: comptime_int,
-    //    comptime DimType: type,
-    //    cart_coords: [num_dims]DimType,
-    //    dim_list: [num_dims]DimType,
     comptime num_dims: comptime_int,
-    cart_coord: *[num_dims]usize, //optimal type????
+    cart_coord: *[num_dims]usize,
     dim_list: [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
@@ -65,8 +61,10 @@ fn getValue(
     comptime ResType: type,
     endianness: std.builtin.Endian,
     comptime num_bytes: comptime_int,
+    //Scaling: (set both to 0 if they do not apply)
     slope: ResType,
     intercept: ResType,
+    //Normalizing
     normalize: bool,
     minmax: [3]ResType, //min, max, max-min
 ) ResType {
@@ -79,7 +77,7 @@ fn getValue(
         endianness,
     ));
     var res_value = raw_value;
-    if (slope != 0) {
+    if (slope != 0 and intercept != 0) {
         res_value = slope * raw_value + intercept;
     }
 
@@ -89,7 +87,7 @@ fn getValue(
     return res_value;
 }
 
-//
+//returns .{mininmum value, maximum value, difference between max and min}
 pub fn MinMax(
     comptime T: type, //must be float for now
     data: *const []const u8,
@@ -164,14 +162,12 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            //            const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
             const dim_list: [3]usize = .{
                 @intCast(hdr.dim[1]),
                 @intCast(hdr.dim[2]),
                 @intCast(hdr.dim[3]),
             }; //is this the most performant type?
 
-            //for (0..num_voxels) |idx| {
             var cart = [_]usize{ 0, 0, 0 };
             var idx: usize = 0;
             while (true) {
@@ -179,13 +175,6 @@ pub fn nifti1ToVDB(
                     break;
                 }
                 idx += 1;
-
-                // const cart = linear_to_cartesian(
-                //     idx,
-                //     3,
-                //     i16,
-                //     hdr.dim[1..4],
-                // );
                 const res_value = getValue(
                     &img.data,
                     idx,
