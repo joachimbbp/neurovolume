@@ -34,6 +34,77 @@ fn linear_to_cartesian(
     return cartesian_index;
 }
 
+//hmmm... maybe more things can be comptime!
+fn getValue(
+    data: *[]const u8,
+    idx: usize, //linear index
+    bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
+    comptime SourceType: type,
+    comptime ResType: type,
+    endianness: std.builtin.Endian,
+    num_bytes: usize,
+    slope: ResType,
+    intercept: ResType,
+    normalize: bool,
+    minmax: .{ ResType, ResType, ResType }, //min, max, max-min
+) ResType {
+    const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
+    const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
+    const bytes_input = data[bit_start..bit_end];
+    const raw_value: f32 = @floatFromInt(std.mem.readInt(
+        SourceType,
+        bytes_input[0..num_bytes],
+        endianness,
+    ));
+    var res_value = raw_value;
+    if (slope != 0) {
+        res_value = slope * raw_value + intercept;
+    }
+
+    if (normalize) {
+        res_value = (res_value - minmax[0]) / minmax[2];
+    }
+}
+
+//
+pub fn MinMax(
+    comptime T: type, //must be float for now
+    data: *[]const u8,
+    bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
+    slope: f32,
+    intercept: f32,
+) .{ T, T, T } //min, max, max-min
+{
+    const num_voxels = data.len / @as(usize, @intCast(bytes_per_voxel)); //LLM:
+    var minmax: [3]T = .{
+        std.math.floatMax(T),
+        -std.math.floatMax(T),
+    };
+
+    for (0..num_voxels) |idx| {
+        const val = getValue(
+            data,
+            idx,
+            bytes_per_voxel,
+            i16,
+            T,
+            .little,
+            2,
+            slope,
+            intercept,
+            false,
+            .{ 0, 0, 0 },
+        );
+        if (val < minmax[0]) {
+            minmax[0] = val;
+        }
+        if (val > minmax[1]) {
+            minmax[1] = val;
+        }
+    }
+    minmax[2] = minmax[1] - minmax[0];
+    return minmax;
+}
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub fn nifti1ToVDB(
     nifti_filepath: []const u8,
@@ -44,8 +115,13 @@ pub fn nifti1ToVDB(
     const img = try nifti1.Image.init(nifti_filepath);
     defer img.deinit();
     const hdr = try nifti1.getHeader(nifti_filepath);
-    const minmax = try nifti1.MinMax3D(img);
-    const minmax_diff = minmax[1] - minmax[0];
+    const minmax = MinMax(
+        f32,
+        &img.data,
+        img.bytes_per_voxel,
+        hdr.sclSlope,
+        hdr.sclInter,
+    );
     //output folder / new filename / framename_0
     var n_split = std.mem.splitBackwardsSequence(u8, nifti_filepath, "/");
     var name_split = std.mem.splitBackwardsSequence(u8, n_split.first(), ".");
@@ -66,40 +142,26 @@ pub fn nifti1ToVDB(
 
             const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
 
-            for (0..num_voxels) |voxel_idx| {
-                //LLM: Claude's translation of Jan's linear_to_cartesian:
-                // var cart: [3]usize = @splat(0);
-                // var idx = voxel_idx;
-                // for (0.., hdr.dim[1..4]) |i, di| {
-                //     const di_usize: usize = @intCast(di);
-                //     cart[i] = idx % di_usize;
-                //     idx = idx / di_usize;
-                // }
-                //
+            for (0..num_voxels) |idx| {
                 const cart = linear_to_cartesian(
-                    voxel_idx,
+                    idx,
                     3,
                     i16,
                     hdr.dim[1..4],
                 );
-
-                const bit_start: usize = voxel_idx * @as(usize, @intCast(img.bytes_per_voxel));
-                const bit_end: usize = (voxel_idx + 1) * @as(usize, @intCast(img.bytes_per_voxel));
-                const bytes_input = img.data[bit_start..bit_end];
-                const raw_value: f32 = @floatFromInt(std.mem.readInt(
+                const res_value = getValue(
+                    &img.data,
+                    idx,
+                    img.bytes_per_voxel,
                     i16,
-                    bytes_input[0..2],
+                    f32,
                     .little,
-                ));
-
-                var res_value = raw_value;
-                if (hdr.sclSlope != 0) {
-                    res_value = hdr.sclSlope * raw_value + hdr.sclInter;
-                }
-
-                if (normalize) {
-                    res_value = (res_value - minmax[0]) / minmax_diff;
-                }
+                    2,
+                    hdr.sclSlope,
+                    hdr.sclInter,
+                    true,
+                    minmax,
+                );
                 try vdb543.setVoxel(
                     &vdb,
                     .{
