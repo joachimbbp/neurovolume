@@ -1,8 +1,8 @@
 const std = @import("std");
 
+//builds C library for Python hooks
+//no built zig library for now
 pub fn build(b: *std.Build) void {
-    //TODO:
-    // - [ ] test the c_root level
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
     }).module("zools");
 
     const nvol_mod = b.createModule(.{
-        .root_source_file = b.path("./src/root.zig"),
+        .root_source_file = b.path("./src/c_root.zig"),
         .target = target,
         .optimize = optimize,
     });

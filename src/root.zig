@@ -135,6 +135,14 @@ pub fn nifti1ToVDB(
     const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
     var filepath: []const u8 = undefined;
 
+    var cart = [_]usize{ 0, 0, 0 };
+    var idx: usize = 0;
+    const dim_list: [3]usize = .{
+        @intCast(hdr.dim[1]),
+        @intCast(hdr.dim[2]),
+        @intCast(hdr.dim[3]),
+    };
+
     switch (img.header.dim[0]) {
         //_:Static Image
         3 => {
@@ -143,14 +151,16 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            const dim_list: [3]usize = .{
-                @intCast(hdr.dim[1]),
-                @intCast(hdr.dim[2]),
-                @intCast(hdr.dim[3]),
-            }; //is this the most performant type?
+            //---
+            // var cart = [_]usize{ 0, 0, 0 };
+            // var idx: usize = 0;
+            // const dim_list: [3]usize = .{
+            //     @intCast(hdr.dim[1]),
+            //     @intCast(hdr.dim[2]),
+            //     @intCast(hdr.dim[3]),
+            // };
+            //---
 
-            var cart = [_]usize{ 0, 0, 0 };
-            var idx: usize = 0;
             while (true) {
                 if (increment_cartesian(3, &cart, dim_list) == false) {
                     break;
@@ -219,15 +229,12 @@ pub fn nifti1ToVDB(
             try buf.append(0);
             const vdb_seq_folder_slice: [:0]const u8 = buf.items[0 .. buf.items.len - 1 :0];
 
-            const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
             const num_frames: usize = @intCast(img.header.dim[4]);
             const vpf = @as(usize, @intCast(hdr.dim[1])) *
                 @as(usize, @intCast(hdr.dim[2])) *
                 @as(usize, @intCast(hdr.dim[3])) *
                 @as(usize, @intCast(img.bytes_per_voxel));
 
-            print("🔎 INSPECT: Voxels Per Frame: {d}/{d}={d}\n", .{ num_voxels, num_frames, vpf });
-            //this should always be an int!
             const leading_zeros = zools.math.numDigitsShort(@bitCast(img.header.dim[4]));
 
             for (0..num_frames) |frame| {
@@ -236,17 +243,16 @@ pub fn nifti1ToVDB(
                 const frame_data = img.data[frame_start..frame_end]; //its late, i think exclusive zig?
                 var vdb = try vdb543.VDB.build(arena_alloc);
 
-                //CLEAN: these magic numbers are probably not great?
-                //I guess I could clean up this code with splatting or something...
-                //It would be nice to capture the case (3 and 4) and then use that to build the num_dims,
-                //splat from there, etc!
-                var cart = [_]usize{ 0, 0, 0 };
-                var idx: usize = 0;
-                const dim_list: [3]usize = .{
-                    @intCast(hdr.dim[1]),
-                    @intCast(hdr.dim[2]),
-                    @intCast(hdr.dim[3]),
-                };
+                //---
+                // var cart = [_]usize{ 0, 0, 0 };
+                // var idx: usize = 0;
+                // const dim_list: [3]usize = .{
+                //     @intCast(hdr.dim[1]),
+                //     @intCast(hdr.dim[2]),
+                //     @intCast(hdr.dim[3]),
+                // };
+                //---
+                idx = 0;
 
                 while (true) {
                     if (increment_cartesian(3, &cart, dim_list) == false) {
