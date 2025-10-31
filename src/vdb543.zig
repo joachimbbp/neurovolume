@@ -394,7 +394,7 @@ const Img = nifti1.Image;
 pub fn buildFrame(
     arena_alloc: std.mem.Allocator,
     img_deprecated: Img,
-    minmax_deprecated: [2]f32, //DEPRECATED: will eventually live in img
+    minmax_deprecated: [2]f32, //DEPRECATED:
     normalize: bool,
     frame: usize,
 ) !VDB {

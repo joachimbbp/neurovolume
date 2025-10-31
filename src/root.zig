@@ -36,21 +36,21 @@ fn linear_to_cartesian(
 
 //hmmm... maybe more things can be comptime!
 fn getValue(
-    data: *[]const u8,
+    data: *const []const u8,
     idx: usize, //linear index
     bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
     comptime SourceType: type,
     comptime ResType: type,
     endianness: std.builtin.Endian,
-    num_bytes: usize,
+    comptime num_bytes: comptime_int,
     slope: ResType,
     intercept: ResType,
     normalize: bool,
-    minmax: .{ ResType, ResType, ResType }, //min, max, max-min
+    minmax: [3]ResType, //min, max, max-min
 ) ResType {
     const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
     const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
-    const bytes_input = data[bit_start..bit_end];
+    const bytes_input = data.*[bit_start..bit_end]; //GPT: dereferencing suggested
     const raw_value: f32 = @floatFromInt(std.mem.readInt(
         SourceType,
         bytes_input[0..num_bytes],
@@ -64,21 +64,23 @@ fn getValue(
     if (normalize) {
         res_value = (res_value - minmax[0]) / minmax[2];
     }
+    return res_value;
 }
 
 //
 pub fn MinMax(
     comptime T: type, //must be float for now
-    data: *[]const u8,
+    data: *const []const u8,
     bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
     slope: f32,
     intercept: f32,
-) .{ T, T, T } //min, max, max-min
+) [3]T //min, max, max-min
 {
     const num_voxels = data.len / @as(usize, @intCast(bytes_per_voxel)); //LLM:
     var minmax: [3]T = .{
         std.math.floatMax(T),
         -std.math.floatMax(T),
+        undefined,
     };
 
     for (0..num_voxels) |idx| {
@@ -230,7 +232,7 @@ pub fn nifti1ToVDB(
                 var vdb = try vdb543.buildFrame(
                     arena_alloc,
                     img,
-                    minmax,
+                    .{ minmax[0], minmax[1] },
                     normalize,
                     frame,
                 ); //write VDB frame
