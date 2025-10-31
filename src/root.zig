@@ -17,11 +17,32 @@ const SupportError = error{
 
 //_: Zig Library:
 
+// implementation of Jan's increment_cartesian suggestion
+fn increment_cartesian(
+    //    comptime num_dims: comptime_int,
+    //    comptime DimType: type,
+    //    cart_coords: [num_dims]DimType,
+    //    dim_list: [num_dims]DimType,
+    comptime num_dims: comptime_int,
+    cart_coord: *[num_dims]usize, //optimal type????
+    dim_list: [num_dims]usize,
+) bool {
+    //false if overflow occurs, true if otherwise
+    for (0.., dim_list) |i, di| {
+        cart_coord[i] += 1;
+        if (cart_coord[i] < di) {
+            return true;
+        }
+        cart_coord[i] = 0;
+    }
+    return false;
+}
+
 fn linear_to_cartesian(
     linear_index: usize,
     comptime num_dims: comptime_int, //number of dimensions //HACK: feels redundant?
-    comptime DimensionType: type,
-    dims: *const [num_dims]DimensionType,
+    comptime DimType: type,
+    dims: *const [num_dims]DimType,
 ) [num_dims]usize {
     var cartesian_index: [num_dims]usize = @splat(0);
     var idx = linear_index;
@@ -31,6 +52,7 @@ fn linear_to_cartesian(
         cartesian_index[i] = idx % di_usize;
         idx = idx / di_usize;
     }
+    //BUG: calculating this once per frame is slow on multi-frame seqs!
     return cartesian_index;
 }
 
@@ -142,15 +164,28 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
+            //            const num_voxels = img.data.len / @as(usize, @intCast(img.bytes_per_voxel)); //LLM:
+            const dim_list: [3]usize = .{
+                @intCast(hdr.dim[1]),
+                @intCast(hdr.dim[2]),
+                @intCast(hdr.dim[3]),
+            }; //is this the most performant type?
 
-            for (0..num_voxels) |idx| {
-                const cart = linear_to_cartesian(
-                    idx,
-                    3,
-                    i16,
-                    hdr.dim[1..4],
-                );
+            //for (0..num_voxels) |idx| {
+            var cart = [_]usize{ 0, 0, 0 };
+            var idx: usize = 0;
+            while (true) {
+                if (increment_cartesian(3, &cart, dim_list) == false) {
+                    break;
+                }
+                idx += 1;
+
+                // const cart = linear_to_cartesian(
+                //     idx,
+                //     3,
+                //     i16,
+                //     hdr.dim[1..4],
+                // );
                 const res_value = getValue(
                     &img.data,
                     idx,
@@ -239,6 +274,7 @@ pub fn nifti1ToVDB(
                         i16,
                         hdr.dim[1..4],
                     );
+
                     const res_value = getValue(
                         &frame_data, //LLM: caught this eroneously left as `img.data`
                         idx,
