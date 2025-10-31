@@ -220,8 +220,8 @@ pub fn nifti1ToVDB(
             );
             filepath = versioned_vdb_filepath.items;
         },
-        //_: Time sequence
 
+        //_: Time Series
         4 => {
             const transform = zools.matrix.IdentityMatrix4x4;
             //FIX: native transform doesn't work with bold as of right now!
@@ -258,17 +258,16 @@ pub fn nifti1ToVDB(
                 //I guess I could clean up this code with splatting or something...
                 //It would be nice to capture the case (3 and 4) and then use that to build the num_dims,
                 //splat from there, etc!
-                var cart = [_]usize{ 0, 0, 0, 0 };
+                var cart = [_]usize{ 0, 0, 0 };
                 var idx: usize = 0;
-                const dim_list: [4]usize = .{
+                const dim_list: [3]usize = .{
                     @intCast(hdr.dim[1]),
                     @intCast(hdr.dim[2]),
                     @intCast(hdr.dim[3]),
-                    @intCast(hdr.dim[4]),
-                }; //is this the most performant type?
+                };
 
                 while (true) {
-                    if (increment_cartesian(4, &cart, dim_list) == false) {
+                    if (increment_cartesian(3, &cart, dim_list) == false) {
                         break;
                     }
                     idx += 1;
