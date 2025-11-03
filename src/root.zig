@@ -35,14 +35,13 @@ fn increment_cartesian(
 }
 
 fn getValue(
-    //hmmm... maybe more things can be comptime!
     data: *const []const u8,
     idx: usize, //linear index
     bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
     comptime SourceType: type,
     comptime ResType: type,
     endianness: std.builtin.Endian,
-    comptime num_bytes: comptime_int,
+    num_bytes: u16,
     //Scaling: (set both to 0 if they do not apply)
     slope: ResType,
     intercept: ResType,
@@ -53,9 +52,11 @@ fn getValue(
     const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
     const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
     const bytes_input = data.*[bit_start..bit_end]; //GPT: dereferencing suggested
+    const type_size = @divExact(@typeInfo(SourceType).int.bits, 8);
+    _ = num_bytes;
     const raw_value: f32 = @floatFromInt(std.mem.readInt(
         SourceType,
-        bytes_input[0..num_bytes],
+        bytes_input[0..type_size], //BUG:
         endianness,
     ));
     var res_value = raw_value;
@@ -151,16 +152,6 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            //---
-            // var cart = [_]usize{ 0, 0, 0 };
-            // var idx: usize = 0;
-            // const dim_list: [3]usize = .{
-            //     @intCast(hdr.dim[1]),
-            //     @intCast(hdr.dim[2]),
-            //     @intCast(hdr.dim[3]),
-            // };
-            //---
-
             while (true) {
                 if (increment_cartesian(3, &cart, dim_list) == false) {
                     break;
@@ -173,8 +164,7 @@ pub fn nifti1ToVDB(
                     i16,
                     f32,
                     .little,
-                    //WARN: Hard coded for this particular nifti test file:
-                    2, //QUESTION: I believe this is the byte to float val?
+                    img.bytes_per_voxel,
                     hdr.sclSlope,
                     hdr.sclInter,
                     normalize,
@@ -243,15 +233,6 @@ pub fn nifti1ToVDB(
                 const frame_data = img.data[frame_start..frame_end]; //its late, i think exclusive zig?
                 var vdb = try vdb543.VDB.build(arena_alloc);
 
-                //---
-                // var cart = [_]usize{ 0, 0, 0 };
-                // var idx: usize = 0;
-                // const dim_list: [3]usize = .{
-                //     @intCast(hdr.dim[1]),
-                //     @intCast(hdr.dim[2]),
-                //     @intCast(hdr.dim[3]),
-                // };
-                //---
                 idx = 0;
 
                 while (true) {
@@ -266,8 +247,7 @@ pub fn nifti1ToVDB(
                         i16,
                         f32,
                         .little,
-                        //WARN: Hard coded for this particular nifti test file:
-                        2, //QUESTION: I believe this is the byte to float val?
+                        img.bytes_per_voxel,
                         hdr.sclSlope,
                         hdr.sclInter,
                         normalize,
