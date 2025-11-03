@@ -218,59 +218,12 @@ pub fn getTransform(h: Header) ![4][4]f64 {
     };
 }
 
-//DEPRECATED: in favor of root.MinMax
-pub fn MinMax3D(img: Image) ![2]f32 {
-    var minmax: [2]f32 = .{ std.math.floatMax(f32), -std.math.floatMax(f32) };
-    //dim is [num dimensions, x, y, z, time ...]
-    for (0..@as(usize, @intCast(img.header.dim[3]))) |z| {
-        for (0..@as(usize, @intCast(img.header.dim[2]))) |y| {
-            for (0..@as(usize, @intCast(img.header.dim[1]))) |x| {
-                const val = try img.getAt4D(x, y, z, 0, false, .{ 0, 0 });
-                if (val < minmax[0]) {
-                    minmax[0] = val;
-                }
-                if (val > minmax[1]) {
-                    minmax[1] = val;
-                }
-            }
-        }
-    }
-    return minmax;
-}
-
 //SECTION: Tests:
 const config = @import("config.zig.zon");
 const zools = @import("zools");
 const t = zools.timer;
 test "echo module" {
     print("🧠 nifti1.zig module echo\n", .{});
-}
-
-test "open and normalize nifti file" {
-    const s = t.Click();
-    print("🧠 Opening and normalizing nifti1 file\n", .{});
-    const static = config.testing.files.nifti1_t1;
-    var img = try Image.init(static);
-    defer img.deinit();
-    (&img).printHeader();
-    print("\ndatatype: {s}\n", .{DataType.name(img.data_type)});
-    print("bytes per voxel: {any}\n", .{img.bytes_per_voxel});
-
-    const mid_x: usize = @divFloor(@as(usize, @intCast(img.header.dim[1])), 2);
-    const mid_y: usize = @divFloor(@as(usize, @intCast(img.header.dim[2])), 2);
-    const mid_z: usize = @divFloor(@as(usize, @intCast(img.header.dim[3])), 2);
-    const mid_t: usize = @divFloor(@as(usize, @intCast(img.header.dim[4])), 2);
-
-    const mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, false, .{ 0, 0 });
-
-    print("middle value: {any}\n", .{mid_value});
-
-    print("Normalizing\nSetting Min Max\n", .{});
-    const minmax = try MinMax3D(img);
-    print("Min Max: {any}\n", .{minmax});
-    const normalized_mid_value = try img.getAt4D(mid_x, mid_y, mid_z, mid_t, true, minmax);
-    print("Normalized mid value: {any}\n", .{normalized_mid_value});
-    _ = t.Lap(s, "nifti1.zig open and normalize timer");
 }
 
 test "non deprecated header techniques" {
