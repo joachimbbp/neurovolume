@@ -384,42 +384,6 @@ pub fn lengthSquared(v: [3]f32) f32 {
 }
 //SECTION: writing frames
 
-//DEPRECATED: Normally we wouldn't bring the nifti1 module in here (as
-//VDBs shouldn't be dependent on specific file formats). In the future the img
-//will be a fully universal format, so that will be fine! But for now, we do this.
-const nifti1 = @import("nifti1.zig");
-const Img = nifti1.Image;
-
-// Builds a static VDB frame
-pub fn buildFrame(
-    arena_alloc: std.mem.Allocator,
-    img_deprecated: Img,
-    minmax_deprecated: [2]f32, //DEPRECATED:
-    normalize: bool,
-    frame: usize,
-) !VDB {
-    const dim = img_deprecated.header.dim;
-    var vdb = try VDB.build(arena_alloc);
-
-    for (0..@as(usize, @intCast(dim[3]))) |z| {
-        for (0..@as(usize, @intCast(dim[2]))) |x| {
-            for (0..@as(usize, @intCast(dim[1]))) |y| {
-                const val = try img_deprecated.getAt4D(
-                    x,
-                    y,
-                    z,
-                    frame,
-                    normalize,
-                    minmax_deprecated,
-                );
-                try setVoxel(&vdb, .{ @intCast(x), @intCast(y), @intCast(z) }, @floatCast(val), arena_alloc);
-            }
-        }
-    }
-
-    return vdb;
-}
-
 // Writes a static VDB frame to disk
 pub fn writeFrame(
     buffer: *ArrayList(u8),

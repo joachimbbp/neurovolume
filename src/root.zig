@@ -20,7 +20,7 @@ const SupportError = error{
 // implementation of Jan's increment_cartesian suggestion
 fn increment_cartesian(
     comptime num_dims: comptime_int,
-    cart_coord: *[num_dims]usize,
+    cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
     dim_list: [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
@@ -52,11 +52,11 @@ fn getValue(
     const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
     const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
     const bytes_input = data.*[bit_start..bit_end]; //GPT: dereferencing suggested
-    const type_size = @divExact(@typeInfo(SourceType).int.bits, 8);
+    const type_size = @divExact(@typeInfo(SourceType).int.bits, 8); //LLM: suggested
     _ = num_bytes;
     const raw_value: f32 = @floatFromInt(std.mem.readInt(
         SourceType,
-        bytes_input[0..type_size], //BUG:
+        bytes_input[0..type_size],
         endianness,
     ));
     var res_value = raw_value;
@@ -136,7 +136,7 @@ pub fn nifti1ToVDB(
     const base_seq_folder = try std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ output_dir, basename });
     var filepath: []const u8 = undefined;
 
-    var cart = [_]usize{ 0, 0, 0 };
+    var cart = [_]u32{ 0, 0, 0 };
     var idx: usize = 0;
     const dim_list: [3]usize = .{
         @intCast(hdr.dim[1]),
@@ -172,11 +172,7 @@ pub fn nifti1ToVDB(
                 );
                 try vdb543.setVoxel(
                     &vdb,
-                    .{
-                        @intCast(cart[0]),
-                        @intCast(cart[1]),
-                        @intCast(cart[2]),
-                    },
+                    .{ cart[0], cart[1], cart[2] },
                     @floatCast(res_value),
                     arena_alloc,
                 );
