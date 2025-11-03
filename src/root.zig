@@ -6,7 +6,7 @@ const print = std.debug.print;
 const zools = @import("zools");
 const zip = zools.zip.pairs;
 const rev = zools.slice.reverse;
-const nifti1 = @import("nifti1.zig");
+const NIfTI1 = @import("NIfTI1.zig");
 const vdb543 = @import("vdb543.zig");
 
 //_: CONSTS:
@@ -117,9 +117,9 @@ pub fn nifti1ToVDB(
     normalize: bool,
     arena_alloc: std.mem.Allocator,
 ) ![]const u8 {
-    const img = try nifti1.Image.init(nifti_filepath);
+    const img = try NIfTI1.Image.init(nifti_filepath);
     defer img.deinit();
-    const hdr = try nifti1.getHeader(nifti_filepath);
+    const hdr = try NIfTI1.getHeader(nifti_filepath);
     const minmax = MinMax(
         f32,
         &img.data,
@@ -147,7 +147,7 @@ pub fn nifti1ToVDB(
     switch (img.header.dim[0]) {
         //_:Static Image
         3 => {
-            const transform = try nifti1.getTransform(hdr.*);
+            const transform = try NIfTI1.getTransform(hdr.*);
             var buffer = std.array_list.Managed(u8).init(arena_alloc);
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);

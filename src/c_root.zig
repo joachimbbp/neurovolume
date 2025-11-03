@@ -6,8 +6,7 @@ const print = std.debug.print;
 const zools = @import("zools");
 const zip = zools.zip.pairs;
 const rev = zools.slice.reverse;
-const nifti1 = @import("nifti1.zig");
-const vdb543 = @import("vdb543.zig");
+const NIfTI1 = @import("NIfTI1.zig");
 const root = @import("root.zig");
 
 //_: CONSTS:
@@ -76,7 +75,7 @@ pub export fn unit_c(
             Radians_per_second = 48,
         };
 
-        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+        const hdr_ptr = NIfTI1.getHeader(fpath_slice) catch {
             return 0;
         };
 
@@ -112,7 +111,7 @@ pub export fn numFrames_c(
 ) usize {
     const fpath_slice: []const u8 = std.mem.span(fpath);
     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
-        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+        const hdr_ptr = NIfTI1.getHeader(fpath_slice) catch {
             return 0;
         };
         const num_frames: usize = @intCast(hdr_ptr.dim[4]);
@@ -129,7 +128,7 @@ pub export fn sliceDuration_c( //WARN: not really used, tbh. Test file has 0 sli
 ) f32 {
     const fpath_slice: []const u8 = std.mem.span(fpath);
     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
-        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+        const hdr_ptr = NIfTI1.getHeader(fpath_slice) catch {
             return 0;
         };
         const slice_duration = hdr_ptr.sliceDuration;
@@ -147,7 +146,7 @@ pub export fn pixdim_c( //WARN: not really used, tbh. Test file has 0 slice dura
 ) f32 {
     const fpath_slice: []const u8 = std.mem.span(fpath);
     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
-        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+        const hdr_ptr = NIfTI1.getHeader(fpath_slice) catch {
             return 0;
         };
         const pixdim = hdr_ptr.pixdim; //probably should error handle here tbh!
@@ -163,7 +162,7 @@ const t = zools.timer;
 test "static nifti to vdb - c level" {
     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
     //perhaps: reconcile these by bringing the tmp save out of the function itself and then calling
-    //either that or the default persistent location in the real nifti1ToVDB function!
+    //either that or the default persistent location in the real NIfTI1ToVDB function!
 
     print("🌊 c level nifti to vdb\n", .{});
 
@@ -198,8 +197,8 @@ test "bold nifti to vdb - c level" {
     );
     _ = t.Lap(start, "BOLD nifti timer");
     print("☁️🩸🧠 BOLD nifti test saved as VDB\n", .{});
-    const bhdr = try nifti1.getHeader(config.testing.files.bold);
-    const b_trans = try nifti1.getTransform(bhdr.*);
+    const bhdr = try NIfTI1.getHeader(config.testing.files.bold);
+    const b_trans = try NIfTI1.getTransform(bhdr.*);
     print("         transform: {any}\n", .{b_trans});
     print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
