@@ -152,10 +152,7 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            while (true) {
-                if (increment_cartesian(3, &cart, dim_list) == false) {
-                    break;
-                }
+            while (increment_cartesian(3, &cart, dim_list)) {
                 idx += 1;
                 const res_value = getValue(
                     &img.data,
