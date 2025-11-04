@@ -14,20 +14,19 @@ const FormatSignature = extern struct { //HDF5 v2
 
 const Superblock = extern struct { //HDF5 v2
     fmt_signature: FormatSignature,
-    superblock_version: u8, // = 2
-    size_of_offsets: u8, // = 8 (from your output)
-    size_of_lengths: u8, // = 8 (from your output)
-    file_consistency_flags: u8, // = 0 (from your output)
+    superblock_version: u8,
+    size_of_offsets: u8,
+    size_of_lengths: u8,
+    _file_consistency_flags: u8, //unused in verion 2
 
     // from the SOURCE:
     // This value contains the number of bytes used to store addresses in the file. The values for the addresses of objects in the file are offsets relative to a base address, usually the address of the superblock signature. This allows a wrapper to be added after the file is created without invalidating the internal offset locations. This field is present in version 0+ of the superblock.
-    // Note: Following fields are variable-sized based on size_of_offsets (8 bytes in your case)
 
-    base_address: u64,
-    superblock_extension_address: u64,
-    end_of_file_address: u64,
-    root_group_object_header_address: u64,
-    superblock_checksum: u32,
+    base_address: [4]u8,
+    superblock_extension_address: u8,
+    end_of_file_address: u8,
+    root_group_object_header_address: u8,
+    superblock_checksum: u8,
 };
 
 pub fn load_HDF5_V2(filepath: []const u8) !void {
