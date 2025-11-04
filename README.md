@@ -13,7 +13,6 @@ This project is very much a **work in progress**. There is a lengthy road-map wh
 ## 💿 Installation and Requirements
 Neurovolume requires [Zig 0.15.1](https://ziglang.org/download/#release-0.15.1). It was developed using [Blender 4.3.2](https://www.blender.org/download/releases/4-3/) and [Python 3.11.13](https://www.python.org/downloads/release/python-31113/), but these requirements might be a bit more flexible.
 
-Testing and UUID generation relies on [zools](https://github.com/joachimbbp/zools), a loose collection of zig scripts written by yours truly. You could easily axe this dependency by hard-coding a UUID and ignoring the tests. If you fork this repo and want to stay updated, grab the latest and greatest with `zig fetch --save git+https://github.com/joachimbbp/zools`
 ## 🏗️ Build
 After installing Zig, Blender, and Python, run `zig build` from the project repo.
 

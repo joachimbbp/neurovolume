@@ -3,11 +3,13 @@
 //_: IMPORTS
 const std = @import("std");
 const print = std.debug.print;
-const zools = @import("zools");
-const zip = zools.zip.pairs;
-const rev = zools.slice.reverse;
+const util = @import("util.zig");
+const zip = util.zipPairs;
+const rev = util.reverseSlice;
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
+const constants = @import("constants.zig");
+const save = @import("save.zig");
 
 //_: CONSTS:
 const config = @import("config.zig.zon");
@@ -198,9 +200,9 @@ pub fn nifti1ToVDB(
 
         //_: Time Series
         4 => {
-            const transform = zools.matrix.IdentityMatrix4x4;
+            const transform = constants.IdentityMatrix4x4;
             //FIX: native transform doesn't work with bold as of right now!
-            const vdb_seq_folder = try zools.save.versionFolder(
+            const vdb_seq_folder = try save.versionFolder(
                 base_seq_folder,
                 arena_alloc,
             );
@@ -218,7 +220,7 @@ pub fn nifti1ToVDB(
                 @as(usize, @intCast(hdr.dim[3])) *
                 @as(usize, @intCast(img.bytes_per_voxel));
 
-            const leading_zeros = zools.math.numDigitsShort(@bitCast(img.header.dim[4]));
+            const leading_zeros = util.numDigitsShort(@bitCast(img.header.dim[4]));
 
             for (0..num_frames) |frame| {
                 const frame_start = frame * vpf;
@@ -257,7 +259,7 @@ pub fn nifti1ToVDB(
                         arena_alloc,
                     );
                 }
-                const frame_path = try zools.sequence.elementName(
+                const frame_path = try save.elementName(
                     vdb_seq_folder_slice,
                     basename,
                     "vdb",
