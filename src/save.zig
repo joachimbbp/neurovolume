@@ -6,26 +6,28 @@ const ArrayList = std.array_list.Managed;
 //checks if path exists
 fn exists(
     filepath: []const u8,
-) !bool {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    const absolute_path = try std.fs.cwd().realpathAlloc(gpa_alloc, filepath); //LLM: line
-    //WARN: wont' work for null terminated paths. for that you need accessAbsoluteZ
-    std.fs.accessAbsolute(absolute_path, .{}) catch return false;
+) bool {
+    //LLM: generated function
+    if (std.fs.path.isAbsolute(filepath)) {
+        std.fs.accessAbsolute(filepath, .{}) catch return false;
+    } else {
+        std.fs.cwd().access(filepath, .{}) catch return false;
+    }
     return true;
 }
 test "path exists" {
-    try std.testing.expect(try exists("/Users/joachimpfefferkorn/Desktop/Screenshot 2025-10-31 at 3.02.58 PM.png"));
-    try std.testing.expect(!try exists("ham/spamland"));
+    try std.testing.expect(exists("/Users/joachimpfefferkorn/Desktop/Screenshot 2025-10-31 at 3.02.58 PM.png"));
+    try std.testing.expect(exists("ham/spamland") == false);
+    try std.testing.expect(exists("/Users/joachimpfefferkorn/repos/neurovolume/output"));
 }
 
 // Builds a directory if one is not present at that filepath
 // Returns true for absent paths
 pub fn dirIfAbsent(path_string: []const u8) !bool {
-    try std.fs.accessAbsolute(path_string, .{}) catch {
+    if (!try exists(path_string)) {
         try std.fs.cwd().makeDir(path_string);
         return true;
-    };
+    }
     return false;
 }
 pub fn versionName(path_string: []const u8, arena: std.mem.Allocator) !ArrayList(u8) {
