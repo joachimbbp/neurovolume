@@ -24,7 +24,7 @@ test "path exists" {
 // Builds a directory if one is not present at that filepath
 // Returns true for absent paths
 pub fn dirIfAbsent(path_string: []const u8) !bool {
-    if (!try exists(path_string)) {
+    if (!exists(path_string)) {
         try std.fs.cwd().makeDir(path_string);
         return true;
     }
@@ -33,7 +33,7 @@ pub fn dirIfAbsent(path_string: []const u8) !bool {
 pub fn versionName(path_string: []const u8, arena: std.mem.Allocator) !ArrayList(u8) {
     const version_delimiter = "_";
     var output = ArrayList(u8).init(arena);
-    if (exists(path_string)) {
+    if (!exists(path_string)) {
         for (path_string) |c| {
             try output.append(c);
         }
@@ -68,23 +68,21 @@ pub fn versionName(path_string: []const u8, arena: std.mem.Allocator) !ArrayList
         prefix = version_split.rest();
     }
 
-    var result: []const u8 = undefined;
-
-    result = try std.fmt.allocPrint(arena, "{s}/{s}_{d}.{s}", .{
+    const result = try std.fmt.allocPrint(arena, "{s}/{s}_{d}.{s}", .{
         dir,
         prefix,
         version,
         ext,
     });
+    defer arena.free(result);
 
     if (exists(result)) {
-        result = (try versionName(result, arena)).items;
+        return try versionName(result, arena);
     }
 
     for (result) |c| {
         try output.append(c);
     }
-    arena.free(result);
     return output;
 }
 pub fn versionFile(
@@ -102,7 +100,7 @@ pub fn folderVersionName(folderpath: []const u8, arena: std.mem.Allocator) !Arra
     const version_delimiter = "_";
     var output = ArrayList(u8).init(arena);
 
-    if (exists(folderpath)) {
+    if (!exists(folderpath)) {
         for (folderpath) |c| {
             try output.append(c);
         }
@@ -128,13 +126,13 @@ pub fn folderVersionName(folderpath: []const u8, arena: std.mem.Allocator) !Arra
         version_split.reset();
         prefix = version_split.rest();
     }
-    var result: []const u8 = try std.fmt.allocPrint(arena, "{s}/{s}_{d}", .{
+    const result: []const u8 = try std.fmt.allocPrint(arena, "{s}/{s}_{d}", .{
         dir,
         prefix,
         version,
     });
     if (exists(result)) {
-        result = (try folderVersionName(result, arena)).items;
+        return try folderVersionName(result, arena);
     }
 
     for (result) |c| {
