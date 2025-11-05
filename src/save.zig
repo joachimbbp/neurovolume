@@ -3,25 +3,41 @@ const Io = std.Io;
 const util = @import("util.zig");
 const ArrayList = std.array_list.Managed;
 
+//checks if path exists
+fn exists(
+    filepath: []const u8,
+) !bool {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    const absolute_path = try std.fs.cwd().realpathAlloc(gpa_alloc, filepath); //LLM: line
+    //WARN: wont' work for null terminated paths. for that you need accessAbsoluteZ
+    std.fs.accessAbsolute(absolute_path, .{}) catch return false;
+    return true;
+}
+test "path exists" {
+    try std.testing.expect(try exists("/Users/joachimpfefferkorn/Desktop/Screenshot 2025-10-31 at 3.02.58 PM.png"));
+    try std.testing.expect(!try exists("ham/spamland"));
+}
+
 // Builds a directory if one is not present at that filepath
 // Returns true for absent paths
 pub fn dirIfAbsent(path_string: []const u8) !bool {
-    if (!try std.fs.accessAbsolute(path_string, .{})) {
+    try std.fs.accessAbsolute(path_string, .{}) catch {
         try std.fs.cwd().makeDir(path_string);
         return true;
-    }
+    };
     return false;
 }
 pub fn versionName(path_string: []const u8, arena: std.mem.Allocator) !ArrayList(u8) {
     const version_delimiter = "_";
     var output = ArrayList(u8).init(arena);
-
-    if (@TypeOf(std.fs.accessAbsolute(path_string, .{})) != void) {
+    const absolute_path = try std.fs.cwd().realpathAlloc(arena, path_string); //LLM: line
+    std.fs.accessAbsolute(absolute_path, .{}) catch {
         for (path_string) |c| {
             try output.append(c);
         }
         return output;
-    }
+    };
     const dir = std.fs.path.dirname(path_string).?;
     const file = std.fs.path.basenamePosix(path_string);
     const dot_i = std.mem.lastIndexOfScalar(u8, file, '.'); //ROBOT:
@@ -60,9 +76,11 @@ pub fn versionName(path_string: []const u8, arena: std.mem.Allocator) !ArrayList
         ext,
     });
 
-    if (try std.fs.accessAbsolute(result, .{})) {
+    const res_abs = try std.fs.cwd().realpathAlloc(arena, result); //LLM: line
+
+    std.fs.accessAbsolute(res_abs, .{}) catch {
         result = (try versionName(result, arena)).items;
-    }
+    };
 
     for (result) |c| {
         try output.append(c);
@@ -84,12 +102,14 @@ pub fn versionFile(
 pub fn folderVersionName(folderpath: []const u8, arena: std.mem.Allocator) !ArrayList(u8) {
     const version_delimiter = "_";
     var output = ArrayList(u8).init(arena);
-    if (@TypeOf(std.fs.accessAbsolute(folderpath, .{})) != void) {
+    const absolute_path = try std.fs.cwd().realpathAlloc(arena, folderpath); //LLM: line
+
+    std.fs.accessAbsolute(absolute_path, .{}) catch {
         for (folderpath) |c| {
             try output.append(c);
         }
         return output;
-    }
+    };
 
     const dir = std.fs.path.dirname(folderpath).?;
     const foldername = std.fs.path.basenamePosix(folderpath);
@@ -115,9 +135,11 @@ pub fn folderVersionName(folderpath: []const u8, arena: std.mem.Allocator) !Arra
         prefix,
         version,
     });
-    if (try std.fs.accessAbsolute(result, .{})) {
+    const res_abs = try std.fs.cwd().realpathAlloc(arena, result); //LLM: line
+
+    std.fs.accessAbsolute(res_abs, .{}) catch {
         result = (try folderVersionName(result, arena)).items;
-    }
+    };
 
     for (result) |c| {
         try output.append(c);

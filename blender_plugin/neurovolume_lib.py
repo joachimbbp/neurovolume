@@ -1,5 +1,4 @@
 import ctypes as c
-print("running neurovolume library")
 # _: Things that will eventually live in a config file:
 
 lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
