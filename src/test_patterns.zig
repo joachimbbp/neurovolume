@@ -1,10 +1,10 @@
 const std = @import("std");
 const print = std.debug.print;
-const zools = @import("zools");
-const t = zools.timer;
+const t = @import("timer.zig");
 const vdb543 = @import("vdb543.zig");
 const VDB = vdb543.VDB;
 const config = @import("config.zig.zon");
+const save = @import("save.zig");
 
 pub const TestPatternError = error{
     NotYetImplemented,
@@ -30,7 +30,7 @@ pub fn saveTestPattern(
             fmt,
             .{ tmp_dir_slice, basename },
         );
-        const final_save_location = try zools.save.version(
+        const final_save_location = try save.versionFile(
             default_save_path,
             buffer.*,
             arena_alloc.*,
@@ -43,9 +43,8 @@ pub fn saveTestPattern(
             fmt,
             .{ config.testing.dirs.output, basename },
         );
-        const final_save_location = try zools.save.version(
+        const final_save_location = try save.versionFolder(
             default_persistent_dir,
-            buffer.*,
             arena_alloc.*,
         );
         print("Test pattern saved to persistent location: {s}\n", .{final_save_location.items});

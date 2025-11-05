@@ -6,26 +6,17 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const zools = b.dependency("zools", .{
-        .target = target,
-        .optimize = optimize,
-    }).module("zools");
-
     const nvol_mod = b.createModule(.{
         .root_source_file = b.path("./src/c_root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    nvol_mod.addImport("zools", zools);
-
     const libneurovolume = b.addLibrary(.{
         .name = "neurovolume",
         .linkage = .dynamic,
         .root_module = nvol_mod,
     });
-
-    //libneurovolume.root_module.addImport("zools", zools);
 
     //NOTE: This doesn't really do much at the moment
     const exe = b.addExecutable(.{

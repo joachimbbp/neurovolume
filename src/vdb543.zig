@@ -10,19 +10,14 @@
 // [ ] Arbitrary input data
 // [ ]  setVoxels one 3-node at a time to reduce syscalls
 // [ ] Improve error handling
-
-//DEPENCENCY:
-// This is an external UUID writing dependency (written by me, Joachim)
-// If you don't want to deal with imports feel free to hard code a
-// UUID down under the comment "write UUID"
-const zools = @import("zools");
-
 //DEPRECATED: remove this abstraction eventually
 const ArrayList = std.array_list.Managed;
 
 const std = @import("std");
 const print = std.debug.print;
-
+const util = @import("util.zig");
+const uuidv4 = util.UUIDv4;
+const save = @import("save.zig");
 //SECTION: IO helper functions
 fn writePointer(buffer: *ArrayList(u8), pointer: *const u8, len: usize) !void {
     try buffer.appendSlice(pointer[0..len]);
@@ -350,7 +345,7 @@ pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
     try writeU8(buffer, 0);
 
     //write UUID
-    const uuid = zools.uuid.v4(); //Feel free to replace with your own
+    const uuid = uuidv4(); //Feel free to replace with your own
     try writeString(buffer, uuid[0..]);
 
     //No Metadata for now
@@ -394,7 +389,7 @@ pub fn writeFrame(
 ) !ArrayList(u8) {
     try writeVDB(buffer, vdb, transform);
 
-    const vdb_filepath = try zools.save.version(
+    const vdb_filepath = try save.versionFile(
         path_string,
         buffer.*, //EXORCISE: This pointer pattern seems cursed
         arena_alloc,
@@ -404,10 +399,9 @@ pub fn writeFrame(
 }
 
 //SECTION: Tests:
-//SUBMODULE: as the UUID above, this has lots of zools. However, these are just for testing,
-//so you could just comment it out.
-const id_4x4 = zools.matrix.IdentityMatrix4x4;
-const test_utils = @import("test_utils.zig");
+const constants = @import("constants.zig");
+const id_4x4 = constants.IdentityMatrix4x4;
+const test_patterns = @import("test_patterns.zig");
 //Use "tmp" to use the tmp folder in zig cache
 pub fn sphereTest(comptime save_dir: []const u8) !void {
     //NICE: I think this is a good convention for allocators and arena allocators
@@ -446,7 +440,7 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
         &sphere_vdb,
         id_4x4,
     );
-    try test_utils.saveTestPattern(
+    try test_patterns.saveTestPattern(
         save_dir,
         "sphere_test_pattern",
         &arena_alloc,
@@ -478,14 +472,14 @@ pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
         &single_voxel,
         id_4x4,
     ); // assumes compatible signature
-    try test_utils.saveTestPattern(
+    try test_patterns.saveTestPattern(
         save_dir,
         "one_pixel_test_pattern",
         &arena_alloc,
         &buffer,
     );
 }
-const t = zools.timer;
+const t = @import("timer.zig");
 test "test patterns" {
     const s = t.Click();
     print("☁️ ⚪️ Sphere Test Pattern\n", .{});

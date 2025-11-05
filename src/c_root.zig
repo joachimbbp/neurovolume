@@ -3,12 +3,12 @@
 //_: IMPORTS
 const std = @import("std");
 const print = std.debug.print;
-const zools = @import("zools");
-const zip = zools.zip.pairs;
-const rev = zools.slice.reverse;
+const util = @import("util.zig");
+const zip = util.zipPairs;
 const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
 const root = @import("root.zig");
+const t = @import("timer.zig");
 
 //_: CONSTS:
 const config = @import("config.zig.zon");
@@ -157,8 +157,6 @@ pub export fn pixdim_c( //WARN: not really used, tbh. Test file has 0 slice dura
         return 0;
     }
 }
-
-const t = zools.timer;
 
 test "static nifti to vdb - c level" {
     //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:

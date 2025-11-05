@@ -174,10 +174,6 @@ pub const Image = struct {
             .bytes_per_voxel = bytes_per_voxel,
         };
     }
-    //TODO: You need to prep the image with minmax to get the normalization function!
-    //Some oop-y design habits to destory!
-    //
-    //
     pub fn deinit(self: *const Image) void {
         //TODO: everything else
         //why did robbie put this as destroy for one and free for the other?
@@ -220,8 +216,8 @@ pub fn getTransform(h: Header) ![4][4]f64 {
 
 //SECTION: Tests:
 const config = @import("config.zig.zon");
-const zools = @import("zools");
-const t = zools.timer;
+
+const t = @import("timer.zig");
 test "echo module" {
     print("🧠 nifti1.zig module echo\n", .{});
 }
