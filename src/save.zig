@@ -33,13 +33,12 @@ pub fn dirIfAbsent(path_string: []const u8) !bool {
 pub fn versionName(path_string: []const u8, arena: std.mem.Allocator) !ArrayList(u8) {
     const version_delimiter = "_";
     var output = ArrayList(u8).init(arena);
-    const absolute_path = try std.fs.cwd().realpathAlloc(arena, path_string); //LLM: line
-    std.fs.accessAbsolute(absolute_path, .{}) catch {
+    if (exists(path_string)) {
         for (path_string) |c| {
             try output.append(c);
         }
         return output;
-    };
+    }
     const dir = std.fs.path.dirname(path_string).?;
     const file = std.fs.path.basenamePosix(path_string);
     const dot_i = std.mem.lastIndexOfScalar(u8, file, '.'); //ROBOT:
@@ -78,11 +77,9 @@ pub fn versionName(path_string: []const u8, arena: std.mem.Allocator) !ArrayList
         ext,
     });
 
-    const res_abs = try std.fs.cwd().realpathAlloc(arena, result); //LLM: line
-
-    std.fs.accessAbsolute(res_abs, .{}) catch {
+    if (exists(result)) {
         result = (try versionName(result, arena)).items;
-    };
+    }
 
     for (result) |c| {
         try output.append(c);
@@ -104,14 +101,13 @@ pub fn versionFile(
 pub fn folderVersionName(folderpath: []const u8, arena: std.mem.Allocator) !ArrayList(u8) {
     const version_delimiter = "_";
     var output = ArrayList(u8).init(arena);
-    const absolute_path = try std.fs.cwd().realpathAlloc(arena, folderpath); //LLM: line
 
-    std.fs.accessAbsolute(absolute_path, .{}) catch {
+    if (exists(folderpath)) {
         for (folderpath) |c| {
             try output.append(c);
         }
         return output;
-    };
+    }
 
     const dir = std.fs.path.dirname(folderpath).?;
     const foldername = std.fs.path.basenamePosix(folderpath);
@@ -137,11 +133,9 @@ pub fn folderVersionName(folderpath: []const u8, arena: std.mem.Allocator) !Arra
         prefix,
         version,
     });
-    const res_abs = try std.fs.cwd().realpathAlloc(arena, result); //LLM: line
-
-    std.fs.accessAbsolute(res_abs, .{}) catch {
+    if (exists(result)) {
         result = (try folderVersionName(result, arena)).items;
-    };
+    }
 
     for (result) |c| {
         try output.append(c);
@@ -173,12 +167,6 @@ pub fn elementName(
 }
 
 test "iterate" {
-    //NOTE:
-    //patern should be:
-    //      Test directory exists
-    //      write new element name
-    //      make sure you're not overwriting an existing file (panic for now)
-    //      write sequence element
     std.debug.print("🎥 Testing sequence iteration: \n", .{});
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
