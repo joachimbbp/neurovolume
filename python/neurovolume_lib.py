@@ -38,8 +38,6 @@ def ndarray_to_VDB(arr: np.ndarray, save_path: str):
                                     c.POINTER(c.c_uint32),
                                     c.c_char_p]
     nvol.vdbFromArray_c.restype = c.c_size_t
-    nvol.vdbFromArray_c(arr, dims.ctypes.data_as(
-        c.POINTER(c.c_uint)), save_path.encode('utf8'))
     res = nvol.vdbFromArray_c(
         arr,
         dims.ctypes.data_as(c.POINTER(c.c_uint32)),

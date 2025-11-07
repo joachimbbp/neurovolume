@@ -194,13 +194,16 @@ pub export fn vdbFromArray_c(
     const ny = dims[1];
     const nz = dims[2];
 
-    for (0..nx) |z| {
+    for (0..nz) |z| {
         for (0..ny) |y| {
-            for (0..nz) |x| {
+            for (0..nx) |x| {
                 const idx = z * ny * nx + y * nx + x;
                 const pos = [3]u32{ @intCast(x), @intCast(y), @intCast(z) };
                 const res = setVoxel_c(&vdb, &pos, data[idx]);
-                if (res == 0) return 0;
+                if (res == 0) {
+                    std.debug.print("ERROR: setVoxel failed at ({}, {}, {})\n", .{ x, y, z });
+                    return 0;
+                }
             }
         }
     }
@@ -219,17 +222,20 @@ pub export fn vdbFromArray_c(
     defer buffer.deinit();
     const transform = constants.IdentityMatrix4x4; //TODO: arbitrary transforms
     vdb543.writeVDB(&buffer, &vdb, transform) catch {
+        std.debug.print("ERROR: Failed to write VDB\n", .{});
         return 0;
     };
 
     const file = std.fs.cwd().createFile(std.mem.span(output_filepath), .{}) catch {
+        std.debug.print("ERROR: Failed to create file\n", .{});
         return 0;
     };
     file.writeAll(buffer.items) catch {
+        std.debug.print("ERROR: Failed to write to file\n", .{});
         return 0;
     };
     defer file.close();
-
+    std.debug.print("vdb successfully built from array\n", .{});
     return 1;
 }
 
