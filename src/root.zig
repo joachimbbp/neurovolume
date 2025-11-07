@@ -36,7 +36,7 @@ pub fn increment_cartesian(
     return false;
 }
 
-fn getValue(
+fn getValue( //prbably nifti1 specific!
     data: *const []const u8,
     idx: usize, //linear index
     bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
@@ -44,7 +44,7 @@ fn getValue(
     comptime ResType: type,
     endianness: std.builtin.Endian,
     num_bytes: u16,
-    //Scaling: (set both to 0 if they do not apply)
+    //Scaling: set slope to 1 and int to 0 to have them not apply
     slope: ResType,
     intercept: ResType,
     //Normalizing
@@ -62,7 +62,7 @@ fn getValue(
         endianness,
     ));
     var res_value = raw_value;
-    if (slope != 0 and intercept != 0) {
+    if (slope != 1 or intercept != 0) { //wouldn't change res_value
         res_value = slope * raw_value + intercept;
     }
 
@@ -73,7 +73,7 @@ fn getValue(
 }
 
 //returns .{mininmum value, maximum value, difference between max and min}
-pub fn MinMax(
+pub fn MinMax( //honestly: might be nifti specific! i think all files should have their own minmax maybe?
     comptime T: type, //must be float for now
     data: *const []const u8,
     bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
