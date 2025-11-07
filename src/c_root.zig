@@ -178,38 +178,51 @@ pub export fn setVoxel_c(
     //WARN: don't forget to free everything in this arena after writing the VDB!
 }
 
-pub export fn vdbFromArray_c(data: [*]const f32, dims: *const [3]u32) ?*vdb543.VDB {
-    var vdb = vdb543.VDB.build(arena_alloc) catch { //WARN: don't forget to free
-        return null;
-    };
-
-    //LLM:
-    const nx = dims[0];
-    const ny = dims[1];
-    const nz = dims[2];
-
-    for (0..nx) |z| {
-        for (0..ny) |y| {
-            for (0..nz) |x| {
-                const idx = z * ny * nx + y * nx + x;
-                const pos = [3]u32{ @intCast(x), @intCast(y), @intCast(z) };
-                const res = setVoxel_c(&vdb, &pos, data[idx]);
-                if (res == 0) return null;
-            }
-        }
-    }
-
-    return &vdb;
-    //TODO: Jan's implemenation:
-    //const slice = data[0..len];
-    //    var cart = [_]u32{ 0, 0, 0 };
-    //    var idx: usize = 0;
-    // while (root.increment_cartesian(cart.len, &cart, dims)) {
-    //     idx += 1;
-    //     vdb543.setVoxel(&vdb, .{cart[0], cart[1], cart[2] }, data
-    //
-    // }
-}
+// pub export fn vdbFromArray_c(
+//     data: [*]const f32,
+//     dims: *const [3]u32,
+//     output_dir: [*:0]const u8,
+//     normalize: bool,
+//     fpath_buff: [*]u8,
+//     fpath_cap: usize,
+// ) usize {
+//     var vdb = vdb543.VDB.build(arena_alloc) catch {
+//         return 0;
+//     };
+//
+//     //LLM:
+//     const nx = dims[0];
+//     const ny = dims[1];
+//     const nz = dims[2];
+//
+//     for (0..nx) |z| {
+//         for (0..ny) |y| {
+//             for (0..nz) |x| {
+//                 const idx = z * ny * nx + y * nx + x;
+//                 const pos = [3]u32{ @intCast(x), @intCast(y), @intCast(z) };
+//                 const res = setVoxel_c(&vdb, &pos, data[idx]);
+//                 if (res == 0) return 0;
+//             }
+//         }
+//     }
+//
+//     //TODO: Jan's implemenation:
+//     //const slice = data[0..len];
+//     //    var cart = [_]u32{ 0, 0, 0 };
+//     //    var idx: usize = 0;
+//     // while (root.increment_cartesian(cart.len, &cart, dims)) {
+//     //     idx += 1;
+//     //     vdb543.setVoxel(&vdb, .{cart[0], cart[1], cart[2] }, data
+//     //
+//     // }
+//     const fpath_slice: []const u8 = std.mem.span(fpath); //LLM: suggested line
+//     const output_dir_slice: []const u8 = std.mem.span(output_dir);
+//     };
+//     const n = if (filepath.len + 1 <= fpath_cap) filepath.len else fpath_cap - 1;
+//     @memcpy(fpath_buff[0..n], filepath[0..n]);
+//     arena_alloc.free(filepath);
+//     return n;
+// }
 
 pub export fn buildvdb_c() ?*vdb543.VDB { //llm: nullable pointer to vdb suggested
     var vdb = vdb543.VDB.build(arena_alloc) catch {
