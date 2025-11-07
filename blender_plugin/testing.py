@@ -69,7 +69,7 @@ def build_pyramid(size=64):
 
 
 pyramid = build_pyramid()
-output_arr = "/Users/joachimpfefferkorn/repos/neurovolume/output/arr.vdb"
+output_arr = "/Users/joachimpfefferkorn/repos/neurovolume/output/pyramid.vdb"
 
 nv.ndarray_to_VDB(pyramid, output_arr)
 print('done')
