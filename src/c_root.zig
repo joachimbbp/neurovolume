@@ -9,6 +9,7 @@ const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
 const root = @import("root.zig");
 const t = @import("timer.zig");
+const constants = @import("constants.zig");
 
 //_: CONSTS:
 const config = @import("config.zig.zon");
@@ -178,51 +179,59 @@ pub export fn setVoxel_c(
     //WARN: don't forget to free everything in this arena after writing the VDB!
 }
 
-// pub export fn vdbFromArray_c(
-//     data: [*]const f32,
-//     dims: *const [3]u32,
-//     output_dir: [*:0]const u8,
-//     normalize: bool,
-//     fpath_buff: [*]u8,
-//     fpath_cap: usize,
-// ) usize {
-//     var vdb = vdb543.VDB.build(arena_alloc) catch {
-//         return 0;
-//     };
-//
-//     //LLM:
-//     const nx = dims[0];
-//     const ny = dims[1];
-//     const nz = dims[2];
-//
-//     for (0..nx) |z| {
-//         for (0..ny) |y| {
-//             for (0..nz) |x| {
-//                 const idx = z * ny * nx + y * nx + x;
-//                 const pos = [3]u32{ @intCast(x), @intCast(y), @intCast(z) };
-//                 const res = setVoxel_c(&vdb, &pos, data[idx]);
-//                 if (res == 0) return 0;
-//             }
-//         }
-//     }
-//
-//     //TODO: Jan's implemenation:
-//     //const slice = data[0..len];
-//     //    var cart = [_]u32{ 0, 0, 0 };
-//     //    var idx: usize = 0;
-//     // while (root.increment_cartesian(cart.len, &cart, dims)) {
-//     //     idx += 1;
-//     //     vdb543.setVoxel(&vdb, .{cart[0], cart[1], cart[2] }, data
-//     //
-//     // }
-//     const fpath_slice: []const u8 = std.mem.span(fpath); //LLM: suggested line
-//     const output_dir_slice: []const u8 = std.mem.span(output_dir);
-//     };
-//     const n = if (filepath.len + 1 <= fpath_cap) filepath.len else fpath_cap - 1;
-//     @memcpy(fpath_buff[0..n], filepath[0..n]);
-//     arena_alloc.free(filepath);
-//     return n;
-// }
+pub export fn vdbFromArray_c(
+    data: [*]const f32,
+    dims: *const [3]u32,
+    output_filepath: [*:0]const u8,
+    //TODO: normalize, non-identity transforms
+) usize {
+    var vdb = vdb543.VDB.build(arena_alloc) catch {
+        return 0;
+    };
+
+    //LLM:
+    const nx = dims[0];
+    const ny = dims[1];
+    const nz = dims[2];
+
+    for (0..nx) |z| {
+        for (0..ny) |y| {
+            for (0..nz) |x| {
+                const idx = z * ny * nx + y * nx + x;
+                const pos = [3]u32{ @intCast(x), @intCast(y), @intCast(z) };
+                const res = setVoxel_c(&vdb, &pos, data[idx]);
+                if (res == 0) return 0;
+            }
+        }
+    }
+
+    //TODO: Jan's implemenation:
+    //const slice = data[0..len];
+    //    var cart = [_]u32{ 0, 0, 0 };
+    //    var idx: usize = 0;
+    // while (root.increment_cartesian(cart.len, &cart, dims)) {
+    //     idx += 1;
+    //     vdb543.setVoxel(&vdb, .{cart[0], cart[1], cart[2] }, data
+    //
+    // }
+
+    var buffer = std.array_list.Managed(u8).init(arena_alloc);
+    defer buffer.deinit();
+    const transform = constants.IdentityMatrix4x4; //TODO: arbitrary transforms
+    vdb543.writeVDB(&buffer, &vdb, transform) catch {
+        return 0;
+    };
+
+    const file = std.fs.cwd().createFile(std.mem.span(output_filepath), .{}) catch {
+        return 0;
+    };
+    file.writeAll(buffer.items) catch {
+        return 0;
+    };
+    defer file.close();
+
+    return 1;
+}
 
 pub export fn buildvdb_c() ?*vdb543.VDB { //llm: nullable pointer to vdb suggested
     var vdb = vdb543.VDB.build(arena_alloc) catch {
