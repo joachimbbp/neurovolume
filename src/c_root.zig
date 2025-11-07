@@ -178,38 +178,60 @@ pub export fn setVoxel_c(
     //WARN: don't forget to free everything in this arena after writing the VDB!
 }
 
-//TODO: will involve increment_cartesian, so probably needs some project tidy first!
-// pub export fn setVoxelArray_c(vdb: *vdb543.VDB, data: [*]const f32, len: usize) usize {
-//     const slice = data[0..len];
-//     for (slice) | val, i | {
-//
-//
-//     }
-//
-//
-// }
+pub export fn vdbFromArray_c(data: [*]const f32, dims: *const [3]u32) ?*vdb543.VDB {
+    var vdb = vdb543.VDB.build(arena_alloc) catch { //WARN: don't forget to free
+        return null;
+    };
 
-pub export fn buildVDB_c() ?*vdb543.VDB { //LLM: nullable pointer to VDB suggested
+    //LLM:
+    const nx = dims[0];
+    const ny = dims[1];
+    const nz = dims[2];
+
+    for (0..nx) |z| {
+        for (0..ny) |y| {
+            for (0..nz) |x| {
+                const idx = z * ny * nx + y * nx + x;
+                const pos = [3]u32{ @intCast(x), @intCast(y), @intCast(z) };
+                const res = setVoxel_c(&vdb, &pos, data[idx]);
+                if (res == 0) return null;
+            }
+        }
+    }
+
+    return &vdb;
+    //TODO: Jan's implemenation:
+    //const slice = data[0..len];
+    //    var cart = [_]u32{ 0, 0, 0 };
+    //    var idx: usize = 0;
+    // while (root.increment_cartesian(cart.len, &cart, dims)) {
+    //     idx += 1;
+    //     vdb543.setVoxel(&vdb, .{cart[0], cart[1], cart[2] }, data
+    //
+    // }
+}
+
+pub export fn buildvdb_c() ?*vdb543.VDB { //llm: nullable pointer to vdb suggested
     var vdb = vdb543.VDB.build(arena_alloc) catch {
         return null;
     };
     return &vdb;
-    //WARN: don't forget freeVDB
+    //warn: don't forget freevdb
 }
 
-pub export fn freeVDB_c(vdb: *vdb543.VDB) void { //LLM:
+pub export fn freevdb_c(vdb: *vdb543.VDB) void { //llm:
     arena_alloc.destroy(vdb);
 }
 
 test "static nifti to vdb - c level" {
-    //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
+    //note: there's a little mismatch in the testing/actual functionality at the moment, hence this:
     //perhaps: reconcile these by bringing the tmp save out of the function itself and then calling
-    //either that or the default persistent location in the real nifti1ToVDB function!
+    //either that or the default persistent location in the real nifti1tovdb function!
 
     print("🌊 c level nifti to vdb\n", .{});
 
     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
-    //TODO: make the lenght a bit more robust. What should it be???
+    //todo: make the lenght a bit more robust. what should it be???
 
     const start = t.Click();
     const fpath_len = nifti1ToVDB_c(
@@ -219,15 +241,15 @@ test "static nifti to vdb - c level" {
         &fpath_buff,
         fpath_buff.len,
     );
-    _ = t.Lap(start, "Static Nifti1 to VDB Timer");
-    print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+    _ = t.Lap(start, "static nifti1 to vdb timer");
+    print("☁️ 🧠 static nifti test saved as vdb\n", .{});
+    print("🗃️ output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
 test "bold nifti to vdb - c level" {
-    print("🌊 c level BOLD nifti to vdb\n", .{});
+    print("🌊 c level bold nifti to vdb\n", .{});
 
     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
-    //TODO: make the lenght a bit more robust. What should it be???
+    //todo: make the lenght a bit more robust. what should it be???
 
     const start = t.Click();
     const fpath_len = nifti1ToVDB_c(
@@ -237,14 +259,14 @@ test "bold nifti to vdb - c level" {
         &fpath_buff,
         fpath_buff.len,
     );
-    _ = t.Lap(start, "BOLD nifti timer");
-    print("☁️🩸🧠 BOLD nifti test saved as VDB\n", .{});
+    _ = t.Lap(start, "bold nifti timer");
+    print("☁️🩸🧠 bold nifti test saved as vdb\n", .{});
     const bhdr = try nifti1.getHeader(config.testing.files.bold);
     const b_trans = try nifti1.getTransform(bhdr.*);
     print("         transform: {any}\n", .{b_trans});
-    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+    print("🗃️ output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
-test "header data extraction to C" {
+test "header data extraction to c" {
     //_: num frames
     const ftype = "NIfTI1";
     const num_frames_static = numFrames_c(
@@ -257,17 +279,17 @@ test "header data extraction to C" {
         config.testing.files.bold,
         ftype,
     );
-    try std.testing.expect(num_frames_bold != 1); // FIX: yeaaaah this should be exact to the known testfile len!
-    print("🧠🎞️🌊 c level num frames for Bold: {d}\n", .{num_frames_bold});
+    try std.testing.expect(num_frames_bold != 1); // fix: yeaaaah this should be exact to the known testfile len!
+    print("🧠🎞️🌊 c level num frames for bold: {d}\n", .{num_frames_bold});
 
     //_: slice duration
     const slice_duration = sliceDuration_c(
         config.testing.files.bold,
         ftype,
     );
-    print("🧠🍕🌊 c level slice duration: {d}\n", .{slice_duration}); //WARN: our testfiles just have zero slice duration. Oh well!
+    print("🧠🍕🌊 c level slice duration: {d}\n", .{slice_duration}); //warn: our testfiles just have zero slice duration. oh well!
 
-    //_: Measurement units
+    //_: measurement units
     var t_unit_buff: [20]u8 = undefined;
     const t_unit_len = unit_c(
         config.testing.files.bold,
@@ -287,12 +309,12 @@ test "header data extraction to C" {
     );
     print("📐 🧠 spatial units: {s}\n", .{s_unit_buff[0..s_unit_len]});
 
-    //_: Pixel dimensions
+    //_: pixel dimensions
     const bold_time = pixdim_c(config.testing.files.bold, "NIfTI1", 4);
     const bold_x = pixdim_c(config.testing.files.bold, "NIfTI1", 1);
 
-    print("⏰ Bold time dim: {d:.10}\n", .{bold_time});
-    print(" Bold x dim: {d:.10}\n", .{bold_x});
+    print("⏰ bold time dim: {d:.10}\n", .{bold_time});
+    print(" bold x dim: {d:.10}\n", .{bold_x});
 
     const t1_time = pixdim_c(config.testing.files.nifti1_t1, "NIfTI1", 4);
     const t1_x = pixdim_c(config.testing.files.nifti1_t1, "NIfTI1", 1);

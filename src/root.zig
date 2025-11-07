@@ -20,13 +20,13 @@ const SupportError = error{
 //_: Zig Library:
 
 // implementation of Jan's increment_cartesian suggestion
-fn increment_cartesian(
+pub fn increment_cartesian(
     comptime num_dims: comptime_int,
     cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
-    dim_list: [num_dims]usize,
+    dims: [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
-    for (0.., dim_list) |i, di| {
+    for (0.., dims) |i, di| {
         cart_coord[i] += 1;
         if (cart_coord[i] < di) {
             return true;
@@ -140,7 +140,7 @@ pub fn nifti1ToVDB(
 
     var cart = [_]u32{ 0, 0, 0 };
     var idx: usize = 0;
-    const dim_list: [3]usize = .{
+    const dims: [3]usize = .{
         @intCast(hdr.dim[1]),
         @intCast(hdr.dim[2]),
         @intCast(hdr.dim[3]),
@@ -154,7 +154,7 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            while (increment_cartesian(3, &cart, dim_list)) {
+            while (increment_cartesian(3, &cart, dims)) {
                 idx += 1;
                 const res_value = getValue(
                     &img.data,
@@ -231,7 +231,7 @@ pub fn nifti1ToVDB(
                 idx = 0;
 
                 while (true) {
-                    if (increment_cartesian(3, &cart, dim_list) == false) {
+                    if (increment_cartesian(3, &cart, dims) == false) {
                         break;
                     }
                     idx += 1;
