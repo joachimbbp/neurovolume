@@ -9,10 +9,11 @@ print(type(img))
 data = img.get_fdata()
 print(type(data))
 data = np.array(img.get_fdata(), order='C', dtype=np.float32)
-print(f"Data shape: {data.shape}")
-print(f"Data dtype: {data.dtype}")
-print(f"Data min/max: {data.min()}, {data.max()}")
-print(
-    f"Data memory layout: C-contiguous={data.flags['C_CONTIGUOUS']}, F-contiguous={data.flags['F_CONTIGUOUS']}")
+f = data.flatten()
+n = (f - f.min()) / (f.max() - f.min())
+res = n.reshape(data.shape)
+
 output = "/Users/joachimpfefferkorn/repos/neurovolume/output/from_nib.vdb"
-nv.ndarray_to_VDB(data, output)
+nv.ndarray_to_VDB(res, output)
+
+# WARN: output path needs to be clear!
