@@ -75,8 +75,8 @@ pub const VDB = struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    pub fn build(allocator: std.mem.Allocator) !VDB {
-        const five_node = try Node5.build(allocator);
+    pub fn build(arena_allocator: std.mem.Allocator) !VDB { //WARN: should be arena
+        const five_node = try Node5.build(arena_allocator);
         return VDB{ .five_node = five_node };
     }
 };

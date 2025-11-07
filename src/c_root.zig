@@ -15,6 +15,12 @@ const config = @import("config.zig.zon");
 const SupportError = error{
     Dimensions,
 };
+//_: Globals:
+//LLM: suggested to make allocators global
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const gpa_alloc = gpa.allocator();
+var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+const arena_alloc = arena.allocator();
 
 //_: C library:
 pub export fn nifti1ToVDB_c(
@@ -24,12 +30,12 @@ pub export fn nifti1ToVDB_c(
     fpath_buff: [*]u8,
     fpath_cap: usize,
 ) usize {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
+    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // const gpa_alloc = gpa.allocator();
+    // defer _ = gpa.deinit();
+    // var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    // defer arena.deinit();
+    // const arena_alloc = arena.allocator();
 
     const fpath_slice: []const u8 = std.mem.span(fpath); //LLM: suggested line
     const output_dir_slice: []const u8 = std.mem.span(output_dir);
@@ -41,9 +47,9 @@ pub export fn nifti1ToVDB_c(
     ) catch {
         return 0;
     };
-    defer arena_alloc.free(filepath); //needed????
     const n = if (filepath.len + 1 <= fpath_cap) filepath.len else fpath_cap - 1;
     @memcpy(fpath_buff[0..n], filepath[0..n]);
+    arena_alloc.free(filepath);
     return n;
 }
 
@@ -156,6 +162,43 @@ pub export fn pixdim_c( //WARN: not really used, tbh. Test file has 0 slice dura
         print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
         return 0;
     }
+}
+
+//_: voxels
+
+pub export fn setVoxel_c(
+    vdb: *vdb543.VDB,
+    pos: *const [3]u32,
+    value: f32,
+) usize {
+    vdb543.setVoxel(vdb, .{ pos.*[0], pos.*[1], pos.*[2] }, value, arena_alloc) catch {
+        return 0;
+    };
+    return 1;
+    //WARN: don't forget to free everything in this arena after writing the VDB!
+}
+
+//TODO: will involve increment_cartesian, so probably needs some project tidy first!
+// pub export fn setVoxelArray_c(vdb: *vdb543.VDB, data: [*]const f32, len: usize) usize {
+//     const slice = data[0..len];
+//     for (slice) | val, i | {
+//
+//
+//     }
+//
+//
+// }
+
+pub export fn buildVDB_c() ?*vdb543.VDB { //LLM: nullable pointer to VDB suggested
+    var vdb = vdb543.VDB.build(arena_alloc) catch {
+        return null;
+    };
+    return &vdb;
+    //WARN: don't forget freeVDB
+}
+
+pub export fn freeVDB_c(vdb: *vdb543.VDB) void { //LLM:
+    arena_alloc.destroy(vdb);
 }
 
 test "static nifti to vdb - c level" {
