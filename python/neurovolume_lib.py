@@ -5,7 +5,7 @@ import numpy as np  # DEPENDENCY:
 # _: Things that will eventually live in a config file:
 
 lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
-output_dir = "./output"
+output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
 # _: Main code:
 
 nvol = c.cdll.LoadLibrary(lib_path)  # Neurovolume library

@@ -16,18 +16,27 @@ Neurovolume requires [Zig 0.15.1](https://ziglang.org/download/#release-0.15.1).
 ## 🏗️ Build
 After installing Zig, Blender, and Python, run `zig build` from the project repo.
 
-## 🗃️ Test Files
+## ⚙️ Setup
+The following files need to be modified before building and running. Presently the most robust way to run this program is to include the full system paths for all of these. Feel free to look at the example paths to get an idea of the setup.
+
+In `./src/config.zig.zon`:
 If you wish to run tests, download the [T1](https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz) and [BOLD](https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q) images to `./media`
 Unzip both of these `.gz` files before running the tests.
+- Set `.nifti_t1` and `.bold` to point to the above test files in media.
+- Set `.vdb_output_dir` and `.output` to your output folder (defaults to `./output`).
 
-## 🛤️ Change Hard-Coded paths
-`./src/config.zig.zon` includes full, hard-coded paths to these files as well as your VDB output directory. Set these to the corresponding paths on your machine (they will be `./output` and the filepaths in `./media` respectively).
+In `./python/neurovolume.lib`:
+- Set `lib_path` to the build file of the zig library (defaults to `./zig-out/lib/libneurovolume.dylib`)
+- Set `output_dir` to your output directory (same as the `./output` path mentioned above in the `.zon` file)
 
-Similarly, `./blender_plugin/__init__.py` will need to have `user_set_output_path` set to your `./output` folder. You can change the default file here too (but that's not strictly necessary).
+In `./python/__init__.py` (the Blender plugin):
+- Set `user_set_output_path` to the output path (same output as always)
+- Set `user_set_default_nifti` to the `sub-01_T1w.nii` file in your media folder. This is optional, but it's sometimes nice to have a default path here when testing.
 
-`./blender_plugin/neurovolume.lib` will need to have `lib_path` changed to your `zig-out/lib/libneurovolume.dylib` path. Similarly, you can update these in the `./blender_plugin/testing.py` file if you like.
+In `./python/testing.py` (Optional testing file):
+- Set `static_testfile` to the `sub-01_T1w.nii` 
 
-These hard-coded paths are not great and very much a hack. They were needed to cover some weird edge cases early in development. Cleanup for these is imminent.
+These hard-coded paths are not great and very much a hack. They were needed to cover some weird edge cases early in development and will be cleaned up later.
 
 ## 🔌 Running the Blender Plugin
 Install the Blender plugin using one of the following methods:
