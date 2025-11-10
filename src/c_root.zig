@@ -182,8 +182,9 @@ pub export fn setVoxel_c(
 pub export fn vdbFromArray_c(
     data: [*]const f32,
     dims: *const [3]u32,
+    transform: *const [16]f64,
     output_filepath: [*:0]const u8,
-    //TODO: normalize, non-identity transforms
+    //TODO: normalize?
 ) usize {
     var vdb = vdb543.VDB.build(arena_alloc) catch {
         return 0;
@@ -220,8 +221,13 @@ pub export fn vdbFromArray_c(
 
     var buffer = std.array_list.Managed(u8).init(arena_alloc);
     defer buffer.deinit();
-    const transform = constants.IdentityMatrix4x4; //TODO: arbitrary transforms
-    vdb543.writeVDB(&buffer, &vdb, transform) catch {
+    const transform_matrix = [4][4]f64{
+        .{ transform[0], transform[1], transform[2], transform[3] },
+        .{ transform[4], transform[5], transform[6], transform[7] },
+        .{ transform[8], transform[9], transform[10], transform[11] },
+        .{ transform[12], transform[13], transform[14], transform[15] },
+    };
+    vdb543.writeVDB(&buffer, &vdb, transform_matrix) catch {
         std.debug.print("ERROR: Failed to write VDB\n", .{});
         return 0;
     };

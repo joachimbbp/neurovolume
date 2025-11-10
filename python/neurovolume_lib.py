@@ -30,17 +30,24 @@ def get_folder(path):
     return "/".join(hiearchy[:-1])
 
 
-def ndarray_to_VDB(arr: np.ndarray, save_path: str):
+def ndarray_to_VDB(arr: np.ndarray, save_path: str, affine: np.ndarray = None):
     # LOTS OF LLM: here
-    arr = np.ascontiguousarray(arr, dtype=np.float32)
+    if affine is None:
+        affine = np.eye(4, dtype=np.float64)
+    affine_flat = affine.flatten().astype(np.float64)
+
+    arr = np.ascontiguousarray(arr, dtype=np.float64)
     dims = np.array(arr.shape, dtype=np.uint32)
-    nvol.vdbFromArray_c.argtypes = [np.ctypeslib.ndpointer(dtype=np.float32, flags='C_CONTIGUOUS'),
+    nvol.vdbFromArray_c.argtypes = [np.ctypeslib.ndpointer(dtype=np.float64, flags='C_CONTIGUOUS'),
                                     c.POINTER(c.c_uint32),
+                                    np.ctypeslib.ndpointer(
+                                        dtype=np.float64, flags='C_CONTIGUOUS'),
                                     c.c_char_p]
     nvol.vdbFromArray_c.restype = c.c_size_t
     res = nvol.vdbFromArray_c(
         arr,
         dims.ctypes.data_as(c.POINTER(c.c_uint32)),
+        affine_flat,
         save_path.encode('utf-8')
     )
     if res == 0:
