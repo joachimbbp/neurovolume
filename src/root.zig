@@ -23,7 +23,7 @@ const SupportError = error{
 pub fn incrementCartesian(
     comptime num_dims: comptime_int,
     cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
-    dims: [num_dims]usize,
+    dims: *const [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
     for (0.., dims) |i, di| {
@@ -154,7 +154,7 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            while (incrementCartesian(3, &cart, dims)) {
+            while (incrementCartesian(3, &cart, &dims)) {
                 idx += 1;
                 const res_value = getValue(
                     &img.data,
@@ -231,7 +231,7 @@ pub fn nifti1ToVDB(
                 idx = 0;
 
                 while (true) {
-                    if (incrementCartesian(3, &cart, dims) == false) {
+                    if (incrementCartesian(3, &cart, &dims) == false) {
                         break;
                     }
                     idx += 1;

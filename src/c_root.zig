@@ -184,23 +184,18 @@ pub export fn ndArrayToVDB_c(
     dims: *const [3]usize,
     transform: *const [16]f64,
     output_filepath: [*:0]const u8,
-    //TODO: normalize?
 ) usize {
     var vdb = vdb543.VDB.build(arena_alloc) catch {
         return 0;
     };
 
-    //LLM: match numpy ndarray order
-    // const nz = dims[0];
-    // const ny = dims[1];
-    // const nx = dims[2];
-    //
     var cart = [_]u32{ 0, 0, 0 };
     var idx: usize = 0;
+    //FIX: A simple in-line loop migth actually be more performant here!
     while (root.incrementCartesian(
         3,
         &cart,
-        dims.*, //HACK: don't love that I'm copying this
+        dims,
     )) {
         idx += 1;
         //Cart matches ndarray order
