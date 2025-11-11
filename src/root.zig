@@ -20,13 +20,13 @@ const SupportError = error{
 //_: Zig Library:
 
 // implementation of Jan's increment_cartesian suggestion
-fn increment_cartesian(
+pub fn incrementCartesian(
     comptime num_dims: comptime_int,
     cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
-    dim_list: [num_dims]usize,
+    dims: *const [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
-    for (0.., dim_list) |i, di| {
+    for (0.., dims) |i, di| {
         cart_coord[i] += 1;
         if (cart_coord[i] < di) {
             return true;
@@ -36,7 +36,7 @@ fn increment_cartesian(
     return false;
 }
 
-fn getValue(
+fn getValue( //prbably nifti1 specific!
     data: *const []const u8,
     idx: usize, //linear index
     bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
@@ -44,7 +44,7 @@ fn getValue(
     comptime ResType: type,
     endianness: std.builtin.Endian,
     num_bytes: u16,
-    //Scaling: (set both to 0 if they do not apply)
+    //Scaling: set slope to 1 and int to 0 to have them not apply
     slope: ResType,
     intercept: ResType,
     //Normalizing
@@ -62,7 +62,7 @@ fn getValue(
         endianness,
     ));
     var res_value = raw_value;
-    if (slope != 0 and intercept != 0) {
+    if (slope != 1 or intercept != 0) { //wouldn't change res_value
         res_value = slope * raw_value + intercept;
     }
 
@@ -73,7 +73,7 @@ fn getValue(
 }
 
 //returns .{mininmum value, maximum value, difference between max and min}
-pub fn MinMax(
+pub fn MinMax( //honestly: might be nifti specific! i think all files should have their own minmax maybe?
     comptime T: type, //must be float for now
     data: *const []const u8,
     bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
@@ -140,7 +140,7 @@ pub fn nifti1ToVDB(
 
     var cart = [_]u32{ 0, 0, 0 };
     var idx: usize = 0;
-    const dim_list: [3]usize = .{
+    const dims: [3]usize = .{
         @intCast(hdr.dim[1]),
         @intCast(hdr.dim[2]),
         @intCast(hdr.dim[3]),
@@ -154,7 +154,7 @@ pub fn nifti1ToVDB(
             defer buffer.deinit();
             var vdb = try vdb543.VDB.build(arena_alloc);
 
-            while (increment_cartesian(3, &cart, dim_list)) {
+            while (incrementCartesian(3, &cart, &dims)) {
                 idx += 1;
                 const res_value = getValue(
                     &img.data,
@@ -172,7 +172,7 @@ pub fn nifti1ToVDB(
                 try vdb543.setVoxel(
                     &vdb,
                     .{ cart[0], cart[1], cart[2] },
-                    @floatCast(res_value),
+                    res_value,
                     arena_alloc,
                 );
             }
@@ -231,7 +231,7 @@ pub fn nifti1ToVDB(
                 idx = 0;
 
                 while (true) {
-                    if (increment_cartesian(3, &cart, dim_list) == false) {
+                    if (incrementCartesian(3, &cart, &dims) == false) {
                         break;
                     }
                     idx += 1;

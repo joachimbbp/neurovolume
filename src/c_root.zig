@@ -9,12 +9,19 @@ const nifti1 = @import("nifti1.zig");
 const vdb543 = @import("vdb543.zig");
 const root = @import("root.zig");
 const t = @import("timer.zig");
+const constants = @import("constants.zig");
 
 //_: CONSTS:
 const config = @import("config.zig.zon");
 const SupportError = error{
     Dimensions,
 };
+//_: Globals:
+//LLM: suggested to make allocators global
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const gpa_alloc = gpa.allocator();
+var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+const arena_alloc = arena.allocator();
 
 //_: C library:
 pub export fn nifti1ToVDB_c(
@@ -24,12 +31,12 @@ pub export fn nifti1ToVDB_c(
     fpath_buff: [*]u8,
     fpath_cap: usize,
 ) usize {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
+    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // const gpa_alloc = gpa.allocator();
+    // defer _ = gpa.deinit();
+    // var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    // defer arena.deinit();
+    // const arena_alloc = arena.allocator();
 
     const fpath_slice: []const u8 = std.mem.span(fpath); //LLM: suggested line
     const output_dir_slice: []const u8 = std.mem.span(output_dir);
@@ -41,9 +48,9 @@ pub export fn nifti1ToVDB_c(
     ) catch {
         return 0;
     };
-    defer arena_alloc.free(filepath); //needed????
     const n = if (filepath.len + 1 <= fpath_cap) filepath.len else fpath_cap - 1;
     @memcpy(fpath_buff[0..n], filepath[0..n]);
+    arena_alloc.free(filepath);
     return n;
 }
 
@@ -158,15 +165,98 @@ pub export fn pixdim_c( //WARN: not really used, tbh. Test file has 0 slice dura
     }
 }
 
+//_: voxels
+
+pub export fn setVoxel_c(
+    vdb: *vdb543.VDB,
+    pos: *const [3]u32,
+    value: f32,
+) usize {
+    vdb543.setVoxel(vdb, .{ pos.*[0], pos.*[1], pos.*[2] }, value, arena_alloc) catch {
+        return 0;
+    };
+    return 1;
+    //WARN: don't forget to free everything in this arena after writing the VDB!
+}
+
+pub export fn ndArrayToVDB_c(
+    data: [*]const f32,
+    dims: *const [3]usize,
+    transform: *const [16]f64,
+    output_filepath: [*:0]const u8,
+) usize {
+    var vdb = vdb543.VDB.build(arena_alloc) catch {
+        return 0;
+    };
+
+    var cart = [_]u32{ 0, 0, 0 };
+    var idx: usize = 0;
+    //FIX: A simple in-line loop migth actually be more performant here!
+    while (root.incrementCartesian(
+        3,
+        &cart,
+        dims,
+    )) {
+        idx += 1;
+        //Cart matches ndarray order
+        vdb543.setVoxel(
+            &vdb,
+            .{ cart[2], cart[1], cart[0] },
+            data[idx],
+            arena_alloc,
+        ) catch {
+            print("set voxel error!\n", .{});
+            return 0;
+        };
+    }
+
+    var buffer = std.array_list.Managed(u8).init(arena_alloc);
+    defer buffer.deinit();
+    const transform_matrix = [4][4]f64{
+        .{ transform[0], transform[1], transform[2], transform[3] },
+        .{ transform[4], transform[5], transform[6], transform[7] },
+        .{ transform[8], transform[9], transform[10], transform[11] },
+        .{ transform[12], transform[13], transform[14], transform[15] },
+    };
+    vdb543.writeVDB(&buffer, &vdb, transform_matrix) catch {
+        std.debug.print("ERROR: Failed to write VDB\n", .{});
+        return 0;
+    };
+
+    const file = std.fs.cwd().createFile(std.mem.span(output_filepath), .{}) catch {
+        std.debug.print("ERROR: Failed to create file\n", .{});
+        return 0;
+    };
+    file.writeAll(buffer.items) catch {
+        std.debug.print("ERROR: Failed to write to file\n", .{});
+        return 0;
+    };
+    defer file.close();
+    std.debug.print("vdb successfully built from array\n", .{});
+    return 1;
+}
+
+pub export fn buildvdb_c() ?*vdb543.VDB { //llm: nullable pointer to vdb suggested
+    var vdb = vdb543.VDB.build(arena_alloc) catch {
+        return null;
+    };
+    return &vdb;
+    //warn: don't forget freevdb
+}
+
+pub export fn freevdb_c(vdb: *vdb543.VDB) void { //llm:
+    arena_alloc.destroy(vdb);
+}
+
 test "static nifti to vdb - c level" {
-    //NOTE: There's a little mismatch in the testing/actual functionality at the moment, hence this:
+    //note: there's a little mismatch in the testing/actual functionality at the moment, hence this:
     //perhaps: reconcile these by bringing the tmp save out of the function itself and then calling
-    //either that or the default persistent location in the real nifti1ToVDB function!
+    //either that or the default persistent location in the real nifti1tovdb function!
 
     print("🌊 c level nifti to vdb\n", .{});
 
     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
-    //TODO: make the lenght a bit more robust. What should it be???
+    //todo: make the lenght a bit more robust. what should it be???
 
     const start = t.Click();
     const fpath_len = nifti1ToVDB_c(
@@ -176,15 +266,15 @@ test "static nifti to vdb - c level" {
         &fpath_buff,
         fpath_buff.len,
     );
-    _ = t.Lap(start, "Static Nifti1 to VDB Timer");
-    print("☁️ 🧠 static nifti test saved as VDB\n", .{});
-    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+    _ = t.Lap(start, "static nifti1 to vdb timer");
+    print("☁️ 🧠 static nifti test saved as vdb\n", .{});
+    print("🗃️ output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
 test "bold nifti to vdb - c level" {
-    print("🌊 c level BOLD nifti to vdb\n", .{});
+    print("🌊 c level bold nifti to vdb\n", .{});
 
     var fpath_buff: [4096]u8 = undefined; //very arbitrary length!
-    //TODO: make the lenght a bit more robust. What should it be???
+    //todo: make the lenght a bit more robust. what should it be???
 
     const start = t.Click();
     const fpath_len = nifti1ToVDB_c(
@@ -194,14 +284,14 @@ test "bold nifti to vdb - c level" {
         &fpath_buff,
         fpath_buff.len,
     );
-    _ = t.Lap(start, "BOLD nifti timer");
-    print("☁️🩸🧠 BOLD nifti test saved as VDB\n", .{});
+    _ = t.Lap(start, "bold nifti timer");
+    print("☁️🩸🧠 bold nifti test saved as vdb\n", .{});
     const bhdr = try nifti1.getHeader(config.testing.files.bold);
     const b_trans = try nifti1.getTransform(bhdr.*);
     print("         transform: {any}\n", .{b_trans});
-    print("🗃️ Output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
+    print("🗃️ output filepath:\n       {s}\n", .{fpath_buff[0..fpath_len]});
 }
-test "header data extraction to C" {
+test "header data extraction to c" {
     //_: num frames
     const ftype = "NIfTI1";
     const num_frames_static = numFrames_c(
@@ -214,17 +304,17 @@ test "header data extraction to C" {
         config.testing.files.bold,
         ftype,
     );
-    try std.testing.expect(num_frames_bold != 1); // FIX: yeaaaah this should be exact to the known testfile len!
-    print("🧠🎞️🌊 c level num frames for Bold: {d}\n", .{num_frames_bold});
+    try std.testing.expect(num_frames_bold != 1); // fix: yeaaaah this should be exact to the known testfile len!
+    print("🧠🎞️🌊 c level num frames for bold: {d}\n", .{num_frames_bold});
 
     //_: slice duration
     const slice_duration = sliceDuration_c(
         config.testing.files.bold,
         ftype,
     );
-    print("🧠🍕🌊 c level slice duration: {d}\n", .{slice_duration}); //WARN: our testfiles just have zero slice duration. Oh well!
+    print("🧠🍕🌊 c level slice duration: {d}\n", .{slice_duration}); //warn: our testfiles just have zero slice duration. oh well!
 
-    //_: Measurement units
+    //_: measurement units
     var t_unit_buff: [20]u8 = undefined;
     const t_unit_len = unit_c(
         config.testing.files.bold,
@@ -244,12 +334,12 @@ test "header data extraction to C" {
     );
     print("📐 🧠 spatial units: {s}\n", .{s_unit_buff[0..s_unit_len]});
 
-    //_: Pixel dimensions
+    //_: pixel dimensions
     const bold_time = pixdim_c(config.testing.files.bold, "NIfTI1", 4);
     const bold_x = pixdim_c(config.testing.files.bold, "NIfTI1", 1);
 
-    print("⏰ Bold time dim: {d:.10}\n", .{bold_time});
-    print(" Bold x dim: {d:.10}\n", .{bold_x});
+    print("⏰ bold time dim: {d:.10}\n", .{bold_time});
+    print(" bold x dim: {d:.10}\n", .{bold_x});
 
     const t1_time = pixdim_c(config.testing.files.nifti1_t1, "NIfTI1", 4);
     const t1_x = pixdim_c(config.testing.files.nifti1_t1, "NIfTI1", 1);

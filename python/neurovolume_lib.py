@@ -1,8 +1,11 @@
 import ctypes as c
+import numpy as np  # DEPENDENCY:
+
+
 # _: Things that will eventually live in a config file:
 
 lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
-output_dir = "./output"
+output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
 # _: Main code:
 
 nvol = c.cdll.LoadLibrary(lib_path)  # Neurovolume library
@@ -25,6 +28,30 @@ def get_folder(path):
     """Returns the folder in which the path points to"""
     hiearchy = path.split("/")
     return "/".join(hiearchy[:-1])
+
+
+def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None):
+    # LOTS OF LLM: here
+    if transform is None:
+        transform = np.eye(4, dtype=np.float64)
+    affine_flat = transform.flatten().astype(np.float64)
+
+    arr = np.ascontiguousarray(arr, dtype=np.float32)
+    dims = np.array(arr.shape, dtype=np.uint64)
+    nvol.ndArrayToVDB_c.argtypes = [np.ctypeslib.ndpointer(dtype=np.float32, flags='C_CONTIGUOUS'),
+                                    c.POINTER(c.c_size_t),
+                                    np.ctypeslib.ndpointer(
+                                        dtype=np.float64, flags='C_CONTIGUOUS'),
+                                    c.c_char_p]
+    nvol.ndArrayToVDB_c.restype = c.c_size_t
+    res = nvol.ndArrayToVDB_c(
+        arr,
+        dims.ctypes.data_as(c.POINTER(c.c_size_t)),
+        affine_flat,
+        save_path.encode('utf-8')
+    )
+    if res == 0:
+        print("error!")
 
 
 def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
