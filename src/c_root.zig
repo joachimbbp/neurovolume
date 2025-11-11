@@ -179,7 +179,7 @@ pub export fn setVoxel_c(
     //WARN: don't forget to free everything in this arena after writing the VDB!
 }
 
-pub export fn vdbFromArray_c(
+pub export fn ndArrayToVDB_c(
     data: [*]const f32,
     dims: *const [3]u32,
     transform: *const [16]f64,
@@ -191,9 +191,10 @@ pub export fn vdbFromArray_c(
     };
 
     //LLM:
-    const nx = dims[0];
+    //match numpy
+    const nz = dims[0];
     const ny = dims[1];
-    const nz = dims[2];
+    const nx = dims[2];
 
     for (0..nz) |z| {
         for (0..ny) |y| {
