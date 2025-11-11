@@ -37,16 +37,16 @@ def ndarray_to_VDB(arr: np.ndarray, save_path: str, affine: np.ndarray = None):
     affine_flat = affine.flatten().astype(np.float64)
 
     arr = np.ascontiguousarray(arr, dtype=np.float32)
-    dims = np.array(arr.shape, dtype=np.uint32)
+    dims = np.array(arr.shape, dtype=np.uint64)
     nvol.ndArrayToVDB_c.argtypes = [np.ctypeslib.ndpointer(dtype=np.float32, flags='C_CONTIGUOUS'),
-                                    c.POINTER(c.c_uint32),
+                                    c.POINTER(c.c_size_t),
                                     np.ctypeslib.ndpointer(
                                         dtype=np.float64, flags='C_CONTIGUOUS'),
                                     c.c_char_p]
     nvol.ndArrayToVDB_c.restype = c.c_size_t
     res = nvol.ndArrayToVDB_c(
         arr,
-        dims.ctypes.data_as(c.POINTER(c.c_uint32)),
+        dims.ctypes.data_as(c.POINTER(c.c_size_t)),
         affine_flat,
         save_path.encode('utf-8')
     )

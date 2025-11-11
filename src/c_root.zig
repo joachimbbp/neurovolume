@@ -181,7 +181,7 @@ pub export fn setVoxel_c(
 
 pub export fn ndArrayToVDB_c(
     data: [*]const f32,
-    dims: *const [3]u32,
+    dims: *const [3]usize,
     transform: *const [16]f64,
     output_filepath: [*:0]const u8,
     //TODO: normalize?
@@ -190,11 +190,14 @@ pub export fn ndArrayToVDB_c(
         return 0;
     };
 
-    //LLM:
-    //match numpy
+    //LLM: match numpy ndarray order
     const nz = dims[0];
     const ny = dims[1];
     const nx = dims[2];
+    //FIRST: change dims to usize!
+    //    var cart = [_]u32{ 0, 0, 0 };
+
+    //    while(root.incrementCartesian(3, &cart, &dims)
 
     for (0..nz) |z| {
         for (0..ny) |y| {
