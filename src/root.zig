@@ -172,7 +172,7 @@ pub fn nifti1ToVDB(
                 try vdb543.setVoxel(
                     &vdb,
                     .{ cart[0], cart[1], cart[2] },
-                    @floatCast(res_value),
+                    res_value,
                     arena_alloc,
                 );
             }

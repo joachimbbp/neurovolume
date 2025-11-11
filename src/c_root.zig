@@ -191,37 +191,29 @@ pub export fn ndArrayToVDB_c(
     };
 
     //LLM: match numpy ndarray order
-    const nz = dims[0];
-    const ny = dims[1];
-    const nx = dims[2];
-    //FIRST: change dims to usize!
-    //    var cart = [_]u32{ 0, 0, 0 };
-
-    //    while(root.incrementCartesian(3, &cart, &dims)
-
-    for (0..nz) |z| {
-        for (0..ny) |y| {
-            for (0..nx) |x| {
-                const idx = z * ny * nx + y * nx + x;
-                const pos = [3]u32{ @intCast(x), @intCast(y), @intCast(z) };
-                const res = setVoxel_c(&vdb, &pos, data[idx]);
-                if (res == 0) {
-                    std.debug.print("ERROR: setVoxel failed at ({}, {}, {})\n", .{ x, y, z });
-                    return 0;
-                }
-            }
-        }
-    }
-
-    //TODO: Jan's implemenation:
-    //const slice = data[0..len];
-    //    var cart = [_]u32{ 0, 0, 0 };
-    //    var idx: usize = 0;
-    // while (root.increment_cartesian(cart.len, &cart, dims)) {
-    //     idx += 1;
-    //     vdb543.setVoxel(&vdb, .{cart[0], cart[1], cart[2] }, data
+    // const nz = dims[0];
+    // const ny = dims[1];
+    // const nx = dims[2];
     //
-    // }
+    var cart = [_]u32{ 0, 0, 0 };
+    var idx: usize = 0;
+    while (root.incrementCartesian(
+        3,
+        &cart,
+        dims.*, //HACK: don't love that I'm copying this
+    )) {
+        idx += 1;
+        //Cart matches ndarray order
+        vdb543.setVoxel(
+            &vdb,
+            .{ cart[2], cart[1], cart[0] },
+            data[idx],
+            arena_alloc,
+        ) catch {
+            print("set voxel error!\n", .{});
+            return 0;
+        };
+    }
 
     var buffer = std.array_list.Managed(u8).init(arena_alloc);
     defer buffer.deinit();
