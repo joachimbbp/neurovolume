@@ -30,11 +30,11 @@ def get_folder(path):
     return "/".join(hiearchy[:-1])
 
 
-def ndarray_to_VDB(arr: np.ndarray, save_path: str, affine: np.ndarray = None):
+def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None):
     # LOTS OF LLM: here
-    if affine is None:
-        affine = np.eye(4, dtype=np.float64)
-    affine_flat = affine.flatten().astype(np.float64)
+    if transform is None:
+        transform = np.eye(4, dtype=np.float64)
+    affine_flat = transform.flatten().astype(np.float64)
 
     arr = np.ascontiguousarray(arr, dtype=np.float32)
     dims = np.array(arr.shape, dtype=np.uint64)
