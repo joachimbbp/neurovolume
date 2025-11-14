@@ -42,9 +42,11 @@ Install the Blender plugin using one of the following methods:
 - Copy-pasting the add-on into Blender's [Text-editor](https://docs.blender.org/manual/en/latest/editors/text_editor.html) and then clicking the triangular "play" button to run.
 
 Import a NIfTI files as a VDBs via the Neurovolume panel:
-![Panel](readme_media/panel.png){ width=400px, height=350px }
+
+![Panel](readme_media/panel.png)
 
 Render and enjoy!
+
 ![overlayed bold and T1 VDBs in blender](readme_media/overlayed_bold_and_t1.jpeg)
 
 # 🐍 Python and ndArray usage
