@@ -1,7 +1,11 @@
-import nibabel as nib
-import neurovolume.src.neurovolume as nv # WARN: Not included in the UV. This is just an example for you neuroscientists out there.
-import numpy as np
 from datetime import datetime
+import numpy as np
+import nibabel as nib
+import neurovolume as nv
+import os
+import sys
+sys.path.append(os.path.abspath('../neurovolume/neurovolume'))
+import neurovolume as nv
 
 static_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
 

@@ -1,7 +1,7 @@
 [project]
 name = "neurovolume"
 version = "0.1.0"
-description = "Add your description here"
+description = "Python library for Neurovolume. Build VDBs for scientific visualizations"
 readme = "README.md"
 authors = [
     { name = "joachimbbp", email = "104856283+joachimbbp@users.noreply.github.com" }
