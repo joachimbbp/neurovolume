@@ -4,14 +4,20 @@
 #                               Imports
 # ----------------------------------------------------------------------------
 import os
+import sys
+# USERSET: Replace with your own:
+nv_path = '/Users/joachimpfefferkorn/repos/neurovolume/neurovolume/src'
+if nv_path not in sys.path: # LLM:
+    sys.path.insert(0, nv_path)
+import neurovolume as nv
 import bpy
-from ..neurovolume.src import neurovolume as nv  # LOCAL:
 # :_: ------------------------------------------------------------------------
 #                               User Set Path
 #                                           Replace these paths with
 #                                           the the corresponding paths
 #                                           on your machine
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------\
+# USERSET:
 user_set_output_path = "/Users/joachimpfefferkorn/repos/neurovolume/output"
 user_set_default_nifti = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"  # optional
 
