@@ -3,10 +3,9 @@
 # :_: ------------------------------------------------------------------------
 #                               Imports
 # ----------------------------------------------------------------------------
-import json
 import os
 import bpy
-from . import neurovolume_lib as nv  # LOCAL:
+from ..neurovolume.src import neurovolume as nv  # LOCAL:
 # :_: ------------------------------------------------------------------------
 #                               User Set Path
 #                                           Replace these paths with

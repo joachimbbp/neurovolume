@@ -1,5 +1,5 @@
 import nibabel as nib
-import neurovolume_lib as nv
+import neurovolume.src.neurovolume as nv # WARN: Not included in the UV. This is just an example for you neuroscientists out there.
 import numpy as np
 from datetime import datetime
 
