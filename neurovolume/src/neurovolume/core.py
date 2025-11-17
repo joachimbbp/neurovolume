@@ -3,7 +3,7 @@ import numpy as np  # DEPENDENCY:
 
 
 # _: Things that will eventually live in a config file:
-
+# USERSET:
 lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
 output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
 # _: Main code:

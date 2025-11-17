@@ -2,6 +2,7 @@ import numpy as np
 import neurovolume as nv
 from datetime import datetime
 
+# USERSET:
 static_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
 fmri_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii"
 
