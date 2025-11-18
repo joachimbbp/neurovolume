@@ -1,8 +1,13 @@
-import nibabel as nib
-import neurovolume_lib as nv
-import numpy as np
 from datetime import datetime
+import numpy as np
+import nibabel as nib
+import neurovolume as nv
+import os
+import sys
+sys.path.append(os.path.abspath('../neurovolume/neurovolume/src'))
+import neurovolume as nv
 
+# USERSET:
 static_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
 
 
@@ -22,6 +27,7 @@ norm = normalize_array(data).astype(np.float64)
 norm = np.transpose(norm, (1, 2, 0))
 norm = np.ascontiguousarray(norm)
 
+# USERSET:
 output = "/Users/joachimpfefferkorn/repos/neurovolume/output/from_nib.vdb"
 nv.ndarray_to_VDB(norm, output, img.affine)
 end = datetime.now()

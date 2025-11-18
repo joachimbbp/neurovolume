@@ -22,7 +22,7 @@ Unzip both of these `.gz` files before running the tests.
 - Set `.nifti_t1` and `.bold` to point to the above test files in media.
 - Set `.vdb_output_dir` and `.output` to your output folder (defaults to `./output`).
 
-In `./python/neurovolume.lib`:
+In `./neurovolume/src/neurovolume/core.py` (The Python library):
 - Set `lib_path` to the build file of the zig library (defaults to `./zig-out/lib/libneurovolume.dylib`)
 - Set `output_dir` to your output directory (same as the `./output` path mentioned above in the `.zon` file)
 
@@ -30,10 +30,12 @@ In `./python/__init__.py` (the Blender plugin):
 - Set `user_set_output_path` to the output path (same output as always)
 - Set `user_set_default_nifti` to the `sub-01_T1w.nii` file in your media folder. This is optional, but it's sometimes nice to have a default path here when testing.
 
-In `./python/testing.py` (Optional testing file):
-- Set `static_testfile` to the `sub-01_T1w.nii` 
+In `./tests/test_core.py` (Optional testing file):
+- Set `static_testfile` and the `fmri_testfile` to the T1 and BOLD testfiles you downloaded to `./media`
 
 These hard-coded paths are not great and very much a hack. They were needed to cover some weird edge cases early in development and will be cleaned up later.
+
+If you wish to find all of these, they should be tagged with `USERSET:`
 
 # 🔌  Blender Plugin
 Install the Blender plugin using one of the following methods:
