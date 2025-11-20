@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     //    const optimize = b.standardOptimizeOption(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = std.builtin.OptimizeMode.ReleaseFast });
     const nvol_mod = b.createModule(.{
-        .root_source_file = b.path("./src/c_root.zig"),
+        .root_source_file = b.path("./src/zig/c_root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "demo",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/demo_temp.zig"),
+            .root_source_file = b.path("./src/zig/demo_temp.zig"),
             .target = target,
             .optimize = optimize,
         }),
