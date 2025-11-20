@@ -1,1 +1,1 @@
-from .core import *
+from neurovolume.core import *

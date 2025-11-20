@@ -11,17 +11,14 @@ start = datetime.now()
 t1_save_location = nv.nifti1_to_VDB(static_testfile, True)
 end = datetime.now()
 elapsed = end - start
-print(
-    f" nifti1_to_VDB time Elapsed: {elapsed.seconds}s {elapsed.microseconds}µs")
+print(f" nifti1_to_VDB time Elapsed: {elapsed.seconds}s {elapsed.microseconds}µs")
 
 t1_nf = nv.num_frames(static_testfile, "NIfTI1")
-print("🐍 static VDB saved to: ", t1_save_location,
-      " with ", t1_nf, " frames\n")
+print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
 
 fmri_save_location = nv.nifti1_to_VDB(fmri_testfile, True)
 bold_nf = nv.num_frames(fmri_testfile, "NIfTI1")
-print("🐍 bold VDB saved to: ", fmri_save_location,
-      " with ", bold_nf, " frames\n")
+print("🐍 bold VDB saved to: ", fmri_save_location, " with ", bold_nf, " frames\n")
 
 time_unit_type = nv.unit(fmri_testfile, "NIfTI1", "time")
 space_unit_type = nv.unit(fmri_testfile, "NIfTI1", "space")
@@ -81,4 +78,5 @@ pyramid = build_pyramid()
 output_arr = "/Users/joachimpfefferkorn/repos/neurovolume/output/pyramid.vdb"
 
 nv.ndarray_to_VDB(pyramid, output_arr)
-print('done')
+print("done")
+
