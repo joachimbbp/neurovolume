@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "numpy>=2.3.5",
+    "pytest>=9.0.1",
     "ziglang>=0.15.1",
 ]
 
