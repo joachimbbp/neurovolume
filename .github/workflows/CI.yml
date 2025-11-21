@@ -23,7 +23,7 @@ jobs:
         run: uv sync --locked --all-extras --dev
 
       - name: Build Zig Binaries
-        run: python -m ziglang build #TODO: maybe test the zig library later?
+        run: uv run python -m ziglang build #TODO: maybe test the zig library later?
       
       - name: Build Python Library
         run: uv build
