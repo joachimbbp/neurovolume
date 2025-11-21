@@ -23,10 +23,10 @@ jobs:
         run: uv sync --locked --all-extras --dev
 
       - name: Build Zig Binaries
-        run: uv 
+        run: python -m ziglang build #TODO: maybe test the zig library later?
       
       - name: Build Python Library
-        run: poetry run python -m ziglang build test
+        run: uv build
 
       - name: Test Python Library
         run: uv run pytest tests
