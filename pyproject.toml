@@ -1,6 +1,6 @@
 [project]
 name = "neurovolume"
-version = "0.1.0"
+version = "0.0.0"
 description = "Python library for Neurovolume. Build VDBs for scientific visualizations"
 readme = "README.md"
 authors = [
@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "numpy>=2.3.5",
+    "ziglang>=0.15.1",
 ]
 
 [build-system]
