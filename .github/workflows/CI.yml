@@ -25,8 +25,10 @@ jobs:
       - name: Build Zig Binaries
         run: uv run python -m ziglang build #TODO: maybe test the zig library later?
       
-      - name: Copy Zig Binary
+      - name: Build Binary Folder 
         run: mkdir -p src/neurovolume/_native
+
+      - name: Copy Binary
         run: cp zig-out/lib/libneurovolume.dylib src/neurovolume/_native/
 
       - name: Build Python Library
