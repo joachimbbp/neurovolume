@@ -4,9 +4,10 @@ version = "0.0.0"
 description = "Python library for Neurovolume. Build VDBs for scientific visualizations"
 readme = "README.md"
 authors = [
-    { name = "joachimbbp", email = "104856283+joachimbbp@users.noreply.github.com" }
+    { name = "joachimbbp", email = "jbbpfefferkorn@gmail.com" }
 ]
-requires-python = ">=3.14"
+# developed using 3.14 but blender uses 3.11.13,
+requires-python = ">=3.11.13" 
 dependencies = [
     "numpy>=2.3.5",
     "pytest>=9.0.1",
@@ -16,3 +17,5 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.9.8,<0.10.0"]
 build-backend = "uv_build"
+
+

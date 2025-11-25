@@ -73,12 +73,13 @@ def build_pyramid(size=64):
                 if max(dx, dy) <= max_radius:
                     arr[z, y, x] = 1.0
 
+    print("Pyramid build")
     return arr, True
 
 
 def test_pyramid():
     pyramid, built = build_pyramid()
-    assert built == True
+    assert built
     output_arr = "./output/pyramid.vdb"
     nv.ndarray_to_VDB(pyramid, output_arr)
     print("pyramid built")
