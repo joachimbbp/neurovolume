@@ -1,6 +1,5 @@
 import numpy as np
 import neurovolume as nv
-import pytest
 # from datetime import datetime
 # TODO: These will need to download the test files during CI
 
