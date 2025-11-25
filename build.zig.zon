@@ -1,7 +1,7 @@
 .{
     .name = .neurovolume,
 
-    .version = "0.0.0",
+    .version = "0.1.0a1",
     .dependencies = .{},
 
     .fingerprint = 0x7f0c83e043c37613, // Changing this has security and trust implications.
