@@ -36,9 +36,6 @@ jobs:
       - name: Build Binary Folder 
         run: mkdir -p src/neurovolume/_native
 
-      - name: Copy Binary For Python Testing #TODO: probably best to just run on ./dist
-        run: cp zig-out/lib/libneurovolume.dylib src/neurovolume/_native/
-
       - name: Build Python Library
         run: uv build
 

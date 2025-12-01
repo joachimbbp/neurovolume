@@ -1,10 +1,8 @@
 const std = @import("std");
-
+const cwd = std.fs.cwd();
 //builds C library for Python hooks
-//no built zig library for now
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    //    const optimize = b.standardOptimizeOption(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = std.builtin.OptimizeMode.ReleaseFast });
     const nvol_mod = b.createModule(.{
         .root_source_file = b.path("./src/zig/c_root.zig"),
@@ -39,4 +37,12 @@ pub fn build(b: *std.Build) void {
     const run_mod_tests = b.addRunArtifact(mod_tests);
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
+
+    //_: copy binaries:
+    //LLM: heavy LLM inspo here
+    //WARN: just mac for now!
+    const install_lib = b.addInstallArtifact(libneurovolume, .{});
+    const copy_lib = b.addInstallFile(libneurovolume.getEmittedBin(), "../src/neurovolume/_native/libneurovolume.dylib");
+    copy_lib.step.dependOn(&install_lib.step);
+    b.getInstallStep().dependOn(&copy_lib.step);
 }
