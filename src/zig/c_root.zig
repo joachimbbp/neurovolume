@@ -26,7 +26,7 @@ const arena_alloc = arena.allocator();
 //_: C library:
 
 // Print "hello neurovolume" to terminal for testing purposes
-pub fn hello() void {
+pub export fn hello() void {
     print("hello neurovolume\n", .{});
 }
 test "hello" {

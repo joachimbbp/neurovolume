@@ -76,6 +76,10 @@ def build_pyramid(size=64):
     return arr, True
 
 
+def test_hello():
+    nv.hello()
+
+
 def test_pyramid():
     pyramid, built = build_pyramid()
     assert built

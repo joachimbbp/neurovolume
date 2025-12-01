@@ -4,6 +4,10 @@ import sys
 import ctypes
 from pathlib import Path
 
+# _: Things that will eventually live in a config file:
+# USERSET:
+output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
+
 
 # LLM:
 def get_library_name():
@@ -41,6 +45,11 @@ def get_folder(path):
     """Returns the folder in which the path points to"""
     hiearchy = path.split("/")
     return "/".join(hiearchy[:-1])
+
+
+def hello():
+    """Prints 'hello neurovolume' from the c_root.zig"""
+    nvol.hello()
 
 
 def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None):
@@ -185,4 +194,3 @@ def source_fps(filepath: str, filetype: str) -> int:
 #
 #     # TODO: def runtime
 #     # which will include a lot fo the stuff in fps as well as temporal_offset
-

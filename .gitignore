@@ -8,3 +8,4 @@ zig-out
 .vscode
 dist
 DS_Store
+./src/neurovolume/_native/*
