@@ -1,41 +1,5 @@
 import numpy as np
 import neurovolume as nv
-# from datetime import datetime
-# TODO: These will need to download the test files during CI
-
-# USERSET:
-# static_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_T1w.nii"
-# fmri_testfile = "/Users/joachimpfefferkorn/repos/neurovolume/media/sub-01_task-emotionalfaces_run-1_bold.nii"
-#
-# print("Python tests starting")
-# start = datetime.now()
-# t1_save_location = nv.nifti1_to_VDB(static_testfile, True)
-# end = datetime.now()
-# elapsed = end - start
-# print(f" nifti1_to_VDB time Elapsed: {elapsed.seconds}s {elapsed.microseconds}µs")
-#
-# t1_nf = nv.num_frames(static_testfile, "NIfTI1")
-# print("🐍 static VDB saved to: ", t1_save_location, " with ", t1_nf, " frames\n")
-#
-# fmri_save_location = nv.nifti1_to_VDB(fmri_testfile, True)
-# bold_nf = nv.num_frames(fmri_testfile, "NIfTI1")
-# print("🐍 bold VDB saved to: ", fmri_save_location, " with ", bold_nf, " frames\n")
-#
-# time_unit_type = nv.unit(fmri_testfile, "NIfTI1", "time")
-# space_unit_type = nv.unit(fmri_testfile, "NIfTI1", "space")
-# print("time unit: ", time_unit_type, " space unit: ", space_unit_type)
-#
-#
-# dimension_x = nv.pixdim(fmri_testfile, "NIfTI1", 1)
-# dimension_time = nv.pixdim(fmri_testfile, "NIfTI1", 4)
-# print("time dim: ", dimension_time, " x dim: ", dimension_x)
-#
-# bold_fps = nv.source_fps(fmri_testfile, "NIfTI1")
-# print("bold fps: ", bold_fps)
-# static_fps = nv.source_fps(static_testfile, "NIfTI1")
-# print("static fps (should be 0): ", static_fps)
-#
-#
 
 
 def build_pyramid(size=64):
@@ -83,6 +47,28 @@ def test_hello():
 def test_pyramid():
     pyramid, built = build_pyramid()
     assert built
-    output_arr = "./output/pyramid.vdb"
+    output_arr = "./tests/data/vdb_out/pyramid.vdb"
     nv.ndarray_to_VDB(pyramid, output_arr)
     print("pyramid built")
+
+
+# TODO: download
+
+
+def test_nifti():
+    print("writing bold seq...")
+    bold_path = nv.nifti1_to_VDB(
+        "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii",
+        "./tests/data/vdb_out",
+        True,
+    )
+    print("vdb bold seq written to ", bold_path)
+
+    print("writing anat file...")
+    anat_path = nv.nifti1_to_VDB(
+        "./tests/data/sub-01_T1w.nii",
+        "./tests/data/vdb_out",
+        True,
+    )
+
+    print("vdb anat saved to ", anat_path)
