@@ -18,7 +18,7 @@ print("Downloading test data...")
 urlretrieve(anat_url, anat_gz)
 urlretrieve(bold_url, bold_gz)
 print("Test data downloaded")
-print("Unzipping..")
+print("Unzipping...")
 # TODO: DRY:
 with gzip.open(anat_gz, "rb") as f_in:
     with open(anat, "wb") as f_out:
@@ -74,8 +74,10 @@ def test_hello():
 
 def test_pyramid():
     pyramid, built = build_pyramid()
-    assert built
-    output_arr = "./tests/data/vdb_out/pyramid.vdb"
+    assert built, "Pyramid should build successfully"
+
+    # output_arr = "./tests/data/vdb_out/pyramid.vdb"
+    output_arr = "./ham/spam"  # WARN: this should fail
     nv.ndarray_to_VDB(pyramid, output_arr)
     print("pyramid built")
 

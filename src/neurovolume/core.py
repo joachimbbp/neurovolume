@@ -3,7 +3,7 @@ import numpy as np  # DEPENDENCY:
 import sys
 import ctypes
 from pathlib import Path
-
+import os
 # DEPRECATED: hard coded output directory
 # output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
 
@@ -53,6 +53,11 @@ def hello():
 
 def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None):
     # LOTS OF LLM: here
+    # TODO: More data handling
+    parent_dir = os.path.dirname(save_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        raise FileNotFoundError(f"Parent directory does not exist: {parent_dir}")
+
     if transform is None:
         transform = np.eye(4, dtype=np.float64)
     affine_flat = transform.flatten().astype(np.float64)

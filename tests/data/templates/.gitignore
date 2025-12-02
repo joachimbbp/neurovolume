@@ -5,5 +5,3 @@
 # But not this .gitignore file
 !.gitignore
 
-!vdb_out
-!templates
