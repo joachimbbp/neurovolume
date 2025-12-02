@@ -52,12 +52,13 @@ def hello():
 
 
 def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None):
-    # LOTS OF LLM: here
     # TODO: More data handling
+    # LLM: full up copypasta error handling
     parent_dir = os.path.dirname(save_path)
     if parent_dir and not os.path.exists(parent_dir):
         raise FileNotFoundError(f"Parent directory does not exist: {parent_dir}")
 
+    # LOTS OF LLM: here
     if transform is None:
         transform = np.eye(4, dtype=np.float64)
     affine_flat = transform.flatten().astype(np.float64)

@@ -72,17 +72,21 @@ def test_hello():
     nv.hello()
 
 
+# TODO: Better testing! This is very incomplete as of now
+
+
 def test_pyramid():
     pyramid, built = build_pyramid()
     assert built, "Pyramid should build successfully"
-
-    # output_arr = "./tests/data/vdb_out/pyramid.vdb"
-    output_arr = "./ham/spam"  # WARN: this should fail
+    output_arr = "./tests/data/vdb_out/pyramid.vdb"
     nv.ndarray_to_VDB(pyramid, output_arr)
     print("pyramid built")
 
 
 def test_nifti():
+    pyramid, built = build_pyramid()
+    assert built, "Pyramid should build successfully"
+
     print("writing bold seq...")
     bold_path = nv.nifti1_to_VDB(
         bold,
