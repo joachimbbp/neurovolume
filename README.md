@@ -7,7 +7,14 @@ While this project focuses on neuroscience, it includes `ndarray` to `VDB` to su
 This project is very much a **work in progress**. (see "Missing Features" below). As of now, I do not recommend regarding the images created by this software as scientifically accurate.
 
 # 🏗️ Usage
-#todo 
+
+Native NIfTI1 Parsing
+````python
+#                  path to .nii, output folder, normalization
+vdb_path = nv.nifti1_to_VDB(anat, output, True)
+# note output folder should look like "./output/" (slash on the end)
+````
+A full script, as well as a nibabel example, can be found in the [Neurovolume Examples](https://github.com/joachimbbp/neurovolume_examples).
 
 # 📀 Projects
 - [BoldViz](https://github.com/joachimbbp/boldviz): a Blender plugin for fMRI and MRI visualizations. It was used to create the renders in this README. A great place to start if you don't want to deal with writing any Python.
