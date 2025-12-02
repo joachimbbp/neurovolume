@@ -1,5 +1,33 @@
 import numpy as np
 import neurovolume as nv
+from urllib.request import urlretrieve
+import gzip
+import shutil
+
+# INSTRUCTIONS: must be run from project root, NOT ./tests
+
+anat_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
+bold_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q"
+# HACK: this whole thing is a little hacky/messy
+anat_gz = "./tests/data/sub-01_T1w.nii.gz"
+anat = "./tests/data/sub-01_t1w.nii"
+bold_gz = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii.gz"
+bold = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
+print("Downloading test data...")
+# TODO: check if not present?
+urlretrieve(anat_url, anat_gz)
+urlretrieve(bold_url, bold_gz)
+print("Test data downloaded")
+print("Unzipping..")
+# TODO: DRY:
+with gzip.open(anat_gz, "rb") as f_in:
+    with open(anat, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+with gzip.open(bold_gz, "rb") as f_in:
+    with open(bold, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+
+vdb_out = "./tests/data/vdb_out"
 
 
 def build_pyramid(size=64):
@@ -52,22 +80,19 @@ def test_pyramid():
     print("pyramid built")
 
 
-# TODO: download
-
-
 def test_nifti():
     print("writing bold seq...")
     bold_path = nv.nifti1_to_VDB(
-        "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii",
-        "./tests/data/vdb_out",
+        bold,
+        vdb_out,
         True,
     )
     print("vdb bold seq written to ", bold_path)
 
     print("writing anat file...")
     anat_path = nv.nifti1_to_VDB(
-        "./tests/data/sub-01_T1w.nii",
-        "./tests/data/vdb_out",
+        anat,
+        vdb_out,
         True,
     )
 
