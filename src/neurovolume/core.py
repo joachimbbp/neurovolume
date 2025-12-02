@@ -4,10 +4,6 @@ import sys
 import ctypes
 from pathlib import Path
 
-# _: Things that will eventually live in a config file:
-# USERSET:
-output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
-
 
 # LLM:
 def get_library_name():
@@ -77,7 +73,7 @@ def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None
         print("error!")
 
 
-def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
+def nifti1_to_VDB(nifti_path: str, output_folder: str, normalize: bool) -> str:
     BUF_SIZE = 4096  # somewhat arbitrary, should be big enough for file name
     save_location = c.create_string_buffer(BUF_SIZE)
     nvol.nifti1ToVDB_c.argtypes = [
@@ -88,7 +84,9 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
         c.c_size_t,
     ]
     nvol.nifti1ToVDB_c.restype = c.c_size_t
-    nvol.nifti1ToVDB_c(b(filepath), b(output_dir), normalize, save_location, BUF_SIZE)
+    nvol.nifti1ToVDB_c(
+        b(nifti_path), b(output_folder), normalize, save_location, BUF_SIZE
+    )
 
     return save_location.value.decode()
 

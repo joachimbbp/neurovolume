@@ -6,37 +6,15 @@ While this project focuses on neuroscience, it includes `ndarray` to `VDB` to su
 
 This project is very much a **work in progress**. (see "Missing Features" below). As of now, I do not recommend regarding the images created by this software as scientifically accurate.
 
+# 🏗️ Usage
+#todo 
 
-# 🐍 ndArray Example
-
-The following following is an example of how you might use this project in a neuroscience pipeline. (While it requires external dependencies, this implementation actually runs faster than the native `NIfTI1` parsing implementation)
-
-````python
-import nibabel as nib
-import neurovolume_lib as nv
-import numpy as np
-from datetime import datetime
-
-static_testfile = "./media/sub-01_T1w.nii"
-
-def normalize_array(arr):
-    return (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
-
-img = nib.load(static_testfile)
-data = np.array(img.get_fdata(), order='C', dtype=np.float64)
-norm = normalize_array(data).astype(np.float64)
-
-norm = np.transpose(norm, (1, 2, 0))
-norm = np.ascontiguousarray(norm)
-
-output = "./output/from_nib.vdb"
-nv.ndarray_to_VDB(norm, output, img.affine)
-````
-Note that all data must be normalized from 0.0-1.0 before being written to a VDB.
+# 📀 Projects
+- [BoldViz](https://github.com/joachimbbp/boldviz): a Blender plugin for fMRI and MRI visualizations. It was used to create the renders in this README. A great place to start if you don't want to deal with writing any Python.
+- [Neurovolume Examples](https://github.com/joachimbbp/neurovolume_examples) and [Physarum](https://github.com/joachimbbp/physarum) include some good starting points for how one might use this library with numpy. The [nibabel example](https://github.com/joachimbbp/neurovolume_examples/blob/master/nibabel_example.py) shows how to use an external NIfTI parser, which could be of use for not-yet-supported filetypes.
 
 # ☁️ Why VDB?
 VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Our volume-based approach aims to provide easy access to the original density data throughout the visualization and analysis pipeline. Unlike the [openVDB repo](https://www.openvdb.org/), our smaller version is much more readable and does not need to be run in a docker container.
-
 
 # 🛠️ Missing Features
 While a comprehensive road-map will be published soon, there are a few important considerations to take into account now.
