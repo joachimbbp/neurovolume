@@ -6,6 +6,8 @@ While this project focuses on neuroscience, it includes `ndarray` to `VDB` to su
 
 This project is very much a **work in progress**. (see "Missing Features" below). As of now, I do not recommend regarding the images created by this software as scientifically accurate.
 
+This project is available as a pre-release alpha on [pypi](https://pypi.org/project/neurovolume/). Presently it is only available for arm64. More operating systems coming soon!
+
 # 🏗️ Usage
 
 Native NIfTI1 Parsing
@@ -29,6 +31,7 @@ While a comprehensive road-map will be published soon, there are a few important
 - Neurovolume currently only natively supports `NIfTI1` files (and only some variants). Full coverage and `NIfTI2` will be supported soon. Until then, you can use an `ndarray` as an intermediary (see Python Usage).
 - Frame interpolation (present in the original Go prototype) is currently under development on this branch. If you wish to access the old Go code, check out [the archive](https://github.com/joachimbbp/neurovolume_archive)
 - Documentation has not been written yet.
+- pypi package presently only supports arm64. Coverage for linux and windows is in the works.
 
 
 # 🧠 Dataset Citation
