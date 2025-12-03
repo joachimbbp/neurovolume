@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["python_packaging"] # will be main later
+    branches: ["main"] # will be main later
 
 jobs:
   build:
