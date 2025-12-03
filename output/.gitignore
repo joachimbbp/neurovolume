@@ -1,8 +1,8 @@
 #media gitignore
 
-# Ignore everything in the folder
+# ignore everything in the folder
 *
 /*
-# But not this .gitignore file
+# but not this .gitignore file
 !.gitignore
 

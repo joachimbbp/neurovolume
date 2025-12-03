@@ -1,11 +1,26 @@
 import ctypes as c
 import numpy as np  # DEPENDENCY:
+import sys
+import ctypes
+from pathlib import Path
+import os
+# DEPRECATED: hard coded output directory
+# output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
+
+# LLM:
+def get_library_name():
+    if sys.platform == "darwin":
+        return "libneurovolume.dylib"
+    elif sys.platform == "win32":
+        return "libneurovolume.dll"
+    else:  # Linux and others
+        return "libneurovolume.so"
 
 
-# _: Things that will eventually live in a config file:
-# USERSET:
-lib_path = "/Users/joachimpfefferkorn/repos/neurovolume/zig-out/lib/libneurovolume.dylib"
-output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
+lib_path = Path(__file__).parent / "_native" / get_library_name()
+lib = ctypes.CDLL(str(lib_path))
+# LLMEND:
+
 # _: Main code:
 
 nvol = c.cdll.LoadLibrary(lib_path)  # Neurovolume library
@@ -30,7 +45,18 @@ def get_folder(path):
     return "/".join(hiearchy[:-1])
 
 
+def hello():
+    """Prints 'hello neurovolume' from the c_root.zig"""
+    nvol.hello()
+
+
 def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None):
+    # TODO: More data handling
+    # LLM: full up copypasta error handling
+    parent_dir = os.path.dirname(save_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        raise FileNotFoundError(f"Parent directory does not exist: {parent_dir}")
+
     # LOTS OF LLM: here
     if transform is None:
         transform = np.eye(4, dtype=np.float64)
@@ -38,36 +64,35 @@ def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None
 
     arr = np.ascontiguousarray(arr, dtype=np.float32)
     dims = np.array(arr.shape, dtype=np.uint64)
-    nvol.ndArrayToVDB_c.argtypes = [np.ctypeslib.ndpointer(dtype=np.float32, flags='C_CONTIGUOUS'),
-                                    c.POINTER(c.c_size_t),
-                                    np.ctypeslib.ndpointer(
-                                        dtype=np.float64, flags='C_CONTIGUOUS'),
-                                    c.c_char_p]
+    nvol.ndArrayToVDB_c.argtypes = [
+        np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
+        c.POINTER(c.c_size_t),
+        np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
+        c.c_char_p,
+    ]
     nvol.ndArrayToVDB_c.restype = c.c_size_t
     res = nvol.ndArrayToVDB_c(
         arr,
         dims.ctypes.data_as(c.POINTER(c.c_size_t)),
         affine_flat,
-        save_path.encode('utf-8')
+        save_path.encode("utf-8"),
     )
     if res == 0:
         print("error!")
 
 
-def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
+def nifti1_to_VDB(nifti_path: str, output_dir: str, normalize: bool) -> str:
     BUF_SIZE = 4096  # somewhat arbitrary, should be big enough for file name
     save_location = c.create_string_buffer(BUF_SIZE)
-    nvol.nifti1ToVDB_c.argtypes = [c.c_char_p,
-                                   c.c_char_p,
-                                   c.c_bool,
-                                   c.POINTER(c.c_char),
-                                   c.c_size_t]
+    nvol.nifti1ToVDB_c.argtypes = [
+        c.c_char_p,
+        c.c_char_p,
+        c.c_bool,
+        c.POINTER(c.c_char),
+        c.c_size_t,
+    ]
     nvol.nifti1ToVDB_c.restype = c.c_size_t
-    nvol.nifti1ToVDB_c(b(filepath),
-                       b(output_dir),
-                       normalize,
-                       save_location,
-                       BUF_SIZE)
+    nvol.nifti1ToVDB_c(b(nifti_path), b(output_dir), normalize, save_location, BUF_SIZE)
 
     return save_location.value.decode()
 
@@ -79,7 +104,10 @@ def nifti1_to_VDB(filepath: str, normalize: bool) -> str:
 def num_frames(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
-            nvol.numFrames_c.argtypes = [c.c_char_p, c.c_char_p,]
+            nvol.numFrames_c.argtypes = [
+                c.c_char_p,
+                c.c_char_p,
+            ]
             nvol.numFrames_c.restype = c.c_size_t
             num_frames = nvol.numFrames_c(b(filepath), b(filetype))
             return num_frames
@@ -104,7 +132,10 @@ def pixdim(filepath: str, filetype: str, dim: int) -> float:
 def slice_duration(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
-            nvol.sliceDuration_c.argtypes = [c.c_char_p, c.c_char_p,]
+            nvol.sliceDuration_c.argtypes = [
+                c.c_char_p,
+                c.c_char_p,
+            ]
             nvol.sliceDuration_c.restype = c.c_size_t
             slice_duration = nvol.sliceDuration_c(b(filepath), b(filetype))
             return slice_duration
@@ -116,8 +147,13 @@ def slice_duration(filepath: str, filetype: str) -> int:
 def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     BUF_SIZE = 64  # generously padded, tbh
     unit_name = c.create_string_buffer(BUF_SIZE)
-    nvol.unit_c.argtypes = [c.c_char_p, c.c_char_p,
-                            c.c_char_p, c.POINTER(c.c_char), c.c_size_t]
+    nvol.unit_c.argtypes = [
+        c.c_char_p,
+        c.c_char_p,
+        c.c_char_p,
+        c.POINTER(c.c_char),
+        c.c_size_t,
+    ]
     nvol.unit_c.restype = c.c_size_t
     nvol.unit_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
     return unit_name.value.decode()
@@ -149,8 +185,7 @@ def source_fps(filepath: str, filetype: str) -> int:
                 case "Radians_per_second":
                     raise ValueError("rpm not implemented yet")
                 case _:
-                    raise ValueError(
-                        unit, "is an unknown unit, not implemented yet")
+                    raise ValueError(unit, "is an unknown unit, not implemented yet")
 
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"

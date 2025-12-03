@@ -1,0 +1,53 @@
+# SOURCE: based on:
+# https://docs.astral.sh/uv/guides/integration/github/#publishing-to-pypi
+
+name: "Publish"
+
+on:
+  push:
+    tags:
+      # publish any tag starting with 'v' (version convention)
+      - v*
+jobs:
+  run:
+    runs-on: macos-15 # ARM64, using mac for now
+    environment:
+      name: pypi # (set environment name in PyPi project and github Environments)
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      # Copypasta from my cy.yml
+      - name: Checkout
+        uses: actions/checkout@v5
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Python
+        run: uv python install
+
+      - name: Install uv project 
+        run: uv sync --locked --all-extras --dev
+
+      - name: Build Zig Binaries
+        run: uv run python -m ziglang build #TODO: maybe test the zig library later?
+      
+      - name: Build Binary Folder 
+        run: mkdir -p src/neurovolume/_native
+
+      - name: Build Python Library
+        run: uv build
+
+      - name: Test Python Library
+        run: uv run pytest -s tests
+        # end copypasta
+     
+      # modified from the uv docs:
+      # Check that basic features work and we didn't miss to include crucial files
+      # - name: Smoke test (wheel)
+      #   run: uv run --isolated --no-project --with dist/*.whl tests/smoke_test.py
+      # - name: Smoke test (source distribution)
+      #   run: uv run --isolated --no-project --with dist/*.tar.gz tests/smoke_test.py
+      - name: Publish
+        run: uv publish

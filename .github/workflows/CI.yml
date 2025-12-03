@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: ["python_packaging"] # will be main later
+
+jobs:
+  build:
+    name: build
+    runs-on: macos-15 #ARM64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Python
+        run: uv python install
+
+      - name: Install uv project 
+        run: uv sync --locked --all-extras --dev
+
+      - name: Build Zig Binaries
+        run: uv run python -m ziglang build #TODO: maybe test the zig library later?
+      
+      - name: Build Binary Folder 
+        run: mkdir -p src/neurovolume/_native
+
+      - name: Build Python Library
+        run: uv build
+
+      - name: Test Python Library
+        run: uv run pytest -s tests

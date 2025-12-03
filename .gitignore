@@ -1,9 +1,11 @@
 #Top Level gitignore
 __pycache__
 .venv
-.pynb_checkpoints
 .DS_Store
 *.vdb
 .zig-cache
 zig-out
 .vscode
+dist
+DS_Store
+./src/neurovolume/_native/*

@@ -24,6 +24,15 @@ var arena = std.heap.ArenaAllocator.init(gpa_alloc);
 const arena_alloc = arena.allocator();
 
 //_: C library:
+
+// Print "hello neurovolume" to terminal for testing purposes
+pub export fn hello() void {
+    print("hello neurovolume\n", .{});
+}
+test "hello" {
+    hello();
+}
+
 pub export fn nifti1ToVDB_c(
     fpath: [*:0]const u8,
     output_dir: [*:0]const u8,

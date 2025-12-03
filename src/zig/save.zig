@@ -16,7 +16,7 @@ fn exists(
     return true;
 }
 test "path exists" {
-    try std.testing.expect(exists("/Users/joachimpfefferkorn/Desktop/Screenshot 2025-10-31 at 3.02.58 PM.png"));
+    try std.testing.expect(exists("/Users/joachimpfefferkorn/repos/neurovolume/tests/data/sub-01_T1w.nii"));
     try std.testing.expect(exists("ham/spamland") == false);
     try std.testing.expect(exists("/Users/joachimpfefferkorn/repos/neurovolume/output"));
 }
