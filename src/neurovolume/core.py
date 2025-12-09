@@ -4,8 +4,7 @@ import sys
 import ctypes
 from pathlib import Path
 import os
-# DEPRECATED: hard coded output directory
-# output_dir = "/Users/joachimpfefferkorn/repos/neurovolume/output"
+
 
 # LLM:
 def get_library_name():
@@ -50,8 +49,55 @@ def hello():
     nvol.hello()
 
 
-def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None):
-    # TODO: More data handling
+def prep_ndarray(
+    arr: np.ndarray,
+    normalize=True,
+    transpose=(0, 2, 1),  # Seems to work for most neuroscience packages
+) -> np.ndarray:
+    """
+    Preparation steps needed for ndarrays derrived from nibabel or ANTs
+
+    Parameters:
+    ------------
+    arr: np.ndarray
+        Input numpy array.
+    normalize: bool
+        VDBs must be float32 normalized between 0 and 1
+        By default this is true, but skip if you have already done so
+        earlier in your pipeline
+    transpose: tuple
+        this is set to 0,2,1, which seems to work for ANTs and Nibabel
+
+    Returns:
+    ------------
+    np.ndarray
+        prepared np.ndarray (should be of type float32)
+    """
+    if normalize:
+        arr = (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
+    arr = np.transpose(arr, transpose)
+    arr = np.array(arr, order="C", dtype=np.float32)
+    return arr
+
+
+def ndarray_to_VDB(
+    arr: np.ndarray,
+    save_path: str,
+    transform: np.ndarray = None,
+):
+    """
+    Creates a VDB file from an ndarray.
+    use prep_ndarray to prepprocess ndarrays coming straight
+    out of nibabel or ANTs (might work on other data too)
+
+    Parameters:
+    ---------
+    arr: numpy.ndarray
+        The ndarray you wish to conver
+    save_path: str
+        Full filepath for the .vdb
+    transform: numpy.ndarray
+    """
     # LLM: full up copypasta error handling
     parent_dir = os.path.dirname(save_path)
     if parent_dir and not os.path.exists(parent_dir):
@@ -62,8 +108,8 @@ def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None
         transform = np.eye(4, dtype=np.float64)
     affine_flat = transform.flatten().astype(np.float64)
 
-    arr = np.ascontiguousarray(arr, dtype=np.float32)
     dims = np.array(arr.shape, dtype=np.uint64)
+
     nvol.ndArrayToVDB_c.argtypes = [
         np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
         c.POINTER(c.c_size_t),
@@ -81,7 +127,20 @@ def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None
         print("error!")
 
 
-def nifti1_to_VDB(nifti_path: str, output_dir: str, normalize: bool) -> str:
+def nifti1_to_VDB(
+    nifti_path: str,
+    output_dir: str,
+    normalize: bool,
+) -> str:
+    """
+    Writes a VDB from a nifti1file
+
+    WARNING:
+    Uses native parsing which is currently in active development.
+    This may not cover all your use cases.
+    Recomend using ndarray_to_VDB paired with a third party NIfTI parser.
+    See neurovolume_examples for more
+    """
     BUF_SIZE = 4096  # somewhat arbitrary, should be big enough for file name
     save_location = c.create_string_buffer(BUF_SIZE)
     nvol.nifti1ToVDB_c.argtypes = [
@@ -198,3 +257,4 @@ def source_fps(filepath: str, filetype: str) -> int:
 #
 #     # TODO: def runtime
 #     # which will include a lot fo the stuff in fps as well as temporal_offset
+
