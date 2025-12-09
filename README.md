@@ -4,7 +4,7 @@ Neurovolume is a Python library for manipulating and visualizing volumetric data
 
 While this project focuses on neuroscience, it includes `ndarray` to `VDB` to support virtually any volumetric data pipeline.
 
-This project is very much a **work in progress**. (see "Missing Features" below). As of now, I do not recommend regarding the images created by this software as scientifically accurate.
+This project is under active development and might not have everything you need (particularly if you are working with very large datasets). Please reference the "Missing Features" section.
 
 This project is available as a pre-release alpha on [pypi](https://pypi.org/project/neurovolume/). Presently it is only available for arm64. More operating systems coming soon!
 
@@ -16,7 +16,7 @@ Native NIfTI1 Parsing
 vdb_path = nv.nifti1_to_VDB(anat, output, True)
 # note output folder should look like "./output/" (slash on the end)
 ````
-A full script, as well as a nibabel example, can be found in the [Neurovolume Examples](https://github.com/joachimbbp/neurovolume_examples).
+A full script, as well as a nibabel and ndarray examples, can be found in the [Neurovolume Examples](https://github.com/joachimbbp/neurovolume_examples).
 
 # 📀 Projects
 - [BoldViz](https://github.com/joachimbbp/boldviz): a Blender plugin for fMRI and MRI visualizations. It was used to create the renders in this README. A great place to start if you don't want to deal with writing any Python.

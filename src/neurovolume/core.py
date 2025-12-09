@@ -78,7 +78,6 @@ def ndarray_to_VDB(arr: np.ndarray, save_path: str, transform: np.ndarray = None
         transform = np.eye(4, dtype=np.float64)
     affine_flat = transform.flatten().astype(np.float64)
 
-    # arr = np.ascontiguousarray(arr, dtype=np.float32)
     dims = np.array(arr.shape, dtype=np.uint64)
 
     nvol.ndArrayToVDB_c.argtypes = [
