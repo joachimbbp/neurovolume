@@ -1,6 +1,6 @@
 [project]
 name = "neurovolume"
-version = "0.1.0a10"
+version = "0.1.0a11"
 description = "Python library for Neurovolume. Build VDBs for scientific visualizations"
 readme = "README.md"
 authors = [
