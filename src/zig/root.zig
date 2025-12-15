@@ -15,32 +15,60 @@ const save = @import("save.zig");
 const config = @import("config.zig.zon");
 const SupportError = error{
     Dimensions,
+    Type,
 };
 
 //_: Zig Library:
 
-// implementation of Jan's increment_cartesian suggestion
-pub fn incrementCartesian(
-    comptime num_dims: comptime_int,
-    cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
-    dims: *const [num_dims]usize,
-) bool {
-    //false if overflow occurs, true if otherwise
-    for (0.., dims) |i, di| {
-        cart_coord[i] += 1;
-        if (cart_coord[i] < di) {
-            return true;
-        }
-        cart_coord[i] = 0;
+// pub fn saveVDBFrame(
+
+const FrameInterpolation = enum {
+    realtime,
+    crossfade,
+};
+const Effect = enum {
+    frame_difference,
+    //blur, sharpen, denoise, etc later!
+};
+const SourceType = enum {
+    ndarray,
+    NIfTI1,
+    //not sure how scalable this is but...
+};
+
+// use a data getter function pointer!
+// this means wrapping minmax, nifti1img, etc in one function
+// and doing the same for other data types.
+pub fn saveVDB( // DEPRECATED: let's make this volume
+    comptime source_type: SourceType,
+    data: [*]const f32, //VDB writer only supports f32 for now
+    fps: u8,
+    dims: [4]usize,
+    frame_interpolation: FrameInterpolation,
+    transform: [4][4]f64, //assume same for all frames
+    output_dir: []const u8,
+    effects: []const Effect,
+) ![]const u8 {
+    switch (source_type) {
+        .NIfTI1 => {
+            //prep nifti1 image
+            //if static just write a frame
+            //else call a new sequence function
+
+        },
+        .ndarray => {},
+        else => {
+            std.debug.print("{s} not supported\n", .{source_type});
+            return SupportError.Type;
+        },
     }
-    return false;
 }
 
 fn getValue( //prbably nifti1 specific!
     data: *const []const u8,
     idx: usize, //linear index
     bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
-    comptime SourceType: type,
+    comptime VoxelType: type,
     comptime ResType: type,
     endianness: std.builtin.Endian,
     num_bytes: u16,
@@ -54,10 +82,10 @@ fn getValue( //prbably nifti1 specific!
     const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
     const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
     const bytes_input = data.*[bit_start..bit_end]; //GPT: dereferencing suggested
-    const type_size = @divExact(@typeInfo(SourceType).int.bits, 8); //LLM: suggested
+    const type_size = @divExact(@typeInfo(VoxelType).int.bits, 8); //LLM: suggested
     _ = num_bytes;
     const raw_value: f32 = @floatFromInt(std.mem.readInt(
-        SourceType,
+        VoxelType,
         bytes_input[0..type_size],
         endianness,
     ));

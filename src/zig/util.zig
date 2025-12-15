@@ -3,6 +3,67 @@ const random = std.crypto.random;
 const eql = std.mem.eql;
 const ArrayList = std.array_list.Managed;
 
+//USAGE:
+// ... catch |e| { return util.cErr(e); }
+pub fn cErr(e: error{}) usize {
+    std.debug.print("ERR: {s}\n", .{e});
+    return 0;
+}
+pub fn minMax( //honestly: might be nifti specific! i think all files should have their own minmax maybe?
+    comptime T: type, //must be float for now
+    data: *const []const u8,
+    bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
+    slope: f32,
+    intercept: f32,
+) [3]T //min, max, max-min
+{
+    const num_voxels = data.len / @as(usize, @intCast(bytes_per_voxel)); //LLM:
+    var minmax: [3]T = .{
+        std.math.floatMax(T),
+        -std.math.floatMax(T),
+        undefined,
+    };
+
+    for (0..num_voxels) |idx| {
+        const val = getValue(
+            data,
+            idx,
+            bytes_per_voxel,
+            i16,
+            T,
+            .little,
+            2,
+            slope,
+            intercept,
+            false,
+            .{ 0, 0, 0 },
+        );
+        if (val < minmax[0]) {
+            minmax[0] = val;
+        }
+        if (val > minmax[1]) {
+            minmax[1] = val;
+        }
+    }
+    minmax[2] = minmax[1] - minmax[0];
+    return minmax;
+}
+// implementation of Jan's increment_cartesian suggestion
+pub fn incrementCartesian(
+    comptime num_dims: comptime_int,
+    cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
+    dims: *const [num_dims]usize,
+) bool {
+    //false if overflow occurs, true if otherwise
+    for (0.., dims) |i, di| {
+        cart_coord[i] += 1;
+        if (cart_coord[i] < di) {
+            return true;
+        }
+        cart_coord[i] = 0;
+    }
+    return false;
+}
 //entirely random uuid
 pub fn UUIDv4() [36]u8 {
     var result: [36]u8 = undefined;

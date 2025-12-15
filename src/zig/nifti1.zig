@@ -80,6 +80,120 @@ pub const DataType = enum(i16) {
         return @tagName(field);
     }
 };
+pub fn minMax( //honestly: might be nifti specific! i think all files should have their own minmax maybe?
+    comptime T: type, //must be float for now
+    data: *const []const u8,
+    bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
+    slope: f32,
+    intercept: f32,
+) [3]T //min, max, max-min
+{
+    const num_voxels = data.len / @as(usize, @intCast(bytes_per_voxel)); //LLM:
+    var minmax: [3]T = .{
+        std.math.floatMax(T),
+        -std.math.floatMax(T),
+        undefined,
+    };
+
+    for (0..num_voxels) |idx| {
+        const val = getValue(
+            data,
+            idx,
+            bytes_per_voxel,
+            i16,
+            T,
+            .little,
+            2,
+            slope,
+            intercept,
+            false,
+            .{ 0, 0, 0 },
+        );
+        if (val < minmax[0]) {
+            minmax[0] = val;
+        }
+        if (val > minmax[1]) {
+            minmax[1] = val;
+        }
+    }
+    minmax[2] = minmax[1] - minmax[0];
+    return minmax;
+}
+fn getValue( //prbably nifti1 specific!
+    data: *const []const u8,
+    idx: usize, //linear index
+    bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
+    comptime VoxelType: type,
+    endianness: std.builtin.Endian,
+
+    //Scaling: set slope to 1 and int to 0 to have them not apply
+    slope: f32,
+    intercept: f32,
+
+    //Normalizing
+    normalize: bool,
+    minmax: [3]f32, //min, max, max-min
+) f32 {
+    const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
+    const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
+    const bytes_input = data.*[bit_start..bit_end]; //GPT: dereferencing suggested
+    const type_size = @divExact(@typeInfo(VoxelType).int.bits, 8); //LLM: suggested
+    const raw_value: f32 = @floatFromInt(std.mem.readInt(
+        VoxelType,
+        bytes_input[0..type_size],
+        endianness,
+    ));
+    var res_value = raw_value;
+    if (slope != 1 or intercept != 0) { //wouldn't change res_value
+        res_value = slope * raw_value + intercept;
+    }
+
+    if (normalize) {
+        res_value = (res_value - minmax[0]) / minmax[2];
+    }
+    return res_value;
+}
+
+pub fn getAt4D(
+    self: *const Image,
+    xpos: usize,
+    ypos: usize,
+    zpos: usize,
+    tpos: usize,
+    normalize: bool,
+    minmax: [2]f32,
+) !f32 {
+    const nx: usize = @intCast(self.header.dim[1]);
+    const ny: usize = @intCast(self.header.dim[2]);
+    const nz: usize = @intCast(self.header.dim[3]);
+
+    const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
+
+    const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
+    const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
+
+    const raw_value = try byteToFloat(self.data, self.bytes_per_voxel, bit_start, bit_end);
+
+    var post_slope = raw_value;
+    if (self.header.sclSlope != 0) {
+        post_slope = self.header.sclSlope * raw_value + self.header.sclInter;
+    }
+
+    if (normalize) {
+        return (post_slope - minmax[0]) / (minmax[1] - minmax[0]); //TODO: calc the denom only once
+    } else {
+        return post_slope;
+    }
+}
+pub fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {
+    const ValType = switch (bytes_per_voxel) {
+        2 => i16,
+        //        2 => btf2(raw_data[bit_start..bit_end]),
+        else => return AccessError.NotSupportedYet,
+    };
+    const val = std.mem.readInt(ValType, raw_data[bit_start..bit_end], .little); // i16, not u16
+    return @floatFromInt(val);
+}
 
 //DEPRECATED: Image should be universal to all input formats, not just nifti 1
 //header extraction has to become it's own thing too, so there's lots of
@@ -91,56 +205,10 @@ pub const Image = struct {
     data_type: DataType,
     bytes_per_voxel: u16,
 
-    pub fn getAt4D(
-        self: *const Image,
-        xpos: usize,
-        ypos: usize,
-        zpos: usize,
-        tpos: usize,
-        normalize: bool,
-        minmax: [2]f32,
-    ) !f32 {
-        const nx: usize = @intCast(self.header.dim[1]);
-        const ny: usize = @intCast(self.header.dim[2]);
-        const nz: usize = @intCast(self.header.dim[3]);
-
-        const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
-
-        const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
-        const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
-
-        const raw_value = try byteToFloat(self.data, self.bytes_per_voxel, bit_start, bit_end);
-
-        var post_slope = raw_value;
-        if (self.header.sclSlope != 0) {
-            post_slope = self.header.sclSlope * raw_value + self.header.sclInter;
-        }
-
-        if (normalize) {
-            return (post_slope - minmax[0]) / (minmax[1] - minmax[0]); //TODO: calc the denom only once
-        } else {
-            return post_slope;
-        }
-    }
-
     pub fn printHeader(self: *const Image) void {
         print("🧠 Nifti Header:\n-------- \n{any}\n--------\n", .{self.header});
     }
 
-    fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {
-        const raw_value = switch (bytes_per_voxel) {
-            2 => btf2(raw_data[bit_start..bit_end]),
-            //TODO: all of the other byte to float functions!
-            //which migth requrie multiple types?
-            else => return AccessError.NotSupportedYet,
-        };
-        return raw_value;
-    }
-
-    fn btf2(bytes: []const u8) f32 {
-        const value = std.mem.readInt(i16, bytes[0..2], .little); // i16, not u16
-        return @floatFromInt(value);
-    }
     //DEPRECATED: This can be made much better
     pub fn init(filepath: []const u8) anyerror!Image {
         const allocator = &std.heap.page_allocator;

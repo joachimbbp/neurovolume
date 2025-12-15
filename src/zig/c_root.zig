@@ -40,13 +40,6 @@ pub export fn nifti1ToVDB_c(
     fpath_buff: [*]u8,
     fpath_cap: usize,
 ) usize {
-    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // const gpa_alloc = gpa.allocator();
-    // defer _ = gpa.deinit();
-    // var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    // defer arena.deinit();
-    // const arena_alloc = arena.allocator();
-
     const fpath_slice: []const u8 = std.mem.span(fpath); //LLM: suggested line
     const output_dir_slice: []const u8 = std.mem.span(output_dir);
     const filepath = root.nifti1ToVDB(
@@ -200,7 +193,7 @@ pub export fn ndArrayToVDB_c(
 
     var cart = [_]u32{ 0, 0, 0 };
     var idx: usize = 0;
-    //FIX: A simple in-line loop migth actually be more performant here!
+    //FIX: A simple in-line loop might actually be more performant here!
     while (root.incrementCartesian(
         3,
         &cart,
@@ -243,18 +236,6 @@ pub export fn ndArrayToVDB_c(
     defer file.close();
     std.debug.print("vdb successfully built from array\n", .{});
     return 1;
-}
-
-pub export fn buildvdb_c() ?*vdb543.VDB { //llm: nullable pointer to vdb suggested
-    var vdb = vdb543.VDB.build(arena_alloc) catch {
-        return null;
-    };
-    return &vdb;
-    //warn: don't forget freevdb
-}
-
-pub export fn freevdb_c(vdb: *vdb543.VDB) void { //llm:
-    arena_alloc.destroy(vdb);
 }
 
 test "static nifti to vdb - c level" {
