@@ -104,7 +104,7 @@ def ndarray_to_VDB(
         raise FileNotFoundError(f"Parent directory does not exist: {parent_dir}")
 
     # LOTS OF LLM: here
-    if transform is None:
+    if transform is None:  # WARN: I wonder if this should be an option????
         transform = np.eye(4, dtype=np.float64)
     affine_flat = transform.flatten().astype(np.float64)
 
@@ -257,4 +257,3 @@ def source_fps(filepath: str, filetype: str) -> int:
 #
 #     # TODO: def runtime
 #     # which will include a lot fo the stuff in fps as well as temporal_offset
-

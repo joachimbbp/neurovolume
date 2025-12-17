@@ -69,19 +69,24 @@ pub const Frame = extern struct {
 };
 
 pub const MotionEffects = enum {
-    frame_difference,
+    frame_difference, //WAIT: list of function ptrs instead?
 };
+
+const FrameInterpolation = enum {
+    step_print, //use this for no interpolation
+    cross_fade,
+};
+
 pub const Volume = extern struct {
     //Loaded from source
     name: [*:0]const u8,
     frames: [*]const Frame,
     fps_source: u8,
     motion_effects: [*]const MotionEffects,
-};
-
-const FrameInterpolation = enum {
-    step_print, //use this for no interpolation
-    cross_fade,
+    pub fn render(
+        self: *Volume,
+        interp: FrameInterpolation,
+    ) usize {}
 };
 
 pub const Composition = extern struct {

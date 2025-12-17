@@ -9,7 +9,7 @@ pub fn cErr(e: error{}) usize {
     std.debug.print("ERR: {s}\n", .{e});
     return 0;
 }
-pub fn minMax( //honestly: might be nifti specific! i think all files should have their own minmax maybe?
+pub fn minMax(
     comptime T: type, //must be float for now
     data: *const []const u8,
     bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
@@ -49,6 +49,13 @@ pub fn minMax( //honestly: might be nifti specific! i think all files should hav
     return minmax;
 }
 // implementation of Jan's increment_cartesian suggestion
+// USAGE:
+// var cart = [_]u32{ 0, 0, 0 };
+// var idx: usize = 0;
+// while (util.incrementCartesian(3, &cart, .dims)) {
+// idx += 1;
+//      //...do things here
+// }
 pub fn incrementCartesian(
     comptime num_dims: comptime_int,
     cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
