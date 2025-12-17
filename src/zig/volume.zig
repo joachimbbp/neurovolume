@@ -4,27 +4,21 @@ const util = @import("util.zig");
 const cErr = util.cErr;
 const vdb543 = @import("vdb543.zig");
 
-pub const Volume = extern struct {
-    // Single scan volume
-    // (or combination of scans into one volume)
-    name: [*:0]const u8,
-    frames: [*]const Frame,
-    fps: u8,
-};
-
+//const SpatialEffects
+//blur, sharpen, denoise, etc later!
+// these will be applied frame-wise so we can
+// animate them!
 pub const Frame = extern struct {
+    //Initialize with const f = Frame{.data = data, ...
+    //transform, slope, etc all must be applied first!
     data: [*]const f32,
     dims: *const [3]usize,
-    transform: *const [3][3]f64,
-    bytes_per_voxel: *u16,
-    sclSlope: f32,
-    sclInter: f32,
     c_o: *const [3]usize, // Cartesian coordinaes Order
     // ndarray is 2 1 0
     // nifti1 is 0 1 2
 
     pub fn toVDB(
-        self: *Frame,
+        self: *Composition,
         alloc: std.mem.Allocator,
         normalize: bool,
         save_path: [*:0]const u8,
@@ -63,67 +57,91 @@ pub const Frame = extern struct {
 
             var buffer = std.array_list.Managed(u8).init(alloc);
             defer buffer.deinit();
-            const versioned_vdb_filepath = try vdb543.writeFrame(
-                &buffer,
-                &vdb,
-                save_path,
-                alloc,
-                self.transform,
-            );
-            // FIX: versioning is a little fucked here
-            // it really should check versioning and decide
-            // to overwrite, version, or skip at that level
+
+            //WARN: you must overwrite, version, or skip at the function call!
+            const file = std.fs.cwd().createFile(save_path, .{}) catch |e| {
+                cErr(e);
+            };
+            try file.writeAll(buffer.items);
+            defer file.close();
         }
     }
 };
-pub export fn ndArrayToVDB(
-    data: [*]const f32,
-    dims: *const [3]usize,
-    transform: *const [16]f64,
-    output_filepath: [*:0]const u8,
-) usize {}
+
+pub const MotionEffects = enum {
+    frame_difference,
+};
+pub const Volume = extern struct {
+    //Loaded from source
+    name: [*:0]const u8,
+    frames: [*]const Frame,
+    fps_source: u8,
+    motion_effects: [*]const MotionEffects,
+};
+
+const FrameInterpolation = enum {
+    step_print, //use this for no interpolation
+    cross_fade,
+};
+
+pub const Composition = extern struct {
+    // Set of at least one volume
+    // (eventually can be combined into different
+    // grids on the VDB)
+    volumes: [*]const Volume,
+    fps_playback: u8,
+    combined_save: bool, //true: combines to grids in one vdb, false: separate VDBs
+};
+
+//WARN:
+//Hey maybe these should all just be
+// in their own modules? That way this
+// is the only thing that need to deal with
+// c ABI weirdness
+// pub export fn from_ndarray(
+//     data: [*]const f32,
+//     dims: *const [3]usize,
+//     transform: *const [16]f64,
+//     output_filepath: [*:0]const u8,
+// ) usize {}
 
 // Returns ptr to Volume
-pub fn from_NIfTI1(filepath: [*:0]const u8) usize {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa.allocator()); //LLM: suggested
-    defer arena.deinit();
-
-    const file = std.fs.cwd().openFile(filepath, .{}) catch |e| {
-        return cErr(e);
-    };
-    defer file.close();
-
-    const reader = std.fs.File.deprecatedReader(file); // DEPRECATED:
-    const header_ptr = arena.child_allocator.create(nifti1.Header) catch |e| {
-        return cErr(e);
-    };
-    header_ptr.* = reader.readStruct(nifti1.Header) catch |e| {
-        return cErr(e);
-    };
-    const vox_offset = @as(u32, @intFromFloat(header_ptr.voxOffset));
-    try file.seekTo(vox_offset);
-    const file_size = try file.getEndPos();
-
-    const raw_data = arena.child_allocator.alloc(u8, (file_size - vox_offset)) catch |e| {
-        return cErr(e);
-    };
-    _ = try file.readAll(raw_data);
-
-    const data_type: nifti1.DataType = @enumFromInt(header_ptr.*.datatype);
-    const bytes_per_voxel: u16 = @intCast(@divTrunc(header_ptr.*.bitpix, 8));
-
-    const minmax = nifti1.minMax(
-        f32,
-        &raw_data,
-        bytes_per_voxel,
-        header_ptr.*.sclSlope, //sclSlope,
-        header_ptr.*.sclInter,
-    );
-    // BOOKMARK: continue at root -> switch (img.header.dim[0]
-}
-pub const Composition = extern struct {
-    volumes: [*]const volume,
-    fps: u8,
-};
+// pub fn from_NIfTI1(filepath: [*:0]const u8) usize {
+//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+//     defer _ = gpa.deinit();
+//     var arena = std.heap.ArenaAllocator.init(gpa.allocator()); //LLM: suggested
+//     defer arena.deinit();
+//
+//     const file = std.fs.cwd().openFile(filepath, .{}) catch |e| {
+//         return cErr(e);
+//     };
+//     defer file.close();
+//
+//     const reader = std.fs.File.deprecatedReader(file); // DEPRECATED:
+//     const header_ptr = arena.child_allocator.create(nifti1.Header) catch |e| {
+//         return cErr(e);
+//     };
+//     header_ptr.* = reader.readStruct(nifti1.Header) catch |e| {
+//         return cErr(e);
+//     };
+//     const vox_offset = @as(u32, @intFromFloat(header_ptr.voxOffset));
+//     try file.seekTo(vox_offset);
+//     const file_size = try file.getEndPos();
+//
+//     const raw_data = arena.child_allocator.alloc(u8, (file_size - vox_offset)) catch |e| {
+//         return cErr(e);
+//     };
+//     _ = try file.readAll(raw_data);
+//
+//     const data_type: nifti1.DataType = @enumFromInt(header_ptr.*.datatype);
+//     const bytes_per_voxel: u16 = @intCast(@divTrunc(header_ptr.*.bitpix, 8));
+//
+//     const minmax = nifti1.minMax(
+//         f32,
+//         &raw_data,
+//         bytes_per_voxel,
+//         header_ptr.*.sclSlope, //sclSlope,
+//         header_ptr.*.sclInter,
+//     );
+//     // BOOKMARK: continue at root -> switch (img.header.dim[0]
+// }

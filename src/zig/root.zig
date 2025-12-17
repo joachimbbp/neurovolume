@@ -22,48 +22,6 @@ const SupportError = error{
 
 // pub fn saveVDBFrame(
 
-const FrameInterpolation = enum {
-    realtime,
-    crossfade,
-};
-const Effect = enum {
-    frame_difference,
-    //blur, sharpen, denoise, etc later!
-};
-const SourceType = enum {
-    ndarray,
-    NIfTI1,
-    //not sure how scalable this is but...
-};
-
-// use a data getter function pointer!
-// this means wrapping minmax, nifti1img, etc in one function
-// and doing the same for other data types.
-pub fn saveVDB( // DEPRECATED: let's make this volume
-    comptime source_type: SourceType,
-    data: [*]const f32, //VDB writer only supports f32 for now
-    fps: u8,
-    dims: [4]usize,
-    frame_interpolation: FrameInterpolation,
-    transform: [4][4]f64, //assume same for all frames
-    output_dir: []const u8,
-    effects: []const Effect,
-) ![]const u8 {
-    switch (source_type) {
-        .NIfTI1 => {
-            //prep nifti1 image
-            //if static just write a frame
-            //else call a new sequence function
-
-        },
-        .ndarray => {},
-        else => {
-            std.debug.print("{s} not supported\n", .{source_type});
-            return SupportError.Type;
-        },
-    }
-}
-
 fn getValue( //prbably nifti1 specific!
     data: *const []const u8,
     idx: usize, //linear index
@@ -101,45 +59,7 @@ fn getValue( //prbably nifti1 specific!
 }
 
 //returns .{mininmum value, maximum value, difference between max and min}
-pub fn MinMax( //honestly: might be nifti specific! i think all files should have their own minmax maybe?
-    comptime T: type, //must be float for now
-    data: *const []const u8,
-    bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
-    slope: f32,
-    intercept: f32,
-) [3]T //min, max, max-min
-{
-    const num_voxels = data.len / @as(usize, @intCast(bytes_per_voxel)); //LLM:
-    var minmax: [3]T = .{
-        std.math.floatMax(T),
-        -std.math.floatMax(T),
-        undefined,
-    };
 
-    for (0..num_voxels) |idx| {
-        const val = getValue(
-            data,
-            idx,
-            bytes_per_voxel,
-            i16,
-            T,
-            .little,
-            2,
-            slope,
-            intercept,
-            false,
-            .{ 0, 0, 0 },
-        );
-        if (val < minmax[0]) {
-            minmax[0] = val;
-        }
-        if (val > minmax[1]) {
-            minmax[1] = val;
-        }
-    }
-    minmax[2] = minmax[1] - minmax[0];
-    return minmax;
-}
 // Returns path to VDB file (or folder containing sequence if fMRI)
 pub fn nifti1ToVDB(
     nifti_filepath: []const u8,
