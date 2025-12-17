@@ -4,10 +4,6 @@ const util = @import("util.zig");
 const cErr = util.cErr;
 const vdb543 = @import("vdb543.zig");
 
-//const SpatialEffects
-//blur, sharpen, denoise, etc later!
-// these will be applied frame-wise so we can
-// animate them!
 pub const Frame = extern struct {
     //Initialize with const f = Frame{.data = data, ...
     //transform, slope, etc all must be applied first!
@@ -68,10 +64,6 @@ pub const Frame = extern struct {
     }
 };
 
-pub const MotionEffects = enum {
-    frame_difference, //WAIT: list of function ptrs instead?
-};
-
 const FrameInterpolation = enum {
     step_print, //use this for no interpolation
     cross_fade,
@@ -82,7 +74,7 @@ pub const Volume = extern struct {
     name: [*:0]const u8,
     frames: [*]const Frame,
     fps_source: u8,
-    motion_effects: [*]const MotionEffects,
+    //effect stack
     pub fn render(
         self: *Volume,
         interp: FrameInterpolation,
