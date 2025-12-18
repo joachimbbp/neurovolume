@@ -23,8 +23,8 @@ pub fn normalize(v: *vol.Volume) [][]f32 {
             }
         }
     }
+
     const minmax_delta = max - min;
-    //normalize:
 
     var res: [v.frames.len][]f32 = undefined;
     for (v.frames, 0..) |frame, i| {

@@ -66,8 +66,17 @@ pub const Volume = extern struct {
     fps_source: u8,
     dims: *const [3]usize,
     c_o: *const [3]usize, // Cartesian coordinaes Order
-    effects: []*const fn (v: *Volume) [][]f32,
+    effects: []const *const fn (v: *Volume) usize,
+
+    pub fn run_effects(self: *Volume) void {
+        for (self.effects) |effect| {
+            try effect(self) catch |e| {
+                cErr(e);
+            };
+        }
+    }
 };
+
 pub const Composition = extern struct {
     // Set of at least one volume
     // (eventually can be combined into different
