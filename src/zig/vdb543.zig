@@ -389,6 +389,8 @@ pub fn writeFrame(
 ) !ArrayList(u8) {
     try writeVDB(buffer, vdb, transform);
 
+    //FIX: versioning needs to happen
+    //on the function call level
     const vdb_filepath = try save.versionFile(
         path_string,
         buffer.*, //EXORCISE: This pointer pattern seems cursed

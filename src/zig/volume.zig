@@ -4,66 +4,56 @@ const util = @import("util.zig");
 const cErr = util.cErr;
 const vdb543 = @import("vdb543.zig");
 
-pub const Frame = extern struct {
-    //Initialize with const f = Frame{.data = data, ...
-    //transform, slope, etc all must be applied first!
-    data: [*]const f32,
-    dims: *const [3]usize,
-    c_o: *const [3]usize, // Cartesian coordinaes Order
-    // ndarray is 2 1 0
-    // nifti1 is 0 1 2
-
-    pub fn toVDB(
-        self: *Composition,
-        alloc: std.mem.Allocator,
-        normalize: bool,
-        save_path: [*:0]const u8,
-    ) usize {
-        var vdb = vdb543.VDB.build(alloc) catch |e| {
-            return cErr(e);
-        };
-
-        var cart = [_]u32{ 0, 0, 0 };
-        var idx: usize = 0;
-        const minmax = util.minMax(
-            f32,
-            self.data,
-            self.sclSlope,
-            self.sclInter,
-        );
-        while (util.incrementCartesian(3, &cart, .dims)) {
-            idx += 1;
-            const res_value = nifti1.getValue(
-                .data,
-                idx,
-                .bytes_per_voxel,
-                i16,
-                .little,
-                self.sclSlope,
-                self.sclInter,
-                normalize,
-                minmax,
-            );
-            try vdb543.setVoxel(
-                &vdb,
-                .{ cart[self.c_o[0]], cart[self.c_o[1]], cart[self.c_o[2]] },
-                res_value,
-                alloc,
-            );
-
-            var buffer = std.array_list.Managed(u8).init(alloc);
-            defer buffer.deinit();
-
-            //WARN: you must overwrite, version, or skip at the function call!
-            const file = std.fs.cwd().createFile(save_path, .{}) catch |e| {
-                cErr(e);
-            };
-            try file.writeAll(buffer.items);
-            defer file.close();
-        }
-    }
-};
-
+//TODO: move to vdb543.zig
+// pub fn dataToVDB(
+//     self: *Volume,
+//     alloc: std.mem.Allocator,
+//     save_path: [*:0]const u8,
+// ) usize {
+//     var vdb = vdb543.VDB.build(alloc) catch |e| {
+//         return cErr(e);
+//     };
+//
+//     var cart = [_]u32{ 0, 0, 0 };
+//     var idx: usize = 0;
+//     const minmax = util.minMax(
+//         f32,
+//         self.data,
+//         self.sclSlope,
+//         self.sclInter,
+//     );
+//     while (util.incrementCartesian(3, &cart, .dims)) {
+//         idx += 1;
+//         const res_value = nifti1.getValue(
+//             .data,
+//             idx,
+//             .bytes_per_voxel,
+//             i16,
+//             .little,
+//             self.sclSlope,
+//             self.sclInter,
+//             normalize,
+//             minmax,
+//         );
+//         try vdb543.setVoxel(
+//             &vdb,
+//             .{ cart[self.c_o[0]], cart[self.c_o[1]], cart[self.c_o[2]] },
+//             res_value,
+//             alloc,
+//         );
+//
+//         var buffer = std.array_list.Managed(u8).init(alloc);
+//         defer buffer.deinit();
+//
+//         //WARN: you must overwrite, version, or skip at the function call!
+//         const file = std.fs.cwd().createFile(save_path, .{}) catch |e| {
+//             cErr(e);
+//         };
+//         try file.writeAll(buffer.items);
+//         defer file.close();
+//     }
+// }
+//
 const FrameInterpolation = enum {
     step_print, //use this for no interpolation
     cross_fade,
@@ -72,15 +62,12 @@ const FrameInterpolation = enum {
 pub const Volume = extern struct {
     //Loaded from source
     name: [*:0]const u8,
-    frames: [*]const Frame,
+    frames: [*]const []f32,
     fps_source: u8,
-    //effect stack
-    pub fn render(
-        self: *Volume,
-        interp: FrameInterpolation,
-    ) usize {}
+    dims: *const [3]usize,
+    c_o: *const [3]usize, // Cartesian coordinaes Order
+    effects: []*const fn (v: *Volume) [][]f32,
 };
-
 pub const Composition = extern struct {
     // Set of at least one volume
     // (eventually can be combined into different
