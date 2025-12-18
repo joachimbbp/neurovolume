@@ -54,7 +54,7 @@ const vdb543 = @import("vdb543.zig");
 //     }
 // }
 //
-const FrameInterpolation = enum {
+pub const FrameInterpolation = enum {
     step_print, //use this for no interpolation
     cross_fade,
 };
@@ -63,28 +63,30 @@ pub const Volume = extern struct {
     //Loaded from source
     name: [*:0]const u8,
     frames: [*]const []f32,
-    fps_source: u8,
+
+    fps_source: usize,
+    fps_playback: usize,
+    speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
+    frame_interpolation: FrameInterpolation,
+
     dims: *const [3]usize,
     c_o: *const [3]usize, // Cartesian coordinaes Order
+
     effects: []const *const fn (v: *Volume) usize,
 
-    pub fn run_effects(self: *Volume) void {
+    pub fn render_effects(self: *Volume) void {
         for (self.effects) |effect| {
-            try effect(self) catch |e| {
+            self.frames = effect(self) catch |e| {
                 cErr(e);
             };
         }
     }
 };
 
-pub const Composition = extern struct {
-    // Set of at least one volume
-    // (eventually can be combined into different
-    // grids on the VDB)
-    volumes: [*]const Volume,
-    fps_playback: u8,
-    combined_save: bool, //true: combines to grids in one vdb, false: separate VDBs
-};
+//TODO: instead of Composition, just have a set of
+//effects that allows you to combine volumes in different
+//ways (time stretch for T1 on a BOLD overlay, method of subtraction,
+//classic scalar addition, etc).
 
 //WARN:
 //Hey maybe these should all just be
