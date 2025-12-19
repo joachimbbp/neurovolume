@@ -1,4 +1,6 @@
 const std = @import("std");
+const vol = @import("volume.zig");
+const util = @import("util.zig");
 const print = std.debug.print;
 const AccessError = error{NotSupportedYet};
 
@@ -80,45 +82,7 @@ pub const DataType = enum(i16) {
         return @tagName(field);
     }
 };
-pub fn minMax( //honestly: might be nifti specific! i think all files should have their own minmax maybe?
-    comptime T: type, //must be float for now
-    data: *const []const u8,
-    bytes_per_voxel: u16, //NIfTI1 convention but should cover all cases
-    slope: f32,
-    intercept: f32,
-) [3]T //min, max, max-min
-{
-    const num_voxels = data.len / @as(usize, @intCast(bytes_per_voxel)); //LLM:
-    var minmax: [3]T = .{
-        std.math.floatMax(T),
-        -std.math.floatMax(T),
-        undefined,
-    };
 
-    for (0..num_voxels) |idx| {
-        const val = getValue(
-            data,
-            idx,
-            bytes_per_voxel,
-            i16,
-            T,
-            .little,
-            2,
-            slope,
-            intercept,
-            false,
-            .{ 0, 0, 0 },
-        );
-        if (val < minmax[0]) {
-            minmax[0] = val;
-        }
-        if (val > minmax[1]) {
-            minmax[1] = val;
-        }
-    }
-    minmax[2] = minmax[1] - minmax[0];
-    return minmax;
-}
 fn getValue( //prbably nifti1 specific!
     data: *const []const u8,
     idx: usize, //linear index
@@ -195,61 +159,6 @@ pub fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize,
     return @floatFromInt(val);
 }
 
-//DEPRECATED: Image should be universal to all input formats, not just nifti 1
-//header extraction has to become it's own thing too, so there's lots of
-//stuff that will neeed DRYing in the future
-pub const Image = struct {
-    header: *const Header,
-    data: []const u8,
-    allocator: *const std.mem.Allocator,
-    data_type: DataType,
-    bytes_per_voxel: u16,
-
-    pub fn printHeader(self: *const Image) void {
-        print("🧠 Nifti Header:\n-------- \n{any}\n--------\n", .{self.header});
-    }
-
-    //DEPRECATED: This can be made much better
-    pub fn init(filepath: []const u8) anyerror!Image {
-        const allocator = &std.heap.page_allocator;
-        //Load File
-        const file = try std.fs.cwd().openFile(filepath, .{});
-        defer file.close();
-
-        //Load Header
-        const reader = std.fs.File.deprecatedReader(file);
-
-        const header_ptr = try allocator.create(Header);
-        header_ptr.* = try reader.readStruct(Header);
-
-        //Load Data
-        const vox_offset = @as(u32, @intFromFloat(header_ptr.voxOffset));
-        try file.seekTo(vox_offset);
-        const file_size = try file.getEndPos();
-
-        const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
-        _ = try file.readAll(raw_data);
-
-        //datatype
-        const data_type: DataType = @enumFromInt(header_ptr.*.datatype);
-        const bytes_per_voxel: u16 = @intCast(@divTrunc(header_ptr.*.bitpix, 8));
-
-        return Image{
-            .header = header_ptr,
-            .data = raw_data,
-            .allocator = allocator,
-            .data_type = data_type,
-            .bytes_per_voxel = bytes_per_voxel,
-        };
-    }
-    pub fn deinit(self: *const Image) void {
-        //TODO: everything else
-        //why did robbie put this as destroy for one and free for the other?
-        self.allocator.destroy(self.header);
-        self.allocator.free(self.data);
-    }
-};
-
 pub fn getHeader(filepath: []const u8) !*const Header {
     const allocator = &std.heap.page_allocator;
     //Load File
@@ -282,19 +191,47 @@ pub fn getTransform(h: Header) ![4][4]f64 {
     };
 }
 
-//SECTION: Tests:
-const config = @import("config.zig.zon");
+pub fn toVolume(filepath: []const u8, alloc: std.mem.Allocator) vol.Volume {
+    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // const gpa_alloc = gpa.allocator();
+    // var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+    // const arena_alloc = arena.allocator();
 
-const t = @import("timer.zig");
-test "echo module" {
-    print("🧠 nifti1.zig module echo\n", .{});
-}
+    //Load File
+    const file = try std.fs.cwd().openFile(filepath, .{});
+    defer file.close();
 
-test "non deprecated header techniques" {
-    const static = config.testing.files.nifti1_t1;
-    const hdr = try getHeader(static);
-    const trans = try getTransform(hdr.*);
-    //HACK: i feel like it would be better to pass the pointer
-    print("🧙‍♂️🧠 Non deprecated header extraction {any}: \n", .{hdr.*});
-    print("     extracted transform: {any}\n", .{trans});
+    //Load Header
+    const reader = std.fs.File.deprecatedReader(file);
+
+    const hdr = try alloc.create(Header);
+    hdr.* = try reader.readStruct(Header);
+    defer alloc.destroy(hdr);
+
+    //Load Data
+    const vox_offset = @as(u32, @intFromFloat(hdr.voxOffset));
+    try file.seekTo(vox_offset);
+    const file_size = try file.getEndPos();
+
+    const raw_data = try alloc.alloc(u8, (file_size - vox_offset));
+    _ = try file.readAll(raw_data);
+    defer alloc.destroy(raw_data);
+
+    //datatype
+    const data_type: DataType = @enumFromInt(hdr.*.datatype);
+    const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.*.bitpix, 8));
+
+    const name = util.stripped_basename(filepath);
+    const transform = try getTransform(hdr.*);
+
+    //TODO: FPS
+
+    const v = vol.Volume{
+        .name = name,
+        .transform = transform}
+//BOOKMARK:
+    for (0..hdr.dim[4]) |frame_num| {
+        
+
+    }
 }

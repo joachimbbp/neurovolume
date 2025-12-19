@@ -12,19 +12,6 @@ pub fn cross_fade(v: *vol.Volume) [][]f32 {
     _ = v;
 }
 
-pub fn interpolate(v: *vol.Volume) [][]f32 {
-    switch (v.frame_interpolation) {
-        vol.FrameInterpolation.step_print => {
-            std.debug.print("Not implemented yet");
-        },
-        vol.FrameInterpolation.cross_fade => {
-            std.debug.print("Not implemented yet");
-        },
-        else => {
-            std.debug.print("Not implemented yet");
-        },
-    }
-}
 //
 // pub const FrameInterpolation = enum {
 //     step_print, //use this for no interpolation
