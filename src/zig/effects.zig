@@ -54,11 +54,15 @@ pub fn frame_difference(v: *vol.Volume) [][]f32 {
 // animate them!
 
 //_: Interpolation Effects
+//TODO:
 pub fn step_print(v: *vol.Volume) [][]f32 {
+    _ = v;
     //result is source frames stretched to output fps stretched to speed
 
 }
-pub fn cross_fade(v: *vol.Volume) [][]f32 {}
+pub fn cross_fade(v: *vol.Volume) [][]f32 {
+    _ = v;
+}
 
 // pub fn interpolate(v: *vol.Volume) [][]f32 {
 //     switch (v.frame_interpolation) {
