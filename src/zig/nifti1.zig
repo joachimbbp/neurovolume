@@ -182,7 +182,7 @@ pub fn getHeader(filepath: []const u8) !*const Header {
     return header_ptr;
 }
 
-pub fn getTransform(h: Header) ![4][4]f64 {
+fn getTransform(h: Header) ![4][4]f64 {
     return .{
         .{ h.srowX[0], h.srowX[1], h.srowX[2], h.srowX[3] },
         .{ h.srowY[0], h.srowY[1], h.srowY[2], h.srowY[3] },
@@ -190,8 +190,59 @@ pub fn getTransform(h: Header) ![4][4]f64 {
         .{ 0.0, 0.0, 0.0, 1.0 },
     };
 }
+//gets the xyzt_units from nifti
+const Unit = enum(u8) {
+    Unknown = 0,
+    //spatial
+    Meter = 1,
+    Milimeter = 2,
+    Micron = 3,
+    //temporal
+    Seconds = 8,
+    Miliseconds = 16,
+    Microseconds = 24,
+    Hertz = 32,
+    Parts_per_million = 40,
+    Radians_per_second = 48,
+};
+//returns space, time
+fn getUnits(
+    hdr: *Header,
+) [2]Unit {
+    const field = hdr.xyztUnits;
+    //LLM: bitwise code more or less copypasta
+    const spatial_code = field & 0x07;
+    const temporal_code = (field & 0x38) >> 3;
 
-pub fn toVolume(filepath: []const u8, alloc: std.mem.Allocator) vol.Volume {
+    const space: Unit = @enumFromInt(spatial_code);
+    const time: Unit = @enumFromInt(temporal_code << 3);
+    return .{ space, time };
+}
+
+fn getFPS(hdr: Header) !f32 {
+    const num_frames = hdr.dim[4];
+    if (num_frames == 1) {
+        //static file, thus fps of 0
+        return 0.0;
+    }
+    const units = getUnits(hdr);
+    const time = units[1];
+    const time_value = hdr.pixdim[4];
+    const fps = switch (time) {
+        Unit.Seconds => 1.0 / time_value,
+        Unit.Miliseconds => 0.001 / time_value,
+        Unit.Microseconds => 0.000001 / time_value,
+        else => {
+            print("ERROR: {s} not supported yet\n", .{time});
+            return AccessError.NotSupportedYet;
+        },
+    };
+    return fps;
+}
+
+pub fn toVolume(filepath: []const u8, alloc: std.mem.Allocator) !vol.Volume {
+    // WARN: probably needs to be c-compatable
+
     // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     // const gpa_alloc = gpa.allocator();
     // var arena = std.heap.ArenaAllocator.init(gpa_alloc);
@@ -223,15 +274,13 @@ pub fn toVolume(filepath: []const u8, alloc: std.mem.Allocator) vol.Volume {
 
     const name = util.stripped_basename(filepath);
     const transform = try getTransform(hdr.*);
-
+    //    const fps =
     //TODO: FPS
 
+    //WARN: time offset?
     const v = vol.Volume{
         .name = name,
-        .transform = transform}
-//BOOKMARK:
-    for (0..hdr.dim[4]) |frame_num| {
-        
-
-    }
+        .transform = transform,
+    };
+    for (0..hdr.dim[4]) |frame_num| {}
 }

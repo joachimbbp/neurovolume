@@ -56,81 +56,83 @@ pub export fn nifti1ToVDB_c(
     return n;
 }
 
+// DEPRECATED: moved to nifit1
 //gets the xyzt_units from nifti
-pub export fn unit_c(
-    fpath: [*:0]const u8,
-    filetype: [*:0]const u8,
-    unit_kind: [*:0]const u8, //"time" or "space", can be "na" or other types for other file formats
-    unitName_buff: [*]u8,
-    unitName_cap: usize, //currently the largest is 18
-) usize {
-    //WARN: this leaned way to heavily on LLMs, I definately can't explain exactly why or how a lot of this works!
+// pub export fn unit_c(
+//     fpath: [*:0]const u8,
+//     filetype: [*:0]const u8,
+//     unit_kind: [*:0]const u8, //"time" or "space", can be "na" or other types for other file formats
+//     unitName_buff: [*]u8,
+//     unitName_cap: usize, //currently the largest is 18
+// ) usize {
+//     //WARN: this leaned way to heavily on LLMs, I definately can't explain exactly why or how a lot of this works!
+//
+//     var name: []const u8 = undefined;
+//     const fpath_slice: []const u8 = std.mem.span(fpath);
+//     const unit_kind_slice: []const u8 = std.mem.span(unit_kind);
+//     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
+//         const Unit = enum(u8) {
+//             Unknown = 0,
+//             //spatial
+//             Meter = 1,
+//             Milimeter = 2,
+//             Micron = 3,
+//             //temporal
+//             Seconds = 8,
+//             Miliseconds = 16,
+//             Microseconds = 24,
+//             Hertz = 32,
+//             Parts_per_million = 40,
+//             Radians_per_second = 48,
+//         };
+//
+//         const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+//             return 0;
+//         };
+//
+//         const field = hdr_ptr.xyztUnits;
+//         //LLM:
+//         const spatial_code = field & 0x07;
+//         const temporal_code = (field & 0x38) >> 3;
+//         //LLMEND:
+//
+//         if (std.mem.eql(u8, unit_kind_slice, "time") == true) {
+//             const unit: Unit = @enumFromInt(temporal_code << 3); //LLM: has to shift back
+//             name = @tagName(unit);
+//         } else if (std.mem.eql(u8, unit_kind_slice, "space") == true) {
+//             const unit: Unit = @enumFromInt(spatial_code);
+//             name = @tagName(unit);
+//         } else {
+//             print("⚠️📜 Unsuported unit kind: {s}\n", .{unit_kind_slice});
+//             return 0;
+//         }
+//     } else {
+//         print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
+//         return 0;
+//     }
+//
+//     const n = if (name.len + 1 <= unitName_cap) name.len else name.len - 1;
+//     @memcpy(unitName_buff[0..n], name[0..n]);
+//     return n;
+// }
 
-    var name: []const u8 = undefined;
-    const fpath_slice: []const u8 = std.mem.span(fpath);
-    const unit_kind_slice: []const u8 = std.mem.span(unit_kind);
-    if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
-        const Unit = enum(u8) {
-            Unknown = 0,
-            //spatial
-            Meter = 1,
-            Milimeter = 2,
-            Micron = 3,
-            //temporal
-            Seconds = 8,
-            Miliseconds = 16,
-            Microseconds = 24,
-            Hertz = 32,
-            Parts_per_million = 40,
-            Radians_per_second = 48,
-        };
-
-        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
-            return 0;
-        };
-
-        const field = hdr_ptr.xyztUnits;
-        //LLM:
-        const spatial_code = field & 0x07;
-        const temporal_code = (field & 0x38) >> 3;
-        //LLMEND:
-
-        if (std.mem.eql(u8, unit_kind_slice, "time") == true) {
-            const unit: Unit = @enumFromInt(temporal_code << 3); //LLM: has to shift back
-            name = @tagName(unit);
-        } else if (std.mem.eql(u8, unit_kind_slice, "space") == true) {
-            const unit: Unit = @enumFromInt(spatial_code);
-            name = @tagName(unit);
-        } else {
-            print("⚠️📜 Unsuported unit kind: {s}\n", .{unit_kind_slice});
-            return 0;
-        }
-    } else {
-        print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
-        return 0;
-    }
-
-    const n = if (name.len + 1 <= unitName_cap) name.len else name.len - 1;
-    @memcpy(unitName_buff[0..n], name[0..n]);
-    return n;
-}
-
-pub export fn numFrames_c(
-    fpath: [*:0]const u8,
-    filetype: [*:0]const u8,
-) usize {
-    const fpath_slice: []const u8 = std.mem.span(fpath);
-    if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
-        const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
-            return 0;
-        };
-        const num_frames: usize = @intCast(hdr_ptr.dim[4]);
-        return num_frames;
-    } else {
-        print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
-        return 0;
-    }
-}
+// DEPRECATED: each type will have its own function for this sort of thing
+// pub export fn numFrames_c(
+//     fpath: [*:0]const u8,
+//     filetype: [*:0]const u8,
+// ) usize {
+//     const fpath_slice: []const u8 = std.mem.span(fpath);
+//     if (std.mem.eql(u8, std.mem.span(filetype), "NIfTI1") == true) {
+//         const hdr_ptr = nifti1.getHeader(fpath_slice) catch {
+//             return 0;
+//         };
+//         const num_frames: usize = @intCast(hdr_ptr.dim[4]);
+//         return num_frames;
+//     } else {
+//         print("⚠️📂 Unsuported filetype: {s}\n", .{filetype});
+//         return 0;
+//     }
+// }
 
 pub export fn sliceDuration_c( //WARN: not really used, tbh. Test file has 0 slice duration for no reason
     fpath: [*:0]const u8,
@@ -179,63 +181,6 @@ pub export fn setVoxel_c(
     };
     return 1;
     //WARN: don't forget to free everything in this arena after writing the VDB!
-}
-
-pub export fn ndArrayToVDB_c(
-    data: [*]const f32,
-    dims: *const [3]usize,
-    transform: *const [16]f64,
-    output_filepath: [*:0]const u8,
-) usize {
-    var vdb = vdb543.VDB.build(arena_alloc) catch {
-        return 0;
-    };
-
-    var cart = [_]u32{ 0, 0, 0 };
-    var idx: usize = 0;
-    //FIX: A simple in-line loop might actually be more performant here!
-    while (root.incrementCartesian(
-        3,
-        &cart,
-        dims,
-    )) {
-        idx += 1;
-        //Cart matches ndarray order
-        vdb543.setVoxel(
-            &vdb,
-            .{ cart[2], cart[1], cart[0] },
-            data[idx],
-            arena_alloc,
-        ) catch {
-            print("set voxel error!\n", .{});
-            return 0;
-        };
-    }
-
-    var buffer = std.array_list.Managed(u8).init(arena_alloc);
-    defer buffer.deinit();
-    const transform_matrix = [4][4]f64{
-        .{ transform[0], transform[1], transform[2], transform[3] },
-        .{ transform[4], transform[5], transform[6], transform[7] },
-        .{ transform[8], transform[9], transform[10], transform[11] },
-        .{ transform[12], transform[13], transform[14], transform[15] },
-    };
-    vdb543.writeVDB(&buffer, &vdb, transform_matrix) catch {
-        std.debug.print("ERROR: Failed to write VDB\n", .{});
-        return 0;
-    };
-
-    const file = std.fs.cwd().createFile(std.mem.span(output_filepath), .{}) catch {
-        std.debug.print("ERROR: Failed to create file\n", .{});
-        return 0;
-    };
-    file.writeAll(buffer.items) catch {
-        std.debug.print("ERROR: Failed to write to file\n", .{});
-        return 0;
-    };
-    defer file.close();
-    std.debug.print("vdb successfully built from array\n", .{});
-    return 1;
 }
 
 test "static nifti to vdb - c level" {

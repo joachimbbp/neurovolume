@@ -11,8 +11,8 @@ pub const Volume = extern struct {
     frames: [*]const []f32,
     transform: *const [4][4]f64,
 
-    fps_source: usize,
-    fps_playback: usize,
+    fps_source: f32,
+    fps_playback: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
 
     dims: *const [3]usize,

@@ -56,6 +56,7 @@ def prep_ndarray(
 ) -> np.ndarray:
     """
     Preparation steps needed for ndarrays derrived from nibabel or ANTs
+    NOTE: we only support 3D arrays. For time series you must make a
 
     Parameters:
     ------------
@@ -83,7 +84,7 @@ def prep_ndarray(
 def ndarray_to_VDB(
     arr: np.ndarray,
     save_path: str,
-    transform: np.ndarray = None,
+    transform: np.ndarray = None,  # DEPRECATED:
 ):
     """
     Creates a VDB file from an ndarray.
@@ -218,7 +219,7 @@ def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     return unit_name.value.decode()
 
 
-def source_fps(filepath: str, filetype: str) -> int:
+def source_fps(filepath: str, filetype: str) -> int:  # DEPRECATED:
     match filetype:
         case "NIfTI1":
             if num_frames(filepath, filetype) == 1:
