@@ -11,12 +11,15 @@ pub const Volume = extern struct {
     frames: [*]const []f32,
     transform: *const [4][4]f64,
 
-    fps_source: f32,
-    fps_playback: f32,
+    source_fps: f32,
+    playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
 
     dims: *const [3]usize,
     c_o: *const [3]usize, // Cartesian coordinaes Order
+    // I believe:
+    // 2 1 0 for ndarray
+    // 0 1 2 for nifti1
 
     effects: []const *const fn (v: *Volume) [][]f32, //effects are applied on the data in memory
     interpolation: *const fn (v: *Volume) [][]f32, //interpolation happens while creating the VDB

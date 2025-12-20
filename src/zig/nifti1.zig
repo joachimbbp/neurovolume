@@ -240,13 +240,20 @@ fn getFPS(hdr: Header) !f32 {
     return fps;
 }
 
-pub fn toVolume(filepath: []const u8, alloc: std.mem.Allocator) !vol.Volume {
-    // WARN: probably needs to be c-compatable
+//TODO: let's actually break out the file loading
+//int a separate function!
+//It's computationally expensive so it would be good
+//to only call that once and then just have
+//a universal volume loading from the frames???
 
-    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // const gpa_alloc = gpa.allocator();
-    // var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    // const arena_alloc = arena.allocator();
+pub fn toVolume(
+    filepath: []const u8,
+    alloc: std.mem.Allocator,
+    playback_fps: f32,
+    speed: f32,
+    effects: []const *const fn (vol: *vol.Volume) [][]f32,
+    interpolation: *const fn (vol: *vol.Volume) [][]f32,
+) !vol.Volume {
 
     //Load File
     const file = try std.fs.cwd().openFile(filepath, .{});
@@ -268,19 +275,30 @@ pub fn toVolume(filepath: []const u8, alloc: std.mem.Allocator) !vol.Volume {
     _ = try file.readAll(raw_data);
     defer alloc.destroy(raw_data);
 
+    const name = util.stripped_basename(filepath);
+    const transform = try getTransform(hdr.*);
+    const fps = try getFPS(hdr);
+    const dims: [3]usize = .{ @intCast(hdr.dim[1]), @intCast(hdr.dim[2]), @intCast(hdr.dim[3]) };
+    const cartesian_order: [3]usize = .{ 0, 1, 2 };
+
+    //TODO: continued, yeah so htis right here would be the volume loading!
     //datatype
     const data_type: DataType = @enumFromInt(hdr.*.datatype);
     const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.*.bitpix, 8));
 
-    const name = util.stripped_basename(filepath);
-    const transform = try getTransform(hdr.*);
-    //    const fps =
-    //TODO: FPS
-
-    //WARN: time offset?
-    const v = vol.Volume{
-        .name = name,
-        .transform = transform,
-    };
     for (0..hdr.dim[4]) |frame_num| {}
+
+    return vol.Volume{
+        .name = name,
+
+        //.frames
+        .transform = transform,
+
+        .source_fps = fps,
+        .playback_fps = playback_fps,
+        .speed = speed,
+
+        .dims = &dims,
+        .c_o = &cartesian_order,
+    };
 }
