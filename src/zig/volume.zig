@@ -16,13 +16,11 @@ pub const Volume = extern struct {
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
 
     dims: *const [3]usize,
-    c_o: *const [3]usize, // Cartesian coordinaes Order
-    // I believe:
-    // 2 1 0 for ndarray
-    // 0 1 2 for nifti1
+    cartesian_order: *const [3]usize, // Cartesian coordinaes Order
+    // I believe: 2 1 0 for ndarray, 0 1 2 for nifti1
 
-    effects: []const *const fn (v: *Volume) [][]f32, //effects are applied on the data in memory
-    interpolation: *const fn (v: *Volume) [][]f32, //interpolation happens while creating the VDB
+    effects: []const *const fn (vol: *Volume) [][]f32, //effects are applied on the data in memory
+    interpolation: *const fn (vol: *Volume) [][]f32, //interpolation happens while creating the VDB
 
     pub fn render_effects(self: *Volume) void {
         for (self.effects) |effect| {
@@ -48,7 +46,7 @@ pub const Volume = extern struct {
                 i += 1;
                 try vdb543.setVoxel(
                     &vdb,
-                    .{ cart[self.c_o[0]], cart[self.c_o[1]], cart[self.c_o[2]] },
+                    .{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] },
                     frame[i],
                     alloc,
                 );

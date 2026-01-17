@@ -52,33 +52,3 @@ pub fn frame_difference(v: *vol.Volume) [][]f32 {
 //blur, sharpen, denoise, etc later!
 // these will be applied frame-wise so we can
 // animate them!
-
-//_: Interpolation Effects
-//TODO:
-pub fn step_print(v: *vol.Volume) [][]f32 {
-    _ = v;
-    //result is source frames stretched to output fps stretched to speed
-
-}
-pub fn cross_fade(v: *vol.Volume) [][]f32 {
-    _ = v;
-}
-
-// pub fn interpolate(v: *vol.Volume) [][]f32 {
-//     switch (v.frame_interpolation) {
-//         vol.FrameInterpolation.step_print => {
-//             std.debug.print("Not implemented yet");
-//         },
-//         vol.FrameInterpolation.cross_fade => {
-//             std.debug.print("Not implemented yet");
-//         },
-//         else => {
-//             std.debug.print("Not implemented yet");
-//         },
-//     }
-// }
-//
-// pub const FrameInterpolation = enum {
-//     step_print, //use this for no interpolation
-//     cross_fade,
-// };

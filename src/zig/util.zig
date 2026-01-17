@@ -7,7 +7,9 @@ const ArrayList = std.array_list.Managed;
 // ... catch |e| { return util.cErr(e); }
 pub fn cErr(e: error{}) usize {
     std.debug.print("ERR: {s}\n", .{e});
-    return 0;
+    return 1;
+    //TODO: other error numbers based on error type
+    //big-ish ticket
 }
 
 //from "/path/to/hamspam.nii.gz"

@@ -124,7 +124,7 @@ def ndarray_to_VDB(
         affine_flat,
         save_path.encode("utf-8"),
     )
-    if res == 0:
+    if res != 0:
         print("error!")
 
 

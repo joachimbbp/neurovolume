@@ -246,9 +246,14 @@ fn getFPS(hdr: Header) !f32 {
 //to only call that once and then just have
 //a universal volume loading from the frames???
 
-pub fn toVolume(
+pub fn loadFrames(
     filepath: []const u8,
     alloc: std.mem.Allocator,
+) .{ [][]f32, Header } {}
+
+//TODO: move this to volume
+pub fn toVolume(
+    //take in the hader too built by loadFrames
     playback_fps: f32,
     speed: f32,
     effects: []const *const fn (vol: *vol.Volume) [][]f32,
@@ -282,6 +287,7 @@ pub fn toVolume(
     const cartesian_order: [3]usize = .{ 0, 1, 2 };
 
     //TODO: continued, yeah so htis right here would be the volume loading!
+    //
     //datatype
     const data_type: DataType = @enumFromInt(hdr.*.datatype);
     const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.*.bitpix, 8));
