@@ -3,15 +3,6 @@ const random = std.crypto.random;
 const eql = std.mem.eql;
 const ArrayList = std.array_list.Managed;
 
-//USAGE:
-// ... catch |e| { return util.cErr(e); }
-pub fn cErr(e: error{}) usize {
-    std.debug.print("ERR: {s}\n", .{e});
-    return 1;
-    //TODO: other error numbers based on error type
-    //big-ish ticket
-}
-
 //from "/path/to/hamspam.nii.gz"
 //returns "hamspam"
 pub fn stripped_basename(path: []const u8) []const u8 {

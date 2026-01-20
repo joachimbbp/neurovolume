@@ -93,8 +93,8 @@ def ndarray_to_VDB(
 
     Parameters:
     ---------
-    arr: numpy.ndarray
-        The ndarray you wish to conver
+    arr: numpy.ndarray (must be 3 or 4D)
+        The ndarray you wish to convert
     save_path: str
         Full filepath for the .vdb
     transform: numpy.ndarray
@@ -111,21 +111,21 @@ def ndarray_to_VDB(
 
     dims = np.array(arr.shape, dtype=np.uint64)
 
-    nvol.ndArrayToVDB_c.argtypes = [
-        np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
-        c.POINTER(c.c_size_t),
-        np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
-        c.c_char_p,
-    ]
-    nvol.ndArrayToVDB_c.restype = c.c_size_t
-    res = nvol.ndArrayToVDB_c(
-        arr,
-        dims.ctypes.data_as(c.POINTER(c.c_size_t)),
-        affine_flat,
-        save_path.encode("utf-8"),
-    )
+    # nvol.ndArrayToVDB_c.argtypes = [
+    #     np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
+    #     c.POINTER(c.c_size_t),
+    #     np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
+    #     c.c_char_p,
+    # ]
+    # nvol.ndArrayToVDB_c.restype = c.c_size_t
+    # res = nvol.ndArrayToVDB_c(
+    #     arr,
+    #     dims.ctypes.data_as(c.POINTER(c.c_size_t)),
+    #     affine_flat,
+    #     save_path.encode("utf-8"),
+    # )
     if res != 0:
-        print("error!")
+        print(f"error of type {res}")
 
 
 def nifti1_to_VDB(
