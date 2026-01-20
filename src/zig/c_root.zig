@@ -2,16 +2,20 @@ const ndarray = @import("ndarray.zig");
 const Volume = @import("volume.zig").Volume;
 const std = @import("std");
 
+// C level
+// Converts a 3D ndarray into a frame and appends it to a volume
+// For sequences, iterate through the 4th dimension
 pub export fn toFrame(
-    data: []f32,
+    data_ptr: [*]f32,
+    data_len: usize,
     frame_num: usize,
     volume: *Volume,
 ) usize {
-    //LLM:
-    if (frame_num >= volume.frame_count) return cErr(error.IndexOutOfBounds);
-    const frame_size = volume.dims[0] * volume.dims[1] * volume.dims[2];
-    volume.frames[frame_num] = data[0..frame_size];
-    return 0; // success
+    const data = data_ptr[0..data_len];
+    ndarray.toFrame(&data, frame_num, volume) catch |e| {
+        return cErr(e).code;
+    };
+    return 0;
 }
 
 //_: ERROR UTILS:
