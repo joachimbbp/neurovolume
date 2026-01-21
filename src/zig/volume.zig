@@ -1,32 +1,29 @@
 const std = @import("std");
 const nifti1 = @import("nifti1.zig");
 const util = @import("util.zig");
-const cErr = util.cErr;
 const vdb543 = @import("vdb543.zig");
 
-pub const Volume = extern struct {
+pub const Volume = struct {
     //Loaded from source
-    name: [*:0]const u8,
+    name: []const u8,
 
-    frames: [*]const []f32,
-    transform: *const [4][4]f64,
+    frames: []const []f32,
+    transform: [4][4]f64,
 
     source_fps: f32,
     playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
 
-    dims: *const [3]usize,
-    cartesian_order: *const [3]usize, // Cartesian coordinaes Order
+    dims: [3]usize,
+    cartesian_order: [3]usize, // Cartesian coordinaes Order
     // I believe: 2 1 0 for ndarray, 0 1 2 for nifti1
 
     effects: []const *const fn (vol: *Volume) [][]f32, //effects are applied on the data in memory
     interpolation: *const fn (vol: *Volume) [][]f32, //interpolation happens while creating the VDB
 
-    pub fn render_effects(self: *Volume) void {
+    pub fn render_effects(self: *Volume) !void {
         for (self.effects) |effect| {
-            self.frames = effect(self) catch |e| {
-                cErr(e);
-            };
+            self.frames = try effect(self);
         }
     }
 
@@ -35,10 +32,8 @@ pub const Volume = extern struct {
         alloc: std.mem.Allocator,
         save_path: [*:0]const u8,
         overwrite: bool, //if false, will version file
-    ) usize {
-        var vdb = vdb543.VDB.build(alloc) catch |e| {
-            return cErr(e);
-        };
+    ) !void {
+        var vdb = try vdb543.VDB.build(alloc);
         for (self.frames) |frame| {
             var cart = [_]u32{ 0, 0, 0 };
             var i: usize = 0;
@@ -56,9 +51,8 @@ pub const Volume = extern struct {
             defer buffer.deinit();
 
             if (overwrite) {
-                const file = std.fs.cwd().createFile(save_path, .{}) catch |e| {
-                    cErr(e);
-                };
+                const file = try std.fs.cwd().createFile(save_path, .{});
+
                 try file.writeAll(buffer.items);
                 defer file.close();
             } else {

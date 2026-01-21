@@ -2,21 +2,77 @@ const ndarray = @import("ndarray.zig");
 const Volume = @import("volume.zig").Volume;
 const std = @import("std");
 
-// C level
 // Converts a 3D ndarray into a frame and appends it to a volume
 // For sequences, iterate through the 4th dimension
-pub export fn toFrame(
+// Returns error code
+pub export fn ndarrayToFrame(
     data_ptr: [*]f32,
     data_len: usize,
     frame_num: usize,
     volume: *Volume,
-) usize {
+) c_int {
     const data = data_ptr[0..data_len];
     ndarray.toFrame(&data, frame_num, volume) catch |e| {
         return cErr(e).code;
     };
     return 0;
 }
+
+pub export fn volumeInit(
+    name_ptr: [*:0]const u8,
+    num_frames: usize,
+    transform_flat: *const [16]f64,
+    source_fps: f32,
+    playback_fps: f32,
+    speed: f32,
+    dims: *const [3]usize,
+    cartesian_order: *const [3]usize,
+    allocator: *std.mem.Allocator,
+    out_volume: **Volume,
+) c_int {
+    //LLM: funciton body LLM generated
+    // Allocate the Volume
+    const volume = allocator.create(Volume) catch |e| {
+        return cErr(e).code;
+    };
+
+    // Reshape flat transform into [4][4]f64
+    var transform: [4][4]f64 = undefined;
+    for (0..4) |i| {
+        for (0..4) |j| {
+            transform[i][j] = transform_flat[i * 4 + j];
+        }
+    }
+
+    // Allocate frames slice (initially empty slices)
+    const frames = allocator.alloc([]const f32, num_frames) catch |e| {
+        allocator.destroy(volume);
+        return cErr(e).code;
+    };
+    // Initialize each frame to empty
+    for (frames) |*frame| {
+        frame.* = &[_]f32{};
+    }
+
+    // Initialize the Volume
+    volume.* = Volume{
+        .name = name_ptr,
+        .frames = frames,
+        .transform = transform,
+        .source_fps = source_fps,
+        .playback_fps = playback_fps,
+        .speed = speed,
+        .dims = dims.*,
+        .cartesian_order = cartesian_order.*,
+        .effects = &[_]*const fn (*Volume) [][]f32{},
+        .interpolation = undefined, // Must be set later
+    };
+
+    out_volume.* = volume;
+    return 0;
+}
+
+//TODO: Volume apply effects and interpolation
 
 //_: ERROR UTILS:
 pub fn cErr(e: anyerror) CError {

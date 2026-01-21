@@ -22,7 +22,7 @@ lib = ctypes.CDLL(str(lib_path))
 
 # _: Main code:
 
-nvol = c.cdll.LoadLibrary(lib_path)  # Neurovolume library
+nv = c.cdll.LoadLibrary(lib_path)  # Neurovolume library
 
 
 def b(string):
@@ -46,7 +46,7 @@ def get_folder(path):
 
 def hello():
     """Prints 'hello neurovolume' from the c_root.zig"""
-    nvol.hello()
+    nv.hello()
 
 
 def prep_ndarray(
@@ -80,53 +80,55 @@ def prep_ndarray(
     arr = np.array(arr, order="C", dtype=np.float32)
     return arr
 
+def volume_init(
+    
 
-def ndarray_to_VDB(
-    arr: np.ndarray,
-    save_path: str,
-    transform: np.ndarray = None,  # DEPRECATED:
-):
-    """
-    Creates a VDB file from an ndarray.
-    use prep_ndarray to prepprocess ndarrays coming straight
-    out of nibabel or ANTs (might work on other data too)
 
-    Parameters:
-    ---------
-    arr: numpy.ndarray (must be 3 or 4D)
-        The ndarray you wish to convert
-    save_path: str
-        Full filepath for the .vdb
-    transform: numpy.ndarray
-    """
-    # LLM: full up copypasta error handling
-    parent_dir = os.path.dirname(save_path)
-    if parent_dir and not os.path.exists(parent_dir):
-        raise FileNotFoundError(f"Parent directory does not exist: {parent_dir}")
-
-    # LOTS OF LLM: here
-    if transform is None:  # WARN: I wonder if this should be an option????
-        transform = np.eye(4, dtype=np.float64)
-    affine_flat = transform.flatten().astype(np.float64)
-
-    dims = np.array(arr.shape, dtype=np.uint64)
-
-    # nvol.ndArrayToVDB_c.argtypes = [
-    #     np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
-    #     c.POINTER(c.c_size_t),
-    #     np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
-    #     c.c_char_p,
-    # ]
-    # nvol.ndArrayToVDB_c.restype = c.c_size_t
-    # res = nvol.ndArrayToVDB_c(
-    #     arr,
-    #     dims.ctypes.data_as(c.POINTER(c.c_size_t)),
-    #     affine_flat,
-    #     save_path.encode("utf-8"),
-    # )
-    if res != 0:
-        print(f"error of type {res}")
-
+# def ndarray_to_VDB(
+#     arr: np.ndarray,
+#     save_path: str,
+#     transform: np.ndarray = None,  # DEPRECATED:
+# ):
+#     """
+#     Creates a VDB file from an ndarray.
+#     use prep_ndarray to prepprocess ndarrays coming straight
+#     out of nibabel or ANTs (might work on other data too)
+#
+#     Parameters:
+#     ---------
+#     arr: numpy.ndarray (must be 3 or 4D)
+#         The ndarray you wish to convert
+#     save_path: str
+#         Full filepath for the .vdb
+#     transform: numpy.ndarray
+#     """
+#     # LLM: full up copypasta error handling
+#     parent_dir = os.path.dirname(save_path)
+#     if parent_dir and not os.path.exists(parent_dir):
+#         raise FileNotFoundError(f"Parent directory does not exist: {parent_dir}")
+#
+#     # LOTS OF LLM: here
+#     if transform is None:  # WARN: I wonder if this should be an option????
+#         transform = np.eye(4, dtype=np.float64)
+#     affine_flat = transform.flatten().astype(np.float64)
+#
+#     dims = np.array(arr.shape, dtype=np.uint64)
+#
+#     nv.ndarrayToFrame.argtypes = [
+#         np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
+#         c.POINTER(c.c_size_t),
+#         np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
+#         c.c_char_p,
+#     ]
+#     # nvol.ndArrayToVDB_c.restype = c.c_size_t    # res = nvol.ndArrayToVDB_c(
+#     #     arr,
+#     #     dims.ctypes.data_as(c.POINTER(c.c_size_t)),
+#     #     affine_flat,
+#     #     save_path.encode("utf-8"),
+#     # )
+#     if res != 0:
+#         print(f"error of type {res}")
+#
 
 def nifti1_to_VDB(
     nifti_path: str,
@@ -144,15 +146,15 @@ def nifti1_to_VDB(
     """
     BUF_SIZE = 4096  # somewhat arbitrary, should be big enough for file name
     save_location = c.create_string_buffer(BUF_SIZE)
-    nvol.nifti1ToVDB_c.argtypes = [
+    nv.nifti1ToVDB_c.argtypes = [
         c.c_char_p,
         c.c_char_p,
         c.c_bool,
         c.POINTER(c.c_char),
         c.c_size_t,
     ]
-    nvol.nifti1ToVDB_c.restype = c.c_size_t
-    nvol.nifti1ToVDB_c(b(nifti_path), b(output_dir), normalize, save_location, BUF_SIZE)
+    nv.nifti1ToVDB_c.restype = c.c_size_t
+    nv.nifti1ToVDB_c(b(nifti_path), b(output_dir), normalize, save_location, BUF_SIZE)
 
     return save_location.value.decode()
 
@@ -164,12 +166,12 @@ def nifti1_to_VDB(
 def num_frames(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
-            nvol.numFrames_c.argtypes = [
+            nv.numFrames_c.argtypes = [
                 c.c_char_p,
                 c.c_char_p,
             ]
-            nvol.numFrames_c.restype = c.c_size_t
-            num_frames = nvol.numFrames_c(b(filepath), b(filetype))
+            nv.numFrames_c.restype = c.c_size_t
+            num_frames = nv.numFrames_c(b(filepath), b(filetype))
             return num_frames
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
@@ -179,9 +181,9 @@ def num_frames(filepath: str, filetype: str) -> int:
 def pixdim(filepath: str, filetype: str, dim: int) -> float:
     match filetype:
         case "NIfTI1":
-            nvol.pixdim_c.argtypes = [c.c_char_p, c.c_char_p, c.c_int]
-            nvol.pixdim_c.restype = c.c_float
-            pixdim = nvol.pixdim_c(b(filepath), b(filetype), dim)
+            nv.pixdim_c.argtypes = [c.c_char_p, c.c_char_p, c.c_int]
+            nv.pixdim_c.restype = c.c_float
+            pixdim = nv.pixdim_c(b(filepath), b(filetype), dim)
             return pixdim
         case _:
             err_msg = f"{filetype} is unsupported for pixdim access"
@@ -192,12 +194,12 @@ def pixdim(filepath: str, filetype: str, dim: int) -> float:
 def slice_duration(filepath: str, filetype: str) -> int:
     match filetype:
         case "NIfTI1":
-            nvol.sliceDuration_c.argtypes = [
+            nv.sliceDuration_c.argtypes = [
                 c.c_char_p,
                 c.c_char_p,
             ]
-            nvol.sliceDuration_c.restype = c.c_size_t
-            slice_duration = nvol.sliceDuration_c(b(filepath), b(filetype))
+            nv.sliceDuration_c.restype = c.c_size_t
+            slice_duration = nv.sliceDuration_c(b(filepath), b(filetype))
             return slice_duration
         case _:
             err_msg = f"{filetype} is unsupported for slice_duration access"
@@ -207,15 +209,15 @@ def slice_duration(filepath: str, filetype: str) -> int:
 def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     BUF_SIZE = 64  # generously padded, tbh
     unit_name = c.create_string_buffer(BUF_SIZE)
-    nvol.unit_c.argtypes = [
+    nv.unit_c.argtypes = [
         c.c_char_p,
         c.c_char_p,
         c.c_char_p,
         c.POINTER(c.c_char),
         c.c_size_t,
     ]
-    nvol.unit_c.restype = c.c_size_t
-    nvol.unit_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
+    nv.unit_c.restype = c.c_size_t
+    nv.unit_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
     return unit_name.value.decode()
 
 
