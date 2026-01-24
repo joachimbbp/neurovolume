@@ -412,6 +412,7 @@ const test_patterns = @import("test_patterns.zig");
 //Use "tmp" to use the tmp folder in zig cache
 pub fn sphereTest(comptime save_dir: []const u8) !void {
     //NICE: I think this is a good convention for allocators and arena allocators
+    //FIX: upon using this, it's a little clunky. See nifti1.toVolume for a better option
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();

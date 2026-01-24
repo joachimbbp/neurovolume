@@ -119,18 +119,21 @@ fn getValue( //prbably nifti1 specific!
 }
 
 pub fn getAt4D(
-    self: *const Image,
+    //metadata read
+    header: Header,
+    //positions:
     xpos: usize,
     ypos: usize,
     zpos: usize,
     tpos: usize,
+    //normalization:
     normalize: bool,
     minmax: [2]f32,
 ) !f32 {
-    const nx: usize = @intCast(self.header.dim[1]);
-    const ny: usize = @intCast(self.header.dim[2]);
-    const nz: usize = @intCast(self.header.dim[3]);
-
+    const nx: usize = @intCast(header.dim[1]);
+    const ny: usize = @intCast(header.dim[2]);
+    const nz: usize = @intCast(header.dim[3]);
+    //BOOKMARK:
     const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
 
     const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
@@ -241,12 +244,12 @@ fn getFPS(hdr: Header) !f32 {
 }
 
 pub fn toVolume(
+    allocator: std.mem.Allocator,
     //take in the hader too built by loadFrames
     filepath: []const u8,
     playback_fps: f32,
     speed: f32,
 ) !vol.Volume {
-    const nifti_alloc = std.heap.GeneralPurposeAllocator(.{}){};
 
     //Load File
     const file = try std.fs.cwd().openFile(filepath, .{});
@@ -255,18 +258,22 @@ pub fn toVolume(
     //Load Header
     const reader = std.fs.File.deprecatedReader(file);
 
-    const hdr = try nifti_alloc.create(Header);
+    const hdr = try allocator().create(Header);
     hdr.* = try reader.readStruct(Header);
-    defer nifti_alloc.destroy(hdr);
 
     //Load Data
     const vox_offset = @as(u32, @intFromFloat(hdr.voxOffset));
     try file.seekTo(vox_offset);
     const file_size = try file.getEndPos();
 
-    const raw_data = try nifti_alloc.alloc(u8, (file_size - vox_offset));
+    //LLM: suggested revision of this line:
+    const raw_data = try allocator().create(u8, (file_size - vox_offset));
     _ = try file.readAll(raw_data);
-    defer nifti_alloc.destroy(raw_data);
+
+    //TODO: create frame list
+    //?: is that the best intermediary? Ithink so!
+    //will need to re-implement getAt as not a method
+    //and call it here!
 
     const name = util.stripped_basename(filepath);
     const transform = try getTransform(hdr.*);
@@ -274,32 +281,11 @@ pub fn toVolume(
     const dims: [3]usize = .{ @intCast(hdr.dim[1]), @intCast(hdr.dim[2]), @intCast(hdr.dim[3]) };
     const cartesian_order: [3]usize = .{ 0, 1, 2 };
 
-    //TODO: continued, yeah so htis right here would be the volume loading!
-    //
-    //datatype
     const data_type: DataType = @enumFromInt(hdr.*.datatype);
     const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.*.bitpix, 8));
 
-    var frames = std.array_list.Managed([]f32);
-
-    //BOOKMARK: okay hereis where you'd call volume.Init with the info you need!
-    //
-    // for (0..hdr.dim[4]) |frame_num| {
-    //
-    //
-    // }
-
-    return vol.Volume{
-        .name = name,
-
-        //.frames
-        .transform = transform,
-
-        .source_fps = fps,
-        .playback_fps = playback_fps,
-        .speed = speed,
-
-        .dims = &dims,
-        .c_o = &cartesian_order,
-    };
+    const volume = try vol.Volume.init(
+        allocator,
+        name,
+    );
 }

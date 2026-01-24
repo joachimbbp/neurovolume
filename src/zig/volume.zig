@@ -17,17 +17,18 @@ pub const Volume = struct {
     // I believe: 2 1 0 for ndarray, 0 1 2 for nifti1
 
     pub fn init(
+        base_allocator: std.mem.Allocator,
         name: []const u8,
-        frame_allocator: std.heap.ArenaAllocator,
         frame_list: [*][]f32,
         transform: [4][4]f64,
         source_fps: f32,
         playback_fps: f32,
         speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
-
         dims: [3]usize,
         cartesian_order: [3]usize, // Cartesian coordinaes Order
     ) !Volume {
+        const frame_allocator = std.heap.ArenaAllocator.init(base_allocator);
+
         var frames = std.ArrayList([]f32).init(frame_allocator);
         for (frame_list) |f| {
             try frames.append(f);
@@ -45,7 +46,10 @@ pub const Volume = struct {
         };
     }
 
-    //TODO: deinit
+    pub fn deinit(self: *Volume) void {
+        self.frame_allocator.deinit();
+    }
+
     pub fn toVDB(
         self: *Volume,
         alloc: std.mem.Allocator,
