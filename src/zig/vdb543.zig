@@ -144,7 +144,12 @@ fn getBitIndex0(position: [3]u32) u32 {
     return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
 
-pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f32, allocator: std.mem.Allocator) !void {
+pub fn setVoxel(
+    vdb: *VDB,
+    position: [3]u32,
+    value: f32,
+    allocator: std.mem.Allocator,
+) !void {
     var node_5: *Node5 = vdb.five_node;
 
     const bit_index_4 = getBitIndex4(position);

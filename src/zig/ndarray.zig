@@ -4,6 +4,9 @@ const util = @import("util.zig");
 const Volume = @import("volume.zig").Volume;
 const constants = @import("constants.zig");
 
+//TODO:
+//Zig level toVolume (will call loop on toFrame
+
 //Converts a 3D ndarray into a frame and appends it to a volume
 //For sequences, iterate through the 4th dimension
 pub fn toFrame(

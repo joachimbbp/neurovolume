@@ -1,6 +1,7 @@
 const ndarray = @import("ndarray.zig");
 const Volume = @import("volume.zig").Volume;
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 
 // Converts a 3D ndarray into a frame and appends it to a volume
 // For sequences, iterate through the 4th dimension
@@ -19,24 +20,21 @@ pub export fn ndarrayToFrame(
 }
 
 pub export fn volumeInit(
+    //BOOKMARK: return to this later after you get nifti1 working natively!
     name_ptr: [*:0]const u8,
-    num_frames: usize,
+    data: [*]const f32, //all frames flattened
     transform_flat: *const [16]f64,
     source_fps: f32,
     playback_fps: f32,
     speed: f32,
     dims: *const [3]usize,
     cartesian_order: *const [3]usize,
-    allocator: *std.mem.Allocator,
     out_volume: **Volume,
 ) c_int {
-    //LLM: funciton body LLM generated
-    // Allocate the Volume
-    const volume = allocator.create(Volume) catch |e| {
-        return cErr(e).code;
-    };
-
-    // Reshape flat transform into [4][4]f64
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa_alloc = gpa.allocator();
+    defer _ = gpa.deinit();
+    // Reshape flat transform into [4][4]f64 LLM:
     var transform: [4][4]f64 = undefined;
     for (0..4) |i| {
         for (0..4) |j| {
@@ -44,18 +42,18 @@ pub export fn volumeInit(
         }
     }
 
-    // Allocate frames slice (initially empty slices)
-    const frames = allocator.alloc([]const f32, num_frames) catch |e| {
-        allocator.destroy(volume);
-        return cErr(e).code;
-    };
-    // Initialize each frame to empty
-    for (frames) |*frame| {
-        frame.* = &[_]f32{};
+    const frame_size = dims[0] * dims[1] * dims[2];
+    const num_frames = data / frame_size;
+
+    var frames = std.array_list.Managed([]f32).init(gpa_alloc);
+    for (0..num_frames) |f| {
+        const pos = f * frame_size;
+        const end = pos + frame_size;
+        frames.append(data[pos..end]);
     }
 
     // Initialize the Volume
-    volume.* = Volume{
+    const volume = Volume{
         .name = name_ptr,
         .frames = frames,
         .transform = transform,
@@ -71,6 +69,8 @@ pub export fn volumeInit(
     out_volume.* = volume;
     return 0;
 }
+
+//TODO: volume deinit (either here or in volume.zig)
 
 //TODO: Volume apply effects and interpolation
 

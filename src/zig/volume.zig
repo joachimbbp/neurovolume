@@ -4,12 +4,10 @@ const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 
 pub const Volume = struct {
-    //Loaded from source
     name: []const u8,
-
-    frames: []const []f32,
+    frames: std.ArrayList([]f32),
+    frame_allocator: std.heap.ArenaAllocator,
     transform: [4][4]f64,
-
     source_fps: f32,
     playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
@@ -18,15 +16,36 @@ pub const Volume = struct {
     cartesian_order: [3]usize, // Cartesian coordinaes Order
     // I believe: 2 1 0 for ndarray, 0 1 2 for nifti1
 
-    effects: []const *const fn (vol: *Volume) [][]f32, //effects are applied on the data in memory
-    interpolation: *const fn (vol: *Volume) [][]f32, //interpolation happens while creating the VDB
+    pub fn init(
+        name: []const u8,
+        frame_allocator: std.heap.ArenaAllocator,
+        frame_list: [*][]f32,
+        transform: [4][4]f64,
+        source_fps: f32,
+        playback_fps: f32,
+        speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
 
-    pub fn render_effects(self: *Volume) !void {
-        for (self.effects) |effect| {
-            self.frames = try effect(self);
+        dims: [3]usize,
+        cartesian_order: [3]usize, // Cartesian coordinaes Order
+    ) !Volume {
+        var frames = std.ArrayList([]f32).init(frame_allocator);
+        for (frame_list) |f| {
+            try frames.append(f);
         }
+        return .{
+            .name = name,
+            .frames = frames,
+            .frame_allocator = frame_allocator,
+            .transform = transform,
+            .source_fps = source_fps,
+            .playback_fps = playback_fps,
+            .speed = speed,
+            .dims = dims,
+            .cartesian_order = cartesian_order,
+        };
     }
 
+    //TODO: deinit
     pub fn toVDB(
         self: *Volume,
         alloc: std.mem.Allocator,
@@ -41,7 +60,11 @@ pub const Volume = struct {
                 i += 1;
                 try vdb543.setVoxel(
                     &vdb,
-                    .{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] },
+                    .{
+                        cart[self.cartesian_order[0]],
+                        cart[self.cartesian_order[1]],
+                        cart[self.cartesian_order[2]],
+                    },
                     frame[i],
                     alloc,
                 );

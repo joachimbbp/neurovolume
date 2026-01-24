@@ -240,25 +240,13 @@ fn getFPS(hdr: Header) !f32 {
     return fps;
 }
 
-//TODO: let's actually break out the file loading
-//int a separate function!
-//It's computationally expensive so it would be good
-//to only call that once and then just have
-//a universal volume loading from the frames???
-
-pub fn loadFrames(
-    filepath: []const u8,
-    alloc: std.mem.Allocator,
-) .{ [][]f32, Header } {}
-
-//TODO: move this to volume
 pub fn toVolume(
     //take in the hader too built by loadFrames
+    filepath: []const u8,
     playback_fps: f32,
     speed: f32,
-    effects: []const *const fn (vol: *vol.Volume) [][]f32,
-    interpolation: *const fn (vol: *vol.Volume) [][]f32,
 ) !vol.Volume {
+    const nifti_alloc = std.heap.GeneralPurposeAllocator(.{}){};
 
     //Load File
     const file = try std.fs.cwd().openFile(filepath, .{});
@@ -267,18 +255,18 @@ pub fn toVolume(
     //Load Header
     const reader = std.fs.File.deprecatedReader(file);
 
-    const hdr = try alloc.create(Header);
+    const hdr = try nifti_alloc.create(Header);
     hdr.* = try reader.readStruct(Header);
-    defer alloc.destroy(hdr);
+    defer nifti_alloc.destroy(hdr);
 
     //Load Data
     const vox_offset = @as(u32, @intFromFloat(hdr.voxOffset));
     try file.seekTo(vox_offset);
     const file_size = try file.getEndPos();
 
-    const raw_data = try alloc.alloc(u8, (file_size - vox_offset));
+    const raw_data = try nifti_alloc.alloc(u8, (file_size - vox_offset));
     _ = try file.readAll(raw_data);
-    defer alloc.destroy(raw_data);
+    defer nifti_alloc.destroy(raw_data);
 
     const name = util.stripped_basename(filepath);
     const transform = try getTransform(hdr.*);
@@ -292,7 +280,14 @@ pub fn toVolume(
     const data_type: DataType = @enumFromInt(hdr.*.datatype);
     const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.*.bitpix, 8));
 
-    for (0..hdr.dim[4]) |frame_num| {}
+    var frames = std.array_list.Managed([]f32);
+
+    //BOOKMARK: okay hereis where you'd call volume.Init with the info you need!
+    //
+    // for (0..hdr.dim[4]) |frame_num| {
+    //
+    //
+    // }
 
     return vol.Volume{
         .name = name,
