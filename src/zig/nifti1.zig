@@ -118,40 +118,46 @@ fn getValue( //prbably nifti1 specific!
     return res_value;
 }
 
-pub fn getAt4D(
-    //metadata read
-    header: Header,
-    //positions:
-    xpos: usize,
-    ypos: usize,
-    zpos: usize,
-    tpos: usize,
-    //normalization:
-    normalize: bool,
-    minmax: [2]f32,
-) !f32 {
-    const nx: usize = @intCast(header.dim[1]);
-    const ny: usize = @intCast(header.dim[2]);
-    const nz: usize = @intCast(header.dim[3]);
-    //BOOKMARK:
-    const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
-
-    const bit_start: usize = idx * @as(usize, @intCast(self.bytes_per_voxel));
-    const bit_end: usize = (idx + 1) * @as(usize, @intCast(self.bytes_per_voxel));
-
-    const raw_value = try byteToFloat(self.data, self.bytes_per_voxel, bit_start, bit_end);
-
-    var post_slope = raw_value;
-    if (self.header.sclSlope != 0) {
-        post_slope = self.header.sclSlope * raw_value + self.header.sclInter;
-    }
-
-    if (normalize) {
-        return (post_slope - minmax[0]) / (minmax[1] - minmax[0]); //TODO: calc the denom only once
-    } else {
-        return post_slope;
-    }
-}
+//DEPRECATED: (i think)
+// pub fn getAt4D(
+//     //Source data
+//     header: Header,
+//     data: []const u8,
+//     //positions:
+//     xpos: usize,
+//     ypos: usize,
+//     zpos: usize,
+//     tpos: usize,
+//     //normalization:
+//     normalize: bool,
+//     //    minmax: [2]f32,
+//     min_val: f32, //minmax[0]
+//     minmax_delta: f32, //minax[1] - minmax[0]
+// ) !f32 {
+//     const bytes_per_voxel: u16 = @intCast(@divTrunc(header.bitpix, 8));
+//
+//     const nx: usize = @intCast(header.dim[1]);
+//     const ny: usize = @intCast(header.dim[2]);
+//     const nz: usize = @intCast(header.dim[3]);
+//     const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
+//
+//     const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
+//     const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
+//
+//     const raw_value = try byteToFloat(data, bytes_per_voxel, bit_start, bit_end);
+//
+//     var post_slope = raw_value;
+//     if (header.sclSlope != 0) {
+//         post_slope = header.sclSlope * raw_value + header.sclInter;
+//     }
+//
+//     if (normalize) {
+//         return (post_slope - min_val) / minmax_delta;
+//     } else {
+//         return post_slope;
+//     }
+// }
+//
 pub fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {
     const ValType = switch (bytes_per_voxel) {
         2 => i16,
@@ -162,7 +168,7 @@ pub fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize,
     return @floatFromInt(val);
 }
 
-pub fn getHeader(filepath: []const u8) !*const Header {
+pub fn load(filepath: []const u8) !struct { header_pointer: *Header, data: []u8 } {
     const allocator = &std.heap.page_allocator;
     //Load File
     const file = try std.fs.cwd().openFile(filepath, .{});
@@ -182,7 +188,7 @@ pub fn getHeader(filepath: []const u8) !*const Header {
     const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
     _ = try file.readAll(raw_data);
 
-    return header_ptr;
+    return .{ .header_pointer = header_ptr, .data = raw_data };
 }
 
 fn getTransform(h: Header) ![4][4]f64 {
