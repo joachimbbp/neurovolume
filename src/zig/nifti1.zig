@@ -14,7 +14,8 @@ pub const Header = extern struct {
     _regular: u8,
     dimInfo: u8, //key for MRI slice ordering
 
-    dim: [8]i16,
+    dim: [8]i16, //number of dimensions, x, y, z, t, optional, optional, optional
+    //if dim[0] is not between 1-7, assume opposite endianness and byte swap
     intentP1: f32,
     intentP2: f32,
     intentP3: f32,
@@ -117,47 +118,45 @@ fn getValue( //prbably nifti1 specific!
     }
     return res_value;
 }
+pub fn getAt4D(
+    //Source data
+    hdr: Header,
+    data: []const u8,
+    //positions:
+    xpos: usize,
+    ypos: usize,
+    zpos: usize,
+    tpos: usize,
+    //normalization:
+    normalize: bool,
+    //    minmax: [2]f32,
+    min_val: f32, //minmax[0]
+    minmax_delta: f32, //minax[1] - minmax[0]
+) !f32 {
+    const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.bitpix, 8));
 
-//DEPRECATED: (i think)
-// pub fn getAt4D(
-//     //Source data
-//     header: Header,
-//     data: []const u8,
-//     //positions:
-//     xpos: usize,
-//     ypos: usize,
-//     zpos: usize,
-//     tpos: usize,
-//     //normalization:
-//     normalize: bool,
-//     //    minmax: [2]f32,
-//     min_val: f32, //minmax[0]
-//     minmax_delta: f32, //minax[1] - minmax[0]
-// ) !f32 {
-//     const bytes_per_voxel: u16 = @intCast(@divTrunc(header.bitpix, 8));
-//
-//     const nx: usize = @intCast(header.dim[1]);
-//     const ny: usize = @intCast(header.dim[2]);
-//     const nz: usize = @intCast(header.dim[3]);
-//     const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
-//
-//     const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
-//     const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
-//
-//     const raw_value = try byteToFloat(data, bytes_per_voxel, bit_start, bit_end);
-//
-//     var post_slope = raw_value;
-//     if (header.sclSlope != 0) {
-//         post_slope = header.sclSlope * raw_value + header.sclInter;
-//     }
-//
-//     if (normalize) {
-//         return (post_slope - min_val) / minmax_delta;
-//     } else {
-//         return post_slope;
-//     }
-// }
-//
+    const nx: usize = @intCast(hdr.dim[1]);
+    const ny: usize = @intCast(hdr.dim[2]);
+    const nz: usize = @intCast(hdr.dim[3]);
+    const idx: usize = tpos * nx * ny * nz + zpos * nx * ny + ypos * nx + xpos;
+
+    const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
+    const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
+
+    const raw_value = try byteToFloat(data, bytes_per_voxel, bit_start, bit_end);
+
+    var post_slope = raw_value;
+    if (hdr.sclSlope != 0) {
+        post_slope = hdr.sclSlope * raw_value + hdr.sclInter;
+    }
+
+    if (normalize) {
+        return (post_slope - min_val) / minmax_delta;
+    } else {
+        return post_slope;
+    }
+}
+
 pub fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {
     const ValType = switch (bytes_per_voxel) {
         2 => i16,
@@ -168,8 +167,12 @@ pub fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize,
     return @floatFromInt(val);
 }
 
-pub fn load(filepath: []const u8) !struct { header_pointer: *Header, data: []u8 } {
-    const allocator = &std.heap.page_allocator;
+const Nifti1Unpacked = struct { hdr: *Header, data: *[]u8 };
+
+pub fn load(
+    allocator: std.mem.Allocator,
+    filepath: []const u8,
+) !Nifti1Unpacked {
     //Load File
     const file = try std.fs.cwd().openFile(filepath, .{});
     defer file.close();
@@ -185,10 +188,11 @@ pub fn load(filepath: []const u8) !struct { header_pointer: *Header, data: []u8 
     try file.seekTo(vox_offset);
     const file_size = try file.getEndPos();
 
+    //LLM: suggested revision of this line:
     const raw_data = try allocator.alloc(u8, (file_size - vox_offset));
     _ = try file.readAll(raw_data);
 
-    return .{ .header_pointer = header_ptr, .data = raw_data };
+    return .{ .hdr = header_ptr, .data = &raw_data };
 }
 
 fn getTransform(h: Header) ![4][4]f64 {
@@ -228,7 +232,7 @@ fn getUnits(
     return .{ space, time };
 }
 
-fn getFPS(hdr: Header) !f32 {
+fn getFPS(hdr: *Header) !f32 {
     const num_frames = hdr.dim[4];
     if (num_frames == 1) {
         //static file, thus fps of 0
@@ -249,6 +253,19 @@ fn getFPS(hdr: Header) !f32 {
     return fps;
 }
 
+fn makeFrameList(n1u: Nifti1Unpacked) ![*][]f32 {
+    const data_type: DataType = @enumFromInt(n1u.hdr_ptr.datatype);
+    const bytes_per_voxel: u16 = @intCast(@divTrunc(n1u.hdr_ptr.bitpix, 8));
+    const num_voxels = n1u.hdr.dim[1] * n1u.hdr.dim[2] * n1u.hdr.dim[2];
+
+    var frame_list = [*][]f32;
+    for (0..num_voxels) |v| {
+        //BOOKMARK: increment cartesian or something here?
+        // Basically: get the data from the nifti1 and set the list!
+
+    }
+}
+
 pub fn toVolume(
     allocator: std.mem.Allocator,
     //take in the hader too built by loadFrames
@@ -256,39 +273,22 @@ pub fn toVolume(
     playback_fps: f32,
     speed: f32,
 ) !vol.Volume {
+    const n1u = try load(allocator, filepath);
+    const name = util.stripped_basename(filepath);
+    const transform = try getTransform(n1u.hdr);
 
-    //Load File
-    const file = try std.fs.cwd().openFile(filepath, .{});
-    defer file.close();
-
-    //Load Header
-    const reader = std.fs.File.deprecatedReader(file);
-
-    const hdr = try allocator().create(Header);
-    hdr.* = try reader.readStruct(Header);
-
-    //Load Data
-    const vox_offset = @as(u32, @intFromFloat(hdr.voxOffset));
-    try file.seekTo(vox_offset);
-    const file_size = try file.getEndPos();
-
-    //LLM: suggested revision of this line:
-    const raw_data = try allocator().create(u8, (file_size - vox_offset));
-    _ = try file.readAll(raw_data);
+    const fps = try getFPS(n1u.hdr);
+    const dims: [3]usize = .{
+        @intCast(n1u.hdr.dim[1]),
+        @intCast(n1u.hdr.dim[2]),
+        @intCast(n1u.hdr.dim[3]),
+    };
+    const cartesian_order: [3]usize = .{ 0, 1, 2 };
 
     //TODO: create frame list
     //?: is that the best intermediary? Ithink so!
     //will need to re-implement getAt as not a method
     //and call it here!
-
-    const name = util.stripped_basename(filepath);
-    const transform = try getTransform(hdr.*);
-    const fps = try getFPS(hdr);
-    const dims: [3]usize = .{ @intCast(hdr.dim[1]), @intCast(hdr.dim[2]), @intCast(hdr.dim[3]) };
-    const cartesian_order: [3]usize = .{ 0, 1, 2 };
-
-    const data_type: DataType = @enumFromInt(hdr.*.datatype);
-    const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.*.bitpix, 8));
 
     const volume = try vol.Volume.init(
         allocator,
