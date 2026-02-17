@@ -1,60 +1,118 @@
 const std = @import("std");
+const ndarray = @import("ndarray.zig");
 const nifti1 = @import("nifti1.zig");
 const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 const interpolation = @import("interpolation.zig");
 
+pub const DataFormat = enum {
+    ndarray,
+    nifti1,
+};
+
+pub const SaveConfiguration = struct {
+    basename: []u8,
+    folder: []u8,
+    overwrite: bool, // if false, saves version number
+};
+
 pub const Volume = struct {
     base_allocator: std.mem.Allocator,
     name: []const u8,
-    data: [*]f32,
+    raw_data: []const u8,
+    format: DataFormat,
     transform: [4][4]f64,
     source_fps: f32,
     playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
+    dims: [4]usize, // x y z t
+    save_config: SaveConfiguration,
 
-    dims: [3]usize,
-    cartesian_order: [3]usize, // Cartesian coordinaes Order
+    // TODO: move cart coords to format modules
     // I believe: 2 1 0 for ndarray, 0 1 2 for nifti1
 
-    //DEPRECATED: trivial now????
-    // pub fn init(
-    //     base_allocator: std.mem.Allocator,
-    //     name: []const u8,
-    //     data: []f32, //raw voxel data
-    //     dims: [4]usize,
-    //     cartesian_order: [3]usize, // Cartesian coordinaes Order
-    //     transform: [4][4]f64,
-    //     source_fps: f32,
-    //     playback_fps: f32,
-    //     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
-    // ) !Volume {
-    //     return .{
-    //         .base
-    //         .name = name,
-    //         .frame_allocator = frame_allocator,
-    //         .transform = transform,
-    //         .source_fps = source_fps,
-    //         .playback_fps = playback_fps,
-    //         .speed = speed,
-    //         .dims = dims,
-    //         .cartesian_order = cartesian_order,
-    //     };
-    // }
-    //
-    pub fn deinit(self: *Volume) void {
-        self.frame_allocator.deinit();
+    pub const InterpolationMode = enum {
+        direct,
+    };
+
+    //WIP:
+    fn buildPath(static: bool, frame: usize, save_config: SaveConfiguration) []const u8 {
+        _ = static;
+        _ = frame;
+        _ = save_config;
+        //WARNING: probably shouldn't be a []u8????
+        return "HAM/SPAM";
     }
 
+    const Interpolate = struct {
+        fn chose(
+            alloc: std.mem.Allocator,
+            mode: InterpolationMode,
+            vol: *Volume,
+            vdb: *vdb543.VDB,
+        ) !void {
+            switch (mode) {
+                .direct => try direct(alloc, vol, vdb),
+                //TODO: error handling
+            }
+            //feeling kinda meh about this pattern
+            //it would be nicer if I didn't have to use
+            //a separate structure for this
+            //like some sort of reflection on the
+            //methods on this struct idk
+            //TODO:
+            //I mean basically you've got the interpolation mode
+            //and the source. Both of these effect how you 
+            //write the vdb to disk and how you access the data
+            //(respectively). So there is probably some better patterin in 
+            //here.
+        }
+
+        // No interpolation
+        // Frames from source are written directly
+        // to the VDB sequene
+        fn direct(alloc: std.mem.Allocator, vol: *Volume, vdb: *vdb543.VDB, format: DataFormat) !void {
+            //WARN: We're working with 4D volumes
+            //      it might get weird!
+
+            for (vol.dims[4]) |frame| {
+                switch (format) {
+                    .ndarray => //TODO: loop through ND array and set via it's voxel setter,
+                }
+            }
+
+            //     for (vol.data) |v| {
+            //         var cart = [_]u32{ 0, 0, 0 };
+            //         var i: usize = 0;
+            //         while (util.incrementcartesian(3, &cart, .dims)) {
+            //             i += 1;
+            //             try vdb543.setVoxel(
+            //                 vdb,
+            //                 .{
+            //                     cart[vol.cartesian_order[0]],
+            //                     cart[vol.cartesian_order[1]],
+            //                     cart[vol.cartesian_order[2]],
+            //                 },
+            //                 vol.data,
+            //             );
+            //             // pub fn setVoxel(
+            //             //     vdb: *VDB,
+            //             //     position: [3]u32,
+            //             //     value: f32,
+            //             //     allocator: std.mem.Allocator,
+            //             // )
+            //         }
+            //     }
+        }
+    };
     pub fn toVDB(
         self: *Volume,
         alloc: std.mem.Allocator,
         save_path: [*:0]const u8,
         overwrite: bool, //if false, will version file
-        voxel_setter: *const fn (self) anyerror!void,
+        interpolation_mode: InterpolationMode,
     ) !void {
         var vdb = try vdb543.VDB.build(alloc);
-        try voxel_setter(self, &vdb);
         //BOOKMARK:
         //this is at a good place for  calling separate functions
         //based on what interpolation you want
@@ -77,29 +135,4 @@ pub const Volume = struct {
         //     }
         // }
     }
-
-    //_: Voxel Setters/Interpolation
-
-    //No interpolation
-    pub fn direct(self: *Volume, vdb: *vdb543.VDB) !void {
-        for (self.data) |v| {
-            var cart = [_]u32{ 0, 0, 0 };
-            var i: usize = 0;
-            while (util.incrementcartesian(3, &cart, .dims)) {
-                i += 1;
-                try vdb543.setvoxel(
-                    vdb,
-                    .{
-                        cart[self.cartesian_order[0]],
-                        cart[self.cartesian_order[1]],
-                        cart[self.cartesian_order[2]],
-                    },
-                    v[i],
-                    self.alloc,
-                );
-            }
-        }
-    }
 };
-
-//Interpolation methods:

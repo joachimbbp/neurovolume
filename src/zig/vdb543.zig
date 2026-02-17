@@ -336,6 +336,9 @@ fn writeGrid(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
 }
 
 pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
+    //CRAZY: this seems to just infer the dimensions from
+    //the transform? Idk i wrote this a while ago...
+
     //Magic Number (needed it spells out BDV)
     try writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
@@ -384,25 +387,14 @@ pub fn lengthSquared(v: [3]f32) f32 {
 }
 //SECTION: writing frames
 
-// Writes a static VDB frame to disk
 pub fn writeFrame(
     buffer: *ArrayList(u8),
     vdb: *VDB,
     path_string: []const u8,
     arena_alloc: std.mem.Allocator,
     transform: [4][4]f64,
-) !ArrayList(u8) {
+) !void {
     try writeVDB(buffer, vdb, transform);
-
-    //FIX: versioning needs to happen
-    //on the function call level
-    const vdb_filepath = try save.versionFile(
-        path_string,
-        buffer.*, //EXORCISE: This pointer pattern seems cursed
-        arena_alloc,
-    );
-
-    return vdb_filepath;
 }
 
 //SECTION: Tests:
