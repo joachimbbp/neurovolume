@@ -1,14 +1,9 @@
-//NOTE:
-//I am presently only using f32 (and should implement that in the vdb as well)
-//This is because the slslope and slinter are f32, which thus sets the data
-//to sort of always be this. I am curious what the larger datatypes
-//typically do (do the super big ones just not use slope and inter?)
-
 //TODO:
+// [ ] True Sparcity (I believe this includes "tiles")
 // [ ] Add multiple grids
-// [ ] Add tiles
-// [ ] Arbitrary input data
-// [ ]  setVoxels one 3-node at a time to reduce syscalls
+// [ ] Arbitrary input data (presently locked at f32)
+// [ ] Optimizations (if needed)
+//      [ ]  setVoxels one 3-node at a time to reduce syscalls (
 // [ ] Improve error handling
 //DEPRECATED: remove this abstraction eventually
 const ArrayList = std.array_list.Managed;
