@@ -11,7 +11,6 @@ const EffectError = error{
 // scales the effect on each frame???????
 
 pub fn normalize(v: *vol.Volume) [][]f32 {
-    //minmax:
     var min = std.math.floatMax(f32);
     var max = -std.math.floatMax(f32);
     for (0..v.frames.len) |frame| {
@@ -24,13 +23,12 @@ pub fn normalize(v: *vol.Volume) [][]f32 {
             }
         }
     }
-
-    const minmax_delta = max - min;
+    const normalizer = util.Normalizer.init(true, min, max);
 
     var res: [v.frames.len][]f32 = undefined;
     for (v.frames, 0..) |frame, i| {
         for (frame, 0..) |voxel, j| {
-            res[i][j] = (voxel - min) / minmax_delta;
+            res[i][j] = normalizer.apply(voxel);
         }
     }
     return res;
