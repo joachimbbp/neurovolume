@@ -51,8 +51,7 @@ def hello():
 
 def prep_ndarray(
     arr: np.ndarray,
-    normalize=True,
-    transpose=(0, 2, 1),  # Seems to work for most neuroscience packages
+    transpose: tuple,
 ) -> np.ndarray:
     """
     Preparation steps needed for ndarrays derrived from nibabel or ANTs
@@ -67,21 +66,19 @@ def prep_ndarray(
         By default this is true, but skip if you have already done so
         earlier in your pipeline
     transpose: tuple
-        this is set to 0,2,1, which seems to work for ANTs and Nibabel
+        requires some domain knowledge about how your ndarray is laid out.
+        This varies by library, so you might need to experiment.
+        Findings:
+            0, 2, 1 seems to work for ANTs and Nibael
 
     Returns:
     ------------
     np.ndarray
         prepared np.ndarray (should be of type float32)
     """
-    if normalize:
-        arr = (arr - np.min(arr)) / (np.max(arr) - np.min(arr))
     arr = np.transpose(arr, transpose)
     arr = np.array(arr, order="C", dtype=np.float32)
     return arr
-
-def volume_init(
-    
 
 
 # def ndarray_to_VDB(
@@ -129,6 +126,7 @@ def volume_init(
 #     if res != 0:
 #         print(f"error of type {res}")
 #
+
 
 def nifti1_to_VDB(
     nifti_path: str,

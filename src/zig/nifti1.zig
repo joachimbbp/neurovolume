@@ -84,40 +84,6 @@ pub const DataType = enum(i16) {
     }
 };
 
-fn getValue( //prbably nifti1 specific!
-    data: *const []const u8,
-    idx: usize, //linear index
-    bytes_per_voxel: u16, //NIfTI1 convention, will cover all cases
-    comptime VoxelType: type,
-    endianness: std.builtin.Endian,
-
-    //Scaling: set slope to 1 and int to 0 to have them not apply
-    slope: f32,
-    intercept: f32,
-
-    //Normalizing
-    normalize: bool,
-    minmax: [3]f32, //min, max, max-min
-) f32 {
-    const bit_start: usize = idx * @as(usize, @intCast(bytes_per_voxel));
-    const bit_end: usize = (idx + 1) * @as(usize, @intCast(bytes_per_voxel));
-    const bytes_input = data.*[bit_start..bit_end]; //GPT: dereferencing suggested
-    const type_size = @divExact(@typeInfo(VoxelType).int.bits, 8); //LLM: suggested
-    const raw_value: f32 = @floatFromInt(std.mem.readInt(
-        VoxelType,
-        bytes_input[0..type_size],
-        endianness,
-    ));
-    var res_value = raw_value;
-    if (slope != 1 or intercept != 0) { //wouldn't change res_value
-        res_value = slope * raw_value + intercept;
-    }
-
-    if (normalize) {
-        res_value = (res_value - minmax[0]) / minmax[2];
-    }
-    return res_value;
-}
 pub fn getAt4D(
     //Source data
     hdr: Header,
@@ -127,11 +93,7 @@ pub fn getAt4D(
     ypos: usize,
     zpos: usize,
     tpos: usize,
-    //normalization:
-    normalize: bool,
-    //    minmax: [2]f32,
-    min_val: f32, //minmax[0]
-    minmax_delta: f32, //minax[1] - minmax[0]
+    normalizer: util.Normalizer,
 ) !f32 {
     const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.bitpix, 8));
 
@@ -149,12 +111,10 @@ pub fn getAt4D(
     if (hdr.sclSlope != 0) {
         post_slope = hdr.sclSlope * raw_value + hdr.sclInter;
     }
-
-    if (normalize) {
-        return (post_slope - min_val) / minmax_delta;
-    } else {
-        return post_slope;
-    }
+    //note: you can set normalizer.active
+    //to false on initialization if you
+    //wish to bypass normalization
+    return normalizer.apply(post_slope);
 }
 
 pub fn byteToFloat(raw_data: []const u8, bytes_per_voxel: u16, bit_start: usize, bit_end: usize) !f32 {

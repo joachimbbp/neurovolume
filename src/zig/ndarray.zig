@@ -1,3 +1,6 @@
+//SOURCE:
+//https://numpy.org/doc/stable/dev/internals.html#numpy-internals
+
 const vdb543 = @import("vdb543.zig");
 const std = @import("std");
 const util = @import("util.zig");
@@ -34,6 +37,7 @@ pub fn getAt4D(
     ypos: usize,
     zpos: usize,
     tpos: usize,
+    normalizer: util.Normalizer,
 ) !OutputType {
     //WARNING: the VDB writer currently only supports f32
     //TODO: remove this check once arbitrary types are
@@ -42,5 +46,4 @@ pub fn getAt4D(
         return NdarrayError.SourceTypeNotSupportedByVDBYet;
     }
     //BOOKMARK: let's pick it up here (see lab notes if your lost)
-    //https://numpy.org/doc/stable/dev/internals.html#numpy-internals
 }
