@@ -94,6 +94,7 @@ pub fn getAt4D(
     zpos: usize,
     tpos: usize,
     normalizer: util.Normalizer,
+    //TODO: Change to cartesian indexing
 ) !f32 {
     const bytes_per_voxel: u16 = @intCast(@divTrunc(hdr.bitpix, 8));
 

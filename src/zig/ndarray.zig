@@ -27,23 +27,42 @@ const NdarrayError = error{
 //So the above won't work if we interpolate on the zig level!
 //
 
-// retrieves voxel data from an x y z t position in an ndarray
-// note: no normaliziation functionality (for now). Do that on the Python level.
-pub fn getAt4D(
+// retrieves voxel data from an cartesian position in an ndarray
+pub fn getAtDD(
     comptime SourceType: type,
     comptime OutputType: type,
     source_data: []const SourceType,
-    xpos: usize,
-    ypos: usize,
-    zpos: usize,
-    tpos: usize,
+    cart_idx: usize,
     normalizer: util.Normalizer,
 ) !OutputType {
-    //WARNING: the VDB writer currently only supports f32
     //TODO: remove this check once arbitrary types are
     //supported in vdb543.zig
     if (OutputType != f32) {
         return NdarrayError.SourceTypeNotSupportedByVDBYet;
     }
-    //BOOKMARK: let's pick it up here (see lab notes if your lost)
+    return normalizer.apply(source_data[cart_idx]);
+    // var cart = [_]u32{0,0,0,0};
+    // BOOKMARK: you're getting sleepy
+    // it is almost 2AM
+    // but this crazy one liner should work I think
+    // like its not that complex
+    // TEST IT IN THE MORNING (or whenever you get to this)
+    // TODO:
 }
+
+//    comptime num_dims: comptime_int,
+// dim_sizes: *const [num_dims]usize,
+// cart_idx: usize, //cartesian index
+// transpose: [4]usize,
+//
+// var cart = [num_dims]u32{0} ** num_dims; //LLM: dynamic sizing
+// while (util.incrementCartesian(cart.len, &cart, dim_sizes)) {
+//
+//
+// }
+// This is inverted, the while loop is what iterates
+// through this. oyu just have to set the pixel
+// while(util.incrementCartesian(4, &cart, dim_sizes)) {
+//
+//
+// }

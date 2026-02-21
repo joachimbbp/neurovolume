@@ -30,7 +30,7 @@ pub const Normalizer = struct {
     min_val: f32,
     minmax_delta: f32,
 
-    pub fn this(self: Normalizer, value: f32) f32 {
+    pub fn apply(self: Normalizer, value: f32) f32 {
         if (!self.normalize) {
             return value;
         }
@@ -49,11 +49,11 @@ pub fn stripped_basename(path: []const u8) []const u8 {
 
 pub fn incrementCartesian(
     comptime num_dims: comptime_int,
-    cart_coord: *[num_dims]u32, //as VDBs seem to be built around U32s
-    dims: *const [num_dims]usize,
+    cart_coord: *[num_dims]usize, //as VDBs seem to be built around U32s
+    dim_sizes: *const [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
-    for (0.., dims) |i, di| {
+    for (0.., dim_sizes) |i, di| {
         cart_coord[i] += 1;
         if (cart_coord[i] < di) {
             return true;
