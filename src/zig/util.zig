@@ -49,8 +49,8 @@ pub fn stripped_basename(path: []const u8) []const u8 {
 
 pub fn incrementCartesian(
     comptime num_dims: comptime_int,
-    cart_coord: *[num_dims]usize, //as VDBs seem to be built around U32s
-    dim_sizes: *const [num_dims]usize,
+    cart_coord: *[num_dims]usize,
+    dim_sizes: [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
     for (0.., dim_sizes) |i, di| {
@@ -62,6 +62,7 @@ pub fn incrementCartesian(
     }
     return false;
 }
+
 //entirely random uuid
 pub fn UUIDv4() [36]u8 {
     var result: [36]u8 = undefined;

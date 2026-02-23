@@ -9,26 +9,11 @@ const constants = @import("constants.zig");
 
 const NdarrayError = error{
     SourceTypeNotSupportedByVDBYet,
+    IndexOutOBounds,
 };
 
-//Converts a 3D ndarray into a frame and appends it to a volume
-//For sequences, iterate through the 4th dimension
-// pub fn toFrame(
-//     data: [*]f32,
-//     frame_num: usize,
-//     volume: *Volume,
-// ) error{IndexOutOfBounds}!void {
-//     if (frame_num >= volume.frame_count) return error.IndexOutOfBounds;
-//     const frame_size = volume.dims[0] * volume.dims[1] * volume.dims[2];
-//     volume.frames[frame_num] = data[0..frame_size];
-// }
-
-//TODO:
-//So the above won't work if we interpolate on the zig level!
-//
-
 // retrieves voxel data from an cartesian position in an ndarray
-pub fn getAtDD(
+pub fn getAt4D(
     comptime SourceType: type,
     comptime OutputType: type,
     source_data: []const SourceType,
@@ -41,14 +26,49 @@ pub fn getAtDD(
         return NdarrayError.SourceTypeNotSupportedByVDBYet;
     }
     return normalizer.apply(source_data[cart_idx]);
-    // var cart = [_]u32{0,0,0,0};
-    // BOOKMARK: you're getting sleepy
-    // it is almost 2AM
-    // but this crazy one liner should work I think
-    // like its not that complex
-    // TEST IT IN THE MORNING (or whenever you get to this)
-    // TODO:
 }
+
+pub fn get3DFrameFrom4D(
+    data: [*]f32,
+    frame_num: usize,
+    v: Volume.FourDim,
+    vdb: *vdb543.VDB,
+    normalizer: util.Normalizer,
+    allocator: std.mem.Allocator,
+) !void {
+    if (frame_num >= v.dims[3]) return NdarrayError.IndexOutOBounds;
+    //Assuming that there aren't headers or things in ndarrays
+    //  (I should read the docs I guess)
+    const start = frame_num * v.frame_size;
+    const end = ((frame_num + 1) * v.frame_size);
+
+    var i: usize = 0;
+    var cart = [_]usize{ 0, 0, 0 };
+    while (true) {
+        try vdb543.setVoxel(
+            vdb,
+            .{
+                cart[v.cartesian_order[0]],
+                cart[v.cartesian_order[1]],
+                cart[v.cartesian_order[2]],
+            },
+            normalizer.apply(data[start..end][i]),
+            allocator,
+        );
+
+        i += 1;
+        if (!util.incrementCartesian(
+            3,
+            &cart,
+            .{ v.dims[0], v.dims[1], v.dims[2] },
+        )) break;
+    }
+}
+
+//     volume.frames[frame_num] = data[0..frame_size];
+//NOTE:
+//so i guess you'll build the VDB here
+//then we'll save it on the volume level!
 
 //    comptime num_dims: comptime_int,
 // dim_sizes: *const [num_dims]usize,
