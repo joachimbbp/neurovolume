@@ -5,6 +5,7 @@
 // [ ] Optimizations (if needed)
 //      [ ]  setVoxels one 3-node at a time to reduce syscalls (
 // [ ] Improve error handling
+//[ ] remove perscriptive "arena allocator" var name?
 //DEPRECATED: remove this abstraction eventually
 const ArrayList = std.array_list.Managed;
 

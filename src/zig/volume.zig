@@ -19,7 +19,7 @@ pub const SaveConfiguration = struct {
 pub const FourDim = struct {
     base_allocator: std.mem.Allocator,
     name: []const u8,
-    raw_data: []const u8,
+    raw_data: [*]const u8,
     cartesian_order: [3]usize, // ndarray: 2 1 0 , nifti1: 0 1 2
     format: DataFormat,
     transform: [4][4]f64,
@@ -29,6 +29,10 @@ pub const FourDim = struct {
     dims: [4]usize, // x y z t
     frame_size: usize,
     save_config: SaveConfiguration,
+
+    data: [*]f32,
+    normalizer: util.Normalizer,
+    allocator: std.mem.Allocator,
 
     pub fn init(
         base_allocator: std.mem.Allocator,
@@ -43,6 +47,7 @@ pub const FourDim = struct {
         dims: [4]usize,
         save_config: SaveConfiguration,
     ) FourDim {
+        //TODO: finish init function!
         //LLM: whole function. I didn't want to type this out
         return .{
             .base_allocator = base_allocator,
@@ -78,10 +83,9 @@ pub const FourDim = struct {
             alloc: std.mem.Allocator,
             mode: InterpolationMode,
             vol: *FourDim,
-            vdb: *vdb543.VDB,
         ) !void {
             switch (mode) {
-                .direct => try direct(alloc, vol, vdb),
+                .direct => try direct(alloc, vol),
                 //TODO: error handling
             }
             //feeling kinda meh about this pattern
@@ -102,15 +106,19 @@ pub const FourDim = struct {
     // Frames from source are written directly
     // to the VDB sequene
     fn direct(
-        alloc: std.mem.Allocator,
+        allocator: std.mem.Allocator,
         v: *FourDim,
         format: DataFormat,
+        frame_getter: *const fn (usize, FourDim, *vdb543.VDB) anyerror!void,
     ) !void {
-        //WARN: We're working with 4D volumes
-        //      it might get weird!
-
-        //BOOKMARK:
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+        var vdb = try vdb543.VDB.build(arena.allocator());
+        for (0..v.dims[4]) |n| {
+            ndarray.extractFrame(n, v, &vdb);
+        }
     }
+    //BOOKMARK: up next is save functionality
 };
 // pub fn toVDB(
 //     self: *Volume,

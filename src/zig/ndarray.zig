@@ -4,7 +4,7 @@
 const vdb543 = @import("vdb543.zig");
 const std = @import("std");
 const util = @import("util.zig");
-const Volume = @import("volume.zig").Volume;
+const volume = @import("volume.zig");
 const constants = @import("constants.zig");
 
 const NdarrayError = error{
@@ -13,6 +13,7 @@ const NdarrayError = error{
 };
 
 // retrieves voxel data from an cartesian position in an ndarray
+//DEPRECATED: ????
 pub fn getAt4D(
     comptime SourceType: type,
     comptime OutputType: type,
@@ -28,13 +29,10 @@ pub fn getAt4D(
     return normalizer.apply(source_data[cart_idx]);
 }
 
-pub fn get3DFrameFrom4D(
-    data: [*]f32,
+pub fn extractFrame(
     frame_num: usize,
-    v: Volume.FourDim,
+    v: volume.FourDim,
     vdb: *vdb543.VDB,
-    normalizer: util.Normalizer,
-    allocator: std.mem.Allocator,
 ) !void {
     if (frame_num >= v.dims[3]) return NdarrayError.IndexOutOBounds;
     //Assuming that there aren't headers or things in ndarrays
@@ -52,8 +50,8 @@ pub fn get3DFrameFrom4D(
                 cart[v.cartesian_order[1]],
                 cart[v.cartesian_order[2]],
             },
-            normalizer.apply(data[start..end][i]),
-            allocator,
+            v.normalizer.apply(v.raw_data[start..end][i]),
+            v.allocator,
         );
 
         i += 1;
