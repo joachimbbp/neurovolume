@@ -29,6 +29,7 @@ pub fn getAt4D(
     return normalizer.apply(source_data[cart_idx]);
 }
 
+//extracts a 3D slice of a 4D ndarray to a VDB
 pub fn extractFrame(
     frame_num: usize,
     v: volume.FourDim,

@@ -381,17 +381,6 @@ pub fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
 pub fn lengthSquared(v: [3]f32) f32 {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
-//SECTION: writing frames
-
-pub fn writeFrame(
-    buffer: *ArrayList(u8),
-    vdb: *VDB,
-    path_string: []const u8,
-    arena_alloc: std.mem.Allocator,
-    transform: [4][4]f64,
-) !void {
-    try writeVDB(buffer, vdb, transform);
-}
 
 //SECTION: Tests:
 const constants = @import("constants.zig");

@@ -5,6 +5,8 @@ const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 const interpolation = @import("interpolation.zig");
 
+const DataFormatError = error{NotSupportedYet};
+
 pub const DataFormat = enum {
     ndarray,
     nifti1,
@@ -22,7 +24,7 @@ pub const FourDim = struct {
     raw_data: [*]const u8,
     cartesian_order: [3]usize, // ndarray: 2 1 0 , nifti1: 0 1 2
     format: DataFormat,
-    transform: [4][4]f64,
+    affine_transform: [4][4]f64,
     source_fps: f32,
     playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
@@ -102,6 +104,26 @@ pub const FourDim = struct {
         }
     };
 
+    fn saveFrame(
+        v: *FourDim,
+        frame_num: usize,
+        buffer: *std.ArrayList(u8),
+    ) !void {
+
+        //LLM: temp save for debug lines
+        var buf: [256]u8 = undefined;
+        const output_filepath = try std.fmt.bufPrint(&buf, "../../output/tmp_{d}.vdb", .{frame_num});
+        //TODO: save logic based off versioning bool etc
+        //in save config (to build in FourDim init)
+        _ = v;
+
+        const file = try std.fs.cwd().createFile(std.mem.span(output_filepath), .{});
+
+        try file.writeAll(buffer.items);
+
+        defer file.close();
+    }
+
     // No interpolation
     // Frames from source are written directly
     // to the VDB sequene
@@ -109,45 +131,22 @@ pub const FourDim = struct {
         allocator: std.mem.Allocator,
         v: *FourDim,
         format: DataFormat,
-        frame_getter: *const fn (usize, FourDim, *vdb543.VDB) anyerror!void,
     ) !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         var vdb = try vdb543.VDB.build(arena.allocator());
+
+        var buffer = std.array_list.Managed(u8).init(arena.allocator());
+
         for (0..v.dims[4]) |n| {
-            ndarray.extractFrame(n, v, &vdb);
+            //TODO: maybe free the memory after its saved to disk?
+            switch (format) {
+                .ndarray => try ndarray.extractFrame(n, v, &vdb),
+                else => return DataFormatError.NotSupportedYet,
+            }
+
+            try vdb543.writeVDB(&buffer, &vdb, v.affine_transform);
+            saveFrame(v, n, &buffer);
         }
     }
-    //BOOKMARK: up next is save functionality
 };
-// pub fn toVDB(
-//     self: *Volume,
-//     alloc: std.mem.Allocator,
-//     save_path: [*:0]const u8,
-//     overwrite: bool, //if false, will version file
-//     interpolation_mode: InterpolationMode,
-// ) !void {
-//     var vdb = try vdb543.VDB.build(alloc);
-//     //BOOKMARK:
-//this is at a good place for  calling separate functions
-//based on what interpolation you want
-//up next:
-//- [ ] finish function with save
-//- [ ] test this functionality
-//- [ ] add new interpolation modes
-
-//         var buffer = std.array_list.Managed(u8).init(alloc);
-//         defer buffer.deinit();
-//
-//         if (overwrite) {
-//             const file = try std.fs.cwd().createFile(save_path, .{});
-//
-//             try file.writeAll(buffer.items);
-//             defer file.close();
-//         } else {
-//             std.debug.print("file versioning not implemented yet!\n file not saved\n", .{});
-//         }
-//     }
-// }
-// }
-//
