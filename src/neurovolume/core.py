@@ -49,13 +49,12 @@ def hello():
     nv.hello()
 
 
-def prep_ndarray(
+def prep_4D_ndarray(
     arr: np.ndarray,
     transpose: tuple,
 ) -> np.ndarray:
     """
     Preparation steps needed for ndarrays derrived from nibabel or ANTs
-    NOTE: we only support 3D arrays. For time series you must make a
 
     Parameters:
     ------------
@@ -70,6 +69,7 @@ def prep_ndarray(
         This varies by library, so you might need to experiment.
         Findings:
             0, 2, 1 seems to work for ANTs and Nibael
+            NOTE update for 4D!
 
     Returns:
     ------------

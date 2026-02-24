@@ -13,7 +13,10 @@ const NdarrayError = error{
 };
 
 // retrieves voxel data from an cartesian position in an ndarray
-//DEPRECATED: ????
+//TODO:
+//this will become useful once we start doing
+//frame interpoloation (see lab notes page 1)
+//might have to get integrated into extractFrame
 pub fn getAt4D(
     comptime SourceType: type,
     comptime OutputType: type,
@@ -63,25 +66,3 @@ pub fn extractFrame(
         )) break;
     }
 }
-
-//     volume.frames[frame_num] = data[0..frame_size];
-//NOTE:
-//so i guess you'll build the VDB here
-//then we'll save it on the volume level!
-
-//    comptime num_dims: comptime_int,
-// dim_sizes: *const [num_dims]usize,
-// cart_idx: usize, //cartesian index
-// transpose: [4]usize,
-//
-// var cart = [num_dims]u32{0} ** num_dims; //LLM: dynamic sizing
-// while (util.incrementCartesian(cart.len, &cart, dim_sizes)) {
-//
-//
-// }
-// This is inverted, the while loop is what iterates
-// through this. oyu just have to set the pixel
-// while(util.incrementCartesian(4, &cart, dim_sizes)) {
-//
-//
-// }

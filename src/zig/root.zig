@@ -13,7 +13,8 @@ const save = @import("save.zig");
 
 //_: CONSTS:
 const config = @import("config.zig.zon");
-const SupportError = error{
-    Dimensions,
-    Type,
-};
+
+//TODO:
+//development is focusing on the python library for now
+//this can be found in c_root.zig and core.py
+//Once that is finished, work will begin on the zig library

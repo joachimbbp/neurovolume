@@ -8,8 +8,8 @@ const interpolation = @import("interpolation.zig");
 const DataFormatError = error{NotSupportedYet};
 
 pub const DataFormat = enum {
-    ndarray,
-    nifti1,
+    ndarray, //1
+    nifti1, //2
 };
 
 pub const SaveConfiguration = struct {
@@ -18,13 +18,15 @@ pub const SaveConfiguration = struct {
     overwrite: bool, // if false, saves version number
 };
 
+//Four dimensional volume structure
+//nothing is allocated in this struct so no deinit
 pub const FourDim = struct {
     base_allocator: std.mem.Allocator,
     name: []const u8,
     raw_data: [*]const u8,
     cartesian_order: [3]usize, // ndarray: 2 1 0 , nifti1: 0 1 2
     format: DataFormat,
-    affine_transform: [4][4]f64,
+    affine_transform: [4][4]f64, //spatial transform only!
     source_fps: f32,
     playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
@@ -32,7 +34,6 @@ pub const FourDim = struct {
     frame_size: usize,
     save_config: SaveConfiguration,
 
-    data: [*]f32,
     normalizer: util.Normalizer,
     allocator: std.mem.Allocator,
 
@@ -49,21 +50,22 @@ pub const FourDim = struct {
         dims: [4]usize,
         save_config: SaveConfiguration,
     ) FourDim {
-        //TODO: finish init function!
-        //LLM: whole function. I didn't want to type this out
+        //LLM: wrote this trivial function for me because I am lazy
         return .{
             .base_allocator = base_allocator,
             .name = name,
-            .raw_data = raw_data,
+            .raw_data = raw_data.ptr,
             .cartesian_order = cartesian_order,
             .format = format,
-            .transform = transform,
+            .affine_transform = transform,
             .source_fps = source_fps,
             .playback_fps = playback_fps,
             .speed = speed,
             .dims = dims,
             .frame_size = dims[0] * dims[1] * dims[2],
             .save_config = save_config,
+            .normalizer = util.Normalizer.init(false, 0.0, 1.0),
+            .allocator = base_allocator,
         };
     }
 
