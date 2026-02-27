@@ -8,9 +8,9 @@ const interpolation = @import("interpolation.zig");
 const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
 const AccessError = error{IndexOutOBounds};
 
-pub const DataFormat = enum {
-    ndarray, //1
-    nifti1, //2
+pub const SourceFormat = enum(c_int) {
+    ndarray = 0,
+    nifti1 = 1,
 };
 
 pub const SaveConfiguration = struct {
@@ -26,7 +26,7 @@ pub const FourDim = struct {
     name: []const u8,
     data: []const f32,
     cartesian_order: [3]usize, // ndarray: 2 1 0 , nifti1: 0 1 2
-    format: DataFormat,
+    source: SourceFormat,
     affine_transform: [4][4]f64, //spatial transform only!
     source_fps: f32,
     playback_fps: f32,
@@ -42,8 +42,8 @@ pub const FourDim = struct {
     pub fn init(
         base_allocator: std.mem.Allocator,
         name: []const u8,
-        raw_data: []const u8,
-        format: DataFormat,
+        data: []const f32,
+        source: SourceFormat,
         transform: [4][4]f64,
         normalize: bool,
         source_fps: f32,
@@ -52,13 +52,11 @@ pub const FourDim = struct {
         dims: [4]usize,
         save_config: SaveConfiguration,
     ) !FourDim {
-        var slice_f32: []const f32 = undefined;
         var cart_ord: [3]usize = undefined;
         var normalizer: util.Normalizer = undefined;
 
-        switch (format) {
+        switch (source) {
             .ndarray => {
-                slice_f32 = std.mem.bytesAsSlice(f32, raw_data);
                 cart_ord = .{ 2, 1, 0 };
                 if (normalize) {
                     std.debug.print(".ndarrays must be normalized on the Python layer.\nUse the prep_4D_ndarray function", .{});
@@ -71,9 +69,9 @@ pub const FourDim = struct {
         return .{
             .base_allocator = base_allocator,
             .name = name,
-            .data = slice_f32,
+            .data = data,
             .cartesian_order = cart_ord,
-            .format = format,
+            .source = source,
             .affine_transform = transform,
             .source_fps = source_fps,
             .playback_fps = playback_fps,
@@ -106,6 +104,7 @@ pub const FourDim = struct {
             vol: *FourDim,
         ) !void {
             switch (mode) {
+                //WARN: broken might be deprecated
                 .direct => try direct(alloc, vol),
                 //TODO: error handling
             }
@@ -184,7 +183,7 @@ pub const FourDim = struct {
     fn direct(
         allocator: std.mem.Allocator,
         v: *FourDim,
-        format: DataFormat,
+        format: SourceFormat,
     ) !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();

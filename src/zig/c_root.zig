@@ -2,18 +2,22 @@ const ndarray = @import("ndarray.zig");
 const volume = @import("volume.zig");
 const std = @import("std");
 
+//WARN: must mirror SourceFormat in volume.zig
+
 //initializes Volume.FourDim, a four dimensional volume
-//from the c layer
-pub export fn fourDimInit(
-    name_ptr: [*:0]const u8,
+//from a ndarray
+//call source with:
+//      c_int(0) #ndarray
+//      c_int(1) #nifti1
+pub export fn fourDimInitFromNDarray(
+    name: [*:0]const u8,
+    source: volume.SourceFormat,
     data: [*]const f32, //all frames flattened
-    cartesian_order: *const [3]usize,
     transform_flat: *const [16]f64,
     source_fps: f32,
     playback_fps: f32,
     speed: f32,
-    dims: *const [3]usize,
-    out_volume: **Volume,
+    dims: *const [4]usize,
 ) c_int {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -27,14 +31,26 @@ pub export fn fourDimInit(
     }
 
     const frame_size = dims[0] * dims[1] * dims[2];
-    const num_frames = data / frame_size;
+    const len = frame_size * dims[4];
 
-    //BOOKMARK:
-    //TODO: up next: get the data format from the c level
+    const vol = volume.FourDim.init(
+        gpa,
+        std.mem.span(name),
+        data[0..len],
+        source,
+        transform,
+        false,
+        source_fps,
+        playback_fps,
+        speed,
+        dims.*,
+    ) catch |e| {
+        return cErr(e);
+    };
+    //BOOKMARK: Here is where you'd do the save func
+    //will probably need work on volume.zig
+    //rewriting the stuff in the Interpolate struct
 
-    // Initialize the Volume
-    // const fdvolume = volume.FourDim.init(gpa.allocator(), name_ptr, data,cartesian_order,
-    // out_volume.* = fdvolume;
     return cErr(0).code; //redundant, but keeps convention
 }
 
