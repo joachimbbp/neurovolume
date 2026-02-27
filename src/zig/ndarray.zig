@@ -1,6 +1,10 @@
 //SOURCE:
 //https://numpy.org/doc/stable/dev/internals.html#numpy-internals
 
+//DEPRECATED:
+//this whole thing might be deprecated
+//
+
 const vdb543 = @import("vdb543.zig");
 const std = @import("std");
 const util = @import("util.zig");
@@ -30,41 +34,4 @@ pub fn getAt4D(
         return NdarrayError.SourceTypeNotSupportedByVDBYet;
     }
     return normalizer.apply(source_data[cart_idx]);
-}
-
-//extracts a 3D slice of a 4D ndarray to a VDB
-pub fn extractFrame(
-    frame_num: usize,
-    v: volume.FourDim,
-    vdb: *vdb543.VDB,
-) !void {
-    const slice = std.mem.bytesAsSlice(f32, v.raw_data);
-
-    if (frame_num >= v.dims[3]) return NdarrayError.IndexOutOBounds;
-    //Assuming that there aren't headers or things in ndarrays
-    //  (I should read the docs I guess)
-    const start = frame_num * v.frame_size;
-    const end = ((frame_num + 1) * v.frame_size);
-
-    var i: usize = 0;
-    var cart = [_]usize{ 0, 0, 0 };
-    while (true) {
-        try vdb543.setVoxel(
-            vdb,
-            .{
-                cart[v.cartesian_order[0]],
-                cart[v.cartesian_order[1]],
-                cart[v.cartesian_order[2]],
-            },
-            v.normalizer.apply(slice[start..end][i]),
-            v.allocator,
-        );
-
-        i += 1;
-        if (!util.incrementCartesian(
-            3,
-            &cart,
-            .{ v.dims[0], v.dims[1], v.dims[2] },
-        )) break;
-    }
 }

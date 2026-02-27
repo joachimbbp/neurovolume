@@ -6,6 +6,7 @@ const vdb543 = @import("vdb543.zig");
 const interpolation = @import("interpolation.zig");
 
 const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
+const AccessError = error{IndexOutOBounds};
 
 pub const DataFormat = enum {
     ndarray, //1
@@ -51,11 +52,11 @@ pub const FourDim = struct {
         dims: [4]usize,
         save_config: SaveConfiguration,
     ) !FourDim {
-        var slice_f32: []f32 = undefined;
+        var slice_f32: []const f32 = undefined;
         var cart_ord: [3]usize = undefined;
         var normalizer: util.Normalizer = undefined;
 
-        switch (DataFormat) {
+        switch (format) {
             .ndarray => {
                 slice_f32 = std.mem.bytesAsSlice(f32, raw_data);
                 cart_ord = .{ 2, 1, 0 };
@@ -71,7 +72,7 @@ pub const FourDim = struct {
             .base_allocator = base_allocator,
             .name = name,
             .data = slice_f32,
-            .cartesian_order = cartesian_order,
+            .cartesian_order = cart_ord,
             .format = format,
             .affine_transform = transform,
             .source_fps = source_fps,
@@ -80,7 +81,7 @@ pub const FourDim = struct {
             .dims = dims,
             .frame_size = dims[0] * dims[1] * dims[2],
             .save_config = save_config,
-            .normalizer = util.Normalizer.init(normalize, 0.0, 1.0),
+            .normalizer = normalizer,
             .allocator = base_allocator,
         };
     }
@@ -142,6 +143,41 @@ pub const FourDim = struct {
         defer file.close();
     }
 
+    //extracts a 3D slice of a 4D ndarray to a VDB
+    pub fn extractFrame(
+        frame_num: usize,
+        v: FourDim,
+        vdb: *vdb543.VDB,
+    ) !void {
+        if (frame_num >= v.dims[3]) return AccessError.IndexOutOBounds;
+        //Assuming that there aren't headers or things in ndarrays
+        //  (I should read the docs I guess)
+        const start = frame_num * v.frame_size;
+        const end = ((frame_num + 1) * v.frame_size);
+
+        var i: usize = 0;
+        var cart = [_]usize{ 0, 0, 0 };
+        while (true) {
+            try vdb543.setVoxel(
+                vdb,
+                .{
+                    cart[v.cartesian_order[0]],
+                    cart[v.cartesian_order[1]],
+                    cart[v.cartesian_order[2]],
+                },
+                v.normalizer.apply(v.data[start..end][i]),
+                v.allocator,
+            );
+
+            i += 1;
+            if (!util.incrementCartesian(
+                3,
+                &cart,
+                .{ v.dims[0], v.dims[1], v.dims[2] },
+            )) break;
+        }
+    }
+
     // No interpolation
     // Frames from source are written directly
     // to the VDB sequene
@@ -156,10 +192,10 @@ pub const FourDim = struct {
 
         var buffer = std.array_list.Managed(u8).init(arena.allocator());
 
-        for (0..v.dims[4]) |n| {
+        for (0..v.dims[3]) |n| {
             //TODO: maybe free the memory after its saved to disk?
             switch (format) {
-                .ndarray => try ndarray.extractFrame(n, v, &vdb),
+                .ndarray => try extractFrame(n, v, &vdb),
                 else => return DataFormatError.NotSupportedYet,
             }
 
