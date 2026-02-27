@@ -5,7 +5,7 @@ const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 const interpolation = @import("interpolation.zig");
 
-const DataFormatError = error{NotSupportedYet};
+const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
 
 pub const DataFormat = enum {
     ndarray, //1
@@ -23,7 +23,7 @@ pub const SaveConfiguration = struct {
 pub const FourDim = struct {
     base_allocator: std.mem.Allocator,
     name: []const u8,
-    raw_data: [*]const u8,
+    data: []const f32,
     cartesian_order: [3]usize, // ndarray: 2 1 0 , nifti1: 0 1 2
     format: DataFormat,
     affine_transform: [4][4]f64, //spatial transform only!
@@ -37,24 +37,40 @@ pub const FourDim = struct {
     normalizer: util.Normalizer,
     allocator: std.mem.Allocator,
 
+    //ensure ndarray compliance with prep_4D_ndarray
     pub fn init(
         base_allocator: std.mem.Allocator,
         name: []const u8,
         raw_data: []const u8,
-        cartesian_order: [3]usize,
         format: DataFormat,
         transform: [4][4]f64,
+        normalize: bool,
         source_fps: f32,
         playback_fps: f32,
         speed: f32,
         dims: [4]usize,
         save_config: SaveConfiguration,
-    ) FourDim {
-        //LLM: wrote this trivial function for me because I am lazy
+    ) !FourDim {
+        var slice_f32: []f32 = undefined;
+        var cart_ord: [3]usize = undefined;
+        var normalizer: util.Normalizer = undefined;
+
+        switch (DataFormat) {
+            .ndarray => {
+                slice_f32 = std.mem.bytesAsSlice(f32, raw_data);
+                cart_ord = .{ 2, 1, 0 };
+                if (normalize) {
+                    std.debug.print(".ndarrays must be normalized on the Python layer.\nUse the prep_4D_ndarray function", .{});
+                    return DataFormatError.UnsupportedUsage;
+                }
+                normalizer = util.Normalizer.init(false, 0.0, 1.0);
+            },
+        }
+
         return .{
             .base_allocator = base_allocator,
             .name = name,
-            .raw_data = raw_data.ptr,
+            .data = slice_f32,
             .cartesian_order = cartesian_order,
             .format = format,
             .affine_transform = transform,
@@ -64,7 +80,7 @@ pub const FourDim = struct {
             .dims = dims,
             .frame_size = dims[0] * dims[1] * dims[2],
             .save_config = save_config,
-            .normalizer = util.Normalizer.init(false, 0.0, 1.0),
+            .normalizer = util.Normalizer.init(normalize, 0.0, 1.0),
             .allocator = base_allocator,
         };
     }

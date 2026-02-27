@@ -76,6 +76,7 @@ def prep_4D_ndarray(
     np.ndarray
         prepared np.ndarray (should be of type float32)
     """
+    # order matters here:
     arr = np.transpose(arr, transpose)
     arr = np.array(arr, order="C", dtype=np.float32)
     return arr

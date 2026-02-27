@@ -3,7 +3,6 @@ const random = std.crypto.random;
 const eql = std.mem.eql;
 const ArrayList = std.array_list.Managed;
 
-//
 //and a function to do so to boot!
 pub const Normalizer = struct {
     //Initializes the normalizer
@@ -31,7 +30,7 @@ pub const Normalizer = struct {
     minmax_delta: f32,
 
     pub fn apply(self: Normalizer, value: f32) f32 {
-        if (!self.normalize) {
+        if (!self.apply) {
             return value;
         }
         return (value - self.min_val) / self.minmax_delta;

@@ -38,6 +38,8 @@ pub fn extractFrame(
     v: volume.FourDim,
     vdb: *vdb543.VDB,
 ) !void {
+    const slice = std.mem.bytesAsSlice(f32, v.raw_data);
+
     if (frame_num >= v.dims[3]) return NdarrayError.IndexOutOBounds;
     //Assuming that there aren't headers or things in ndarrays
     //  (I should read the docs I guess)
@@ -54,7 +56,7 @@ pub fn extractFrame(
                 cart[v.cartesian_order[1]],
                 cart[v.cartesian_order[2]],
             },
-            v.normalizer.apply(v.raw_data[start..end][i]),
+            v.normalizer.apply(slice[start..end][i]),
             v.allocator,
         );
 
