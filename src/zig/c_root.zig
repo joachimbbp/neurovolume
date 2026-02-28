@@ -9,19 +9,20 @@ const std = @import("std");
 //call source with:
 //      c_int(0) #ndarray
 //      c_int(1) #nifti1
+//returns a ptr to the volume
 pub export fn fourDimInitFromNDarray(
-    name: [*:0]const u8,
-    source: volume.SourceFormat,
+    base_name: [*:0]const u8,
+    save_folder: [*:0]const u8,
+    overwrite: bool,
+    source_format: volume.SourceFormat,
     data: [*]const f32, //all frames flattened
     transform_flat: *const [16]f64,
     source_fps: f32,
     playback_fps: f32,
     speed: f32,
     dims: *const [4]usize,
-) c_int {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
+) ?*anyopaque {
+    const allocator = std.heap.c_allocator;
     // Reshape flat transform into [4][4]f64 LLM:
     var transform: [4][4]f64 = undefined;
     for (0..4) |i| {
@@ -31,28 +32,39 @@ pub export fn fourDimInitFromNDarray(
     }
 
     const frame_size = dims[0] * dims[1] * dims[2];
-    const len = frame_size * dims[4];
+    const len = frame_size * dims[3];
 
-    const vol = volume.FourDim.init(
-        gpa,
-        std.mem.span(name),
+    const save_config = volume.SaveConfiguration{
+        .basename = std.mem.span(base_name),
+        .folder = std.mem.span(save_folder),
+        .overwrite = overwrite,
+    };
+
+    //LLM: advice on heap allocating the volume
+    const vol_ptr = allocator.create(volume.FourDim) catch {
+        return null;
+    };
+    vol_ptr.* = volume.FourDim.init(
+        allocator,
+        std.mem.span(base_name),
         data[0..len],
-        source,
+        source_format,
         transform,
         false,
         source_fps,
         playback_fps,
         speed,
         dims.*,
-    ) catch |e| {
-        return cErr(e);
+        save_config,
+    ) catch {
+        allocator.destroy(vol_ptr); //LLM: caught this potential memory leak and added this line
+        return null;
+        //HACK: not sure about error handling on Python side
     };
-    //BOOKMARK: Here is where you'd do the save func
-    //will probably need work on volume.zig
-    //rewriting the stuff in the Interpolate struct
-
-    return cErr(0).code; //redundant, but keeps convention
+    return vol_ptr;
 }
+
+//BOOKMARK: up next: a save function with that takes in the above pointer!
 
 //TODO: volume deinit (either here or in volume.zig)
 
@@ -76,7 +88,7 @@ pub const CError = extern struct {
 
 // Print "hello neurovolume" to terminal for testing purposes
 pub export fn hello() void {
-    std.deug.print("hello neurovolume\n", .{});
+    std.debug.print("hello neurovolume\n", .{});
 }
 test "hello" {
     hello();

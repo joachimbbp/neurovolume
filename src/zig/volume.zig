@@ -5,7 +5,6 @@ const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 
 const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
-const InterpolationError = error{ModeDoesNotExist};
 const AccessError = error{IndexOutOBounds};
 
 pub const SourceFormat = enum(c_int) {
@@ -14,8 +13,8 @@ pub const SourceFormat = enum(c_int) {
 };
 
 pub const SaveConfiguration = struct {
-    basename: []u8,
-    folder: []u8,
+    basename: []const u8,
+    folder: []const u8,
     overwrite: bool, // if false, saves version number
 };
 
@@ -40,7 +39,6 @@ pub const FourDim = struct {
 
     //ensure ndarray compliance with prep_4D_ndarray
     pub fn init(
-        base_allocator: std.mem.Allocator,
         name: []const u8,
         data: []const f32,
         source: SourceFormat,
@@ -67,7 +65,6 @@ pub const FourDim = struct {
         }
 
         return .{
-            .base_allocator = base_allocator,
             .name = name,
             .data = data,
             .cartesian_order = cart_ord,
@@ -80,7 +77,6 @@ pub const FourDim = struct {
             .frame_size = dims[0] * dims[1] * dims[2],
             .save_config = save_config,
             .normalizer = normalizer,
-            .allocator = base_allocator,
         };
     }
 
@@ -153,6 +149,8 @@ pub const FourDim = struct {
         }
     }
 };
+
+const InterpolationError = error{ModeDoesNotExist};
 
 pub const InterolationMode = enum(c_int) {
     direct = 0,
