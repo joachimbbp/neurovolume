@@ -3,9 +3,9 @@ const ndarray = @import("ndarray.zig");
 const nifti1 = @import("nifti1.zig");
 const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
-const interpolation = @import("interpolation.zig");
 
 const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
+const InterpolationError = error{ModeDoesNotExist};
 const AccessError = error{IndexOutOBounds};
 
 pub const SourceFormat = enum(c_int) {
@@ -84,10 +84,6 @@ pub const FourDim = struct {
         };
     }
 
-    pub const InterpolationMode = enum {
-        direct,
-    };
-
     //WIP:
     fn buildPath(static: bool, frame: usize, save_config: SaveConfiguration) []const u8 {
         _ = static;
@@ -97,30 +93,10 @@ pub const FourDim = struct {
         return "HAM/SPAM";
     }
 
-    const Interpolate = struct {
-        fn chose(
-            alloc: std.mem.Allocator,
-            mode: InterpolationMode,
-            vol: *FourDim,
-        ) !void {
-            switch (mode) {
-                //WARN: broken might be deprecated
-                .direct => try direct(alloc, vol),
-                //TODO: error handling
-            }
-            //feeling kinda meh about this pattern
-            //it would be nicer if I didn't have to use
-            //a separate structure for this
-            //like some sort of reflection on the
-            //methods on this struct idk
-            //TODO:
-            //I mean basically you've got the interpolation mode
-            //and the source. Both of these effect how you
-            //write the vdb to disk and how you access the data
-            //(respectively). So there is probably some better patterin in
-            //here.
-        }
-    };
+    // pub fn save(interpolator: *const fn (std.mem.Allocator, *FourDim) !void, allocator: std.mem.Allocator,) !void {
+    //
+    //     try interpolator(allocator, &FourDim,
+    // }
 
     fn saveFrame(
         v: *FourDim,
@@ -144,15 +120,15 @@ pub const FourDim = struct {
 
     //extracts a 3D slice of a 4D ndarray to a VDB
     pub fn extractFrame(
+        self: *FourDim,
         frame_num: usize,
-        v: FourDim,
         vdb: *vdb543.VDB,
     ) !void {
-        if (frame_num >= v.dims[3]) return AccessError.IndexOutOBounds;
+        if (frame_num >= self.dims[3]) return AccessError.IndexOutOBounds;
         //Assuming that there aren't headers or things in ndarrays
         //  (I should read the docs I guess)
-        const start = frame_num * v.frame_size;
-        const end = ((frame_num + 1) * v.frame_size);
+        const start = frame_num * self.frame_size;
+        const end = ((frame_num + 1) * self.frame_size);
 
         var i: usize = 0;
         var cart = [_]usize{ 0, 0, 0 };
@@ -160,20 +136,42 @@ pub const FourDim = struct {
             try vdb543.setVoxel(
                 vdb,
                 .{
-                    cart[v.cartesian_order[0]],
-                    cart[v.cartesian_order[1]],
-                    cart[v.cartesian_order[2]],
+                    cart[self.cartesian_order[0]],
+                    cart[self.cartesian_order[1]],
+                    cart[self.cartesian_order[2]],
                 },
-                v.normalizer.apply(v.data[start..end][i]),
-                v.allocator,
+                self.normalizer.apply(self.data[start..end][i]),
+                self.allocator,
             );
 
             i += 1;
             if (!util.incrementCartesian(
                 3,
                 &cart,
-                .{ v.dims[0], v.dims[1], v.dims[2] },
+                .{ self.dims[0], self.dims[1], self.dims[2] },
             )) break;
+        }
+    }
+};
+
+pub const InterolationMode = enum(c_int) {
+    direct = 0,
+};
+
+pub const Interpolate = struct {
+    allocator: std.mem.Allocator,
+    vol: *FourDim,
+    mode: InterolationMode,
+
+    pub fn write(self: *Interpolate) !void {
+        //HACK: I don't love this pattern, I feel like there is a more elegant way
+        //to chose a function below without having to write it out in two places
+        switch (self.mode) {
+            .direct => direct(self.allocator, self.vol),
+            else => {
+                std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
+                return InterpolationError.ModeDoesNotExist;
+            },
         }
     }
 
@@ -182,8 +180,7 @@ pub const FourDim = struct {
     // to the VDB sequene
     fn direct(
         allocator: std.mem.Allocator,
-        v: *FourDim,
-        format: SourceFormat,
+        vol: *FourDim,
     ) !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
@@ -191,15 +188,15 @@ pub const FourDim = struct {
 
         var buffer = std.array_list.Managed(u8).init(arena.allocator());
 
-        for (0..v.dims[3]) |n| {
+        for (0..vol.dims[3]) |n| {
             //TODO: maybe free the memory after its saved to disk?
-            switch (format) {
-                .ndarray => try extractFrame(n, v, &vdb),
+            switch (vol.source) {
+                .ndarray => try vol.extractFrame(vol, &vdb),
                 else => return DataFormatError.NotSupportedYet,
             }
 
-            try vdb543.writeVDB(&buffer, &vdb, v.affine_transform);
-            saveFrame(v, n, &buffer);
+            try vdb543.writeVDB(&buffer, &vdb, vol.affine_transform);
+            vol.saveFrame(n, &buffer);
         }
     }
 };
