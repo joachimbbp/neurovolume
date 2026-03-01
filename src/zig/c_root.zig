@@ -5,12 +5,12 @@ const std = @import("std");
 //WARN: must mirror SourceFormat in volume.zig
 
 //initializes Volume.FourDim, a four dimensional volume
-//from a ndarray
+//from an ndarray
 //call source with:
 //      c_int(0) #ndarray
 //      c_int(1) #nifti1
 //returns a ptr to the volume
-pub export fn fourDimInitFromNDarray(
+pub export fn initFourDim(
     base_name: [*:0]const u8,
     save_folder: [*:0]const u8,
     overwrite: bool,
@@ -46,7 +46,6 @@ pub export fn fourDimInitFromNDarray(
     };
     vol_ptr.* = volume.FourDim.init(
         allocator,
-        std.mem.span(base_name),
         data[0..len],
         source_format,
         transform,
@@ -65,6 +64,7 @@ pub export fn fourDimInitFromNDarray(
 }
 
 //BOOKMARK: up next: a save function with that takes in the above pointer!
+// pub export fn deinitFourDim
 
 //TODO: volume deinit (either here or in volume.zig)
 

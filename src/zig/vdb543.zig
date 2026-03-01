@@ -144,7 +144,7 @@ pub fn setVoxel(
     vdb: *VDB,
     position: [3]u32,
     value: f32,
-    allocator: std.mem.Allocator,
+    arena_allocator: std.mem.Allocator,
 ) !void {
     var node_5: *Node5 = vdb.five_node;
 
@@ -155,7 +155,7 @@ pub fn setVoxel(
     var node_4: *Node4 = undefined;
     const node_4_or_null = node_5.four_nodes.get(bit_index_4);
     if (node_4_or_null == null) {
-        node_4 = try Node4.build(allocator);
+        node_4 = try Node4.build(arena_allocator);
         try node_5.four_nodes.put(bit_index_4, node_4);
     } else {
         node_4 = node_4_or_null.?;
@@ -164,7 +164,7 @@ pub fn setVoxel(
     var node_3: *Node3 = undefined;
     const node_3_or_null = node_4.three_nodes.get(bit_index_3);
     if (node_3_or_null == null) {
-        node_3 = try Node3.build(allocator);
+        node_3 = try Node3.build(arena_allocator);
         try node_4.three_nodes.put(bit_index_3, node_3);
     } else {
         node_3 = node_3_or_null.?;

@@ -21,11 +21,10 @@ pub const SaveConfiguration = struct {
 //Four dimensional volume structure
 //nothing is allocated in this struct so no deinit
 pub const FourDim = struct {
-    base_allocator: std.mem.Allocator,
     name: []const u8,
     data: []const f32,
     cartesian_order: [3]usize, // ndarray: 2 1 0 , nifti1: 0 1 2
-    source: SourceFormat,
+    source_format: SourceFormat,
     affine_transform: [4][4]f64, //spatial transform only!
     source_fps: f32,
     playback_fps: f32,
@@ -33,15 +32,13 @@ pub const FourDim = struct {
     dims: [4]usize, // x y z t
     frame_size: usize,
     save_config: SaveConfiguration,
-
     normalizer: util.Normalizer,
-    allocator: std.mem.Allocator,
 
     //ensure ndarray compliance with prep_4D_ndarray
     pub fn init(
         name: []const u8,
         data: []const f32,
-        source: SourceFormat,
+        source_format: SourceFormat,
         transform: [4][4]f64,
         normalize: bool,
         source_fps: f32,
@@ -53,7 +50,7 @@ pub const FourDim = struct {
         var cart_ord: [3]usize = undefined;
         var normalizer: util.Normalizer = undefined;
 
-        switch (source) {
+        switch (source_format) {
             .ndarray => {
                 cart_ord = .{ 2, 1, 0 };
                 if (normalize) {
@@ -68,7 +65,7 @@ pub const FourDim = struct {
             .name = name,
             .data = data,
             .cartesian_order = cart_ord,
-            .source = source,
+            .source_format = source_format,
             .affine_transform = transform,
             .source_fps = source_fps,
             .playback_fps = playback_fps,
@@ -117,6 +114,7 @@ pub const FourDim = struct {
     //extracts a 3D slice of a 4D ndarray to a VDB
     pub fn extractFrame(
         self: *FourDim,
+        arena_allocator: std.mem.Allocator,
         frame_num: usize,
         vdb: *vdb543.VDB,
     ) !void {
@@ -127,7 +125,7 @@ pub const FourDim = struct {
         const end = ((frame_num + 1) * self.frame_size);
 
         var i: usize = 0;
-        var cart = [_]usize{ 0, 0, 0 };
+        var cart = [_]u32{ 0, 0, 0 };
         while (true) {
             try vdb543.setVoxel(
                 vdb,
@@ -137,7 +135,7 @@ pub const FourDim = struct {
                     cart[self.cartesian_order[2]],
                 },
                 self.normalizer.apply(self.data[start..end][i]),
-                self.allocator,
+                arena_allocator,
             );
 
             i += 1;
@@ -148,6 +146,7 @@ pub const FourDim = struct {
             )) break;
         }
     }
+    //TODO: allocaotor destroy???
 };
 
 const InterpolationError = error{ModeDoesNotExist};
@@ -157,15 +156,20 @@ pub const InterolationMode = enum(c_int) {
 };
 
 pub const Interpolate = struct {
-    allocator: std.mem.Allocator,
     vol: *FourDim,
     mode: InterolationMode,
 
     pub fn write(self: *Interpolate) !void {
         //HACK: I don't love this pattern, I feel like there is a more elegant way
         //to chose a function below without having to write it out in two places
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        const gpa_alloc = gpa.allocator();
+        defer _ = gpa.deinit();
+        var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+        defer arena.deinit();
+
         switch (self.mode) {
-            .direct => direct(self.allocator, self.vol),
+            .direct => direct(arena.allocator(), self.vol),
             else => {
                 std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
                 return InterpolationError.ModeDoesNotExist;
@@ -173,28 +177,62 @@ pub const Interpolate = struct {
         }
     }
 
+    //BOOKMARK:
+    //FIx this messy stuff that claude pushed you towards
+    //From claude:
+
+    //⏺ Yeah, it is weird — you're right to push back. Nesting an arena inside another arena's
+    //   interface is odd and unnecessary.
+    //
+    //   The cleaner fix is to just pass *std.heap.ArenaAllocator directly so direct owns the reset
+    //   logic:
+    //
+    //   fn direct(arena: *std.heap.ArenaAllocator, vol: *FourDim) !void {
+    //       for (0..vol.dims[3]) |n| {
+    //           defer _ = arena.reset(.retain_capacity);
+    //           var vdb = try vdb543.VDB.build(arena.allocator());
+    //           var buffer = std.array_list.Managed(u8).init(arena.allocator());
+    //           ...
+    //       }
+    //   }
+    //
+    //   And in write, pass &arena instead of arena.allocator():
+    //
+    //   .direct => try direct(&arena, self.vol),
+    //
+    //   Now write creates and destroys the arena, direct resets it per frame. No nesting, no
+    //   weirdness. The GPA → arena relationship is clean and the ownership is obvious.
+    //
+    //
+
     // No interpolation
     // Frames from source are written directly
     // to the VDB sequene
     fn direct(
-        allocator: std.mem.Allocator,
+        arena_alloc: std.mem.Allocator,
         vol: *FourDim,
     ) !void {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-        var vdb = try vdb543.VDB.build(arena.allocator());
-
-        var buffer = std.array_list.Managed(u8).init(arena.allocator());
-
+        var frame_arena = std.heap.ArenaAllocator.init(arena_alloc);
+        defer frame_arena.deinit();
         for (0..vol.dims[3]) |n| {
-            //TODO: maybe free the memory after its saved to disk?
-            switch (vol.source) {
-                .ndarray => try vol.extractFrame(vol, &vdb),
+            defer _ = frame_arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
+            var vdb = try vdb543.VDB.build(arena_alloc);
+            var buffer = std.array_list.Managed(u8).init(arena_alloc);
+            switch (vol.source_format) {
+                .ndarray => try vol.extractFrame(
+                    arena_alloc,
+                    n,
+                    &vdb,
+                ),
                 else => return DataFormatError.NotSupportedYet,
             }
 
-            try vdb543.writeVDB(&buffer, &vdb, vol.affine_transform);
-            vol.saveFrame(n, &buffer);
+            try vdb543.writeVDB(
+                &buffer,
+                &vdb,
+                vol.affine_transform,
+            );
+            try vol.saveFrame(n, &buffer);
         }
     }
 };
