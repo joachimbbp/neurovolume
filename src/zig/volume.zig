@@ -114,7 +114,7 @@ pub const FourDim = struct {
     //extracts a 3D slice of a 4D ndarray to a VDB
     pub fn extractFrame(
         self: *FourDim,
-        arena_allocator: std.mem.Allocator,
+        allocator: std.mem.Allocator,
         frame_num: usize,
         vdb: *vdb543.VDB,
     ) !void {
@@ -135,7 +135,7 @@ pub const FourDim = struct {
                     cart[self.cartesian_order[2]],
                 },
                 self.normalizer.apply(self.data[start..end][i]),
-                arena_allocator,
+                allocator,
             );
 
             i += 1;
@@ -209,18 +209,16 @@ pub const Interpolate = struct {
     // Frames from source are written directly
     // to the VDB sequene
     fn direct(
-        arena_alloc: std.mem.Allocator,
+        arena: *std.heap.ArenaAllocator,
         vol: *FourDim,
     ) !void {
-        var frame_arena = std.heap.ArenaAllocator.init(arena_alloc);
-        defer frame_arena.deinit();
         for (0..vol.dims[3]) |n| {
-            defer _ = frame_arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
-            var vdb = try vdb543.VDB.build(arena_alloc);
-            var buffer = std.array_list.Managed(u8).init(arena_alloc);
+            defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
+            var vdb = try vdb543.VDB.build(arena.allocator());
+            var buffer = std.array_list.Managed(u8).init(arena.allocator());
             switch (vol.source_format) {
                 .ndarray => try vol.extractFrame(
-                    arena_alloc,
+                    arena.allocator(),
                     n,
                     &vdb,
                 ),

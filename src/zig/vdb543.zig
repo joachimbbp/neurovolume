@@ -5,7 +5,6 @@
 // [ ] Optimizations (if needed)
 //      [ ]  setVoxels one 3-node at a time to reduce syscalls (
 // [ ] Improve error handling
-//[ ] remove perscriptive "arena allocator" var name?
 //DEPRECATED: remove this abstraction eventually
 const ArrayList = std.array_list.Managed;
 
@@ -71,8 +70,8 @@ pub const VDB = struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    pub fn build(arena_allocator: std.mem.Allocator) !VDB { //WARN: should be arena
-        const five_node = try Node5.build(arena_allocator);
+    pub fn build(allocator: std.mem.Allocator) !VDB { //WARN: should be arena
+        const five_node = try Node5.build(allocator);
         return VDB{ .five_node = five_node };
     }
 };
@@ -144,7 +143,7 @@ pub fn setVoxel(
     vdb: *VDB,
     position: [3]u32,
     value: f32,
-    arena_allocator: std.mem.Allocator,
+    allocator: std.mem.Allocator,
 ) !void {
     var node_5: *Node5 = vdb.five_node;
 
@@ -155,7 +154,7 @@ pub fn setVoxel(
     var node_4: *Node4 = undefined;
     const node_4_or_null = node_5.four_nodes.get(bit_index_4);
     if (node_4_or_null == null) {
-        node_4 = try Node4.build(arena_allocator);
+        node_4 = try Node4.build(allocator);
         try node_5.four_nodes.put(bit_index_4, node_4);
     } else {
         node_4 = node_4_or_null.?;
@@ -164,7 +163,7 @@ pub fn setVoxel(
     var node_3: *Node3 = undefined;
     const node_3_or_null = node_4.three_nodes.get(bit_index_3);
     if (node_3_or_null == null) {
-        node_3 = try Node3.build(arena_allocator);
+        node_3 = try Node3.build(allocator);
         try node_4.three_nodes.put(bit_index_3, node_3);
     } else {
         node_3 = node_3_or_null.?;
@@ -395,10 +394,9 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
     defer _ = gpa.deinit();
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-    var arena_alloc = arena.allocator();
+    const arena_alloc = arena.allocator();
 
     var buffer = std.array_list.Managed(u8).init(arena_alloc);
-    defer buffer.deinit();
     const R: u32 = 128;
     const D: u32 = R * 2;
     var sphere_vdb = try VDB.build(arena_alloc);
@@ -428,7 +426,7 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
     try test_patterns.saveTestPattern(
         save_dir,
         "sphere_test_pattern",
-        &arena_alloc,
+        arena_alloc,
         &buffer,
     );
 }
@@ -438,10 +436,9 @@ pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
     defer _ = gpa.deinit();
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-    var arena_alloc = arena.allocator();
+    const arena_alloc = arena.allocator();
 
     var buffer = ArrayList(u8).init(arena_alloc);
-    defer buffer.deinit();
 
     var single_voxel = try VDB.build(arena_alloc);
 
@@ -460,7 +457,7 @@ pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
     try test_patterns.saveTestPattern(
         save_dir,
         "one_pixel_test_pattern",
-        &arena_alloc,
+        arena_alloc,
         &buffer,
     );
 }
