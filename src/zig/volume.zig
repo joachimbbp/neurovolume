@@ -1,6 +1,5 @@
 const std = @import("std");
 const ndarray = @import("ndarray.zig");
-const nifti1 = @import("nifti1.zig");
 const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 
@@ -62,6 +61,7 @@ pub const FourDim = struct {
                 }
                 normalizer = util.Normalizer.init(false, 0.0, 1.0);
             },
+            else => return DataFormatError.NotSupportedYet,
         }
 
         return .{
@@ -92,7 +92,7 @@ pub const FourDim = struct {
     fn saveFrame(
         v: *FourDim,
         frame_num: usize,
-        buffer: *std.ArrayList(u8),
+        buffer: *std.array_list.Managed(u8),
     ) !void {
 
         //LLM: temp save for debug lines
@@ -102,7 +102,10 @@ pub const FourDim = struct {
         //in save config (to build in FourDim init)
         _ = v;
 
-        const file = try std.fs.cwd().createFile(std.mem.span(output_filepath), .{});
+        const file = try std.fs.cwd().createFile(
+            output_filepath,
+            .{},
+        );
 
         try file.writeAll(buffer.items);
 
@@ -138,6 +141,7 @@ pub const FourDim = struct {
 
             i += 1;
             if (!util.incrementCartesian(
+                u32,
                 3,
                 &cart,
                 .{ self.dims[0], self.dims[1], self.dims[2] },
@@ -148,13 +152,13 @@ pub const FourDim = struct {
         self: *FourDim,
         interpolation: InterpolationMode,
     ) !void {
-        const interpolator = Interpolator{
+        var interpolator = Interpolator{
             .vol = self,
             .mode = interpolation,
         };
         //TODO: save config to somewhere other than the hard coded temp dir
         //see FourDim.saveFrame
-        interpolator.write();
+        try interpolator.write();
     }
 };
 
@@ -178,11 +182,11 @@ pub const Interpolator = struct {
         defer arena.deinit();
 
         switch (self.mode) {
-            .direct => direct(&arena, self.vol),
-            else => {
-                std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
-                return InterpolationError.ModeDoesNotExist;
-            },
+            .direct => try direct(&arena, self.vol),
+            // else => {
+            //     std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
+            //     return InterpolationError.ModeDoesNotExist;
+            // },
         }
     }
 
@@ -197,6 +201,7 @@ pub const Interpolator = struct {
             defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
             var vdb = try vdb543.VDB.build(arena.allocator());
             var buffer = std.array_list.Managed(u8).init(arena.allocator());
+            // var buffer = std.ArrayList(u8).init(arena.allocator());
             switch (vol.source_format) {
                 .ndarray => try vol.extractFrame(
                     arena.allocator(),

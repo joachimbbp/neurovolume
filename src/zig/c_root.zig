@@ -45,6 +45,7 @@ pub export fn initFourDim(
         return null;
     };
     vol_ptr.* = volume.FourDim.init(
+        std.mem.span(base_name),
         data[0..len],
         source_format,
         transform,
@@ -74,14 +75,17 @@ pub export fn deinitFourDim(ptr: ?*anyopaque) void {
 pub export fn saveFourDim(
     ptr: ?*anyopaque,
     interpolation_mode: c_int, //0 for direct
-) void {
+) usize {
     const allocator = std.heap.c_allocator;
     if (ptr) |p| { //LLM: unwrapping pattern
         const vol_ptr: *volume.FourDim = @ptrCast(@alignCast(p));
-        vol_ptr.save(@as(volume.InterpolationMode, @enumFromInt(interpolation_mode))); //LLM: casting pattern
+        vol_ptr.save(@as(volume.InterpolationMode, @enumFromInt(interpolation_mode))) catch |e| {
+            return cErr(e).code;
+        }; //LLM: casting pattern
 
         allocator.destroy(vol_ptr);
     } //else would be a null ptr
+    return 0;
 }
 
 //BOOKMARK: up next: a save function with that takes in the above pointer!
@@ -93,6 +97,7 @@ pub export fn saveFourDim(
 pub fn cErr(e: anyerror) CError {
     const name = @errorName(e);
     return .{
+        //TODO: should this be a c_int????
         .code = @intFromError(e),
         .name = name.ptr,
         .len = name.len,

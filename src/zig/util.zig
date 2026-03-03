@@ -30,7 +30,7 @@ pub const Normalizer = struct {
     minmax_delta: f32,
 
     pub fn apply(self: Normalizer, value: f32) f32 {
-        if (!self.apply) {
+        if (!self.active) {
             return value;
         }
         return (value - self.min_val) / self.minmax_delta;
@@ -47,8 +47,9 @@ pub fn stripped_basename(path: []const u8) []const u8 {
 }
 
 pub fn incrementCartesian(
+    comptime T: type,
     comptime num_dims: comptime_int,
-    cart_coord: *[num_dims]usize,
+    cart_coord: *[num_dims]T,
     dim_sizes: [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
