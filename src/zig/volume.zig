@@ -22,7 +22,7 @@ pub const SaveConfiguration = struct {
 pub const FourDim = struct {
     name: []const u8,
     data: []const f32,
-    cartesian_order: [3]usize, // ndarray: 2 1 0 , nifti1: 0 1 2
+    cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
     source_format: SourceFormat,
     affine_transform: [4][4]f64, //spatial transform only!
     source_fps: f32,
@@ -51,7 +51,7 @@ pub const FourDim = struct {
 
         switch (source_format) {
             .ndarray => {
-                cart_ord = .{ 2, 1, 0 };
+                cart_ord = .{ 0, 1, 2 }; // identity: prep_4D_ndarray already handles axis reordering
                 if (normalize) {
                     std.debug.print(
                         "FYI: To ensure compliance, use the prep_4D_ndarray function in the python library",

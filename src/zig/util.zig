@@ -53,9 +53,12 @@ pub fn incrementCartesian(
     dim_sizes: [num_dims]usize,
 ) bool {
     //false if overflow occurs, true if otherwise
-    for (0.., dim_sizes) |i, di| {
+    //C-order (row-major): last index changes fastest, matching numpy C-contiguous layout
+    var i: usize = num_dims;
+    while (i > 0) {
+        i -= 1;
         cart_coord[i] += 1;
-        if (cart_coord[i] < di) {
+        if (cart_coord[i] < dim_sizes[i]) {
             return true;
         }
         cart_coord[i] = 0;
