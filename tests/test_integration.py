@@ -105,9 +105,8 @@ def test_bold_seq():
     if max_val > 0:
         prepped_data = prepped_data / max_val
 
-    # dims must be (x, z, y, t), NOT prepped_data.shape which is (t, x, z, y)
-    t_count = prepped_data.shape[0]
-    dims = (prepped_data.shape[1], prepped_data.shape[2], prepped_data.shape[3], t_count)
+    # x y z t
+    dims = prepped_data.shape
 
     vol = nv.init_four_dim(
         base_name="bold_test",

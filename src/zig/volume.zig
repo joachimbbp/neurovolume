@@ -17,6 +17,19 @@ pub const SaveConfiguration = struct {
     overwrite: bool, // if false, saves version number
 };
 
+pub const ThreeDim = struct {
+    name: []const u8,
+    data: []const f32,
+    cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
+    source_format: SourceFormat,
+    affine_transform: [4][4]f64, //spatial transform only!
+    source_fps: f32,
+    dims: [3]usize, // x y z
+    frame_size: usize,
+    save_config: SaveConfiguration,
+    normalizer: util.Normalizer,
+};
+
 //Four dimensional volume structure
 //nothing is allocated in this struct so no deinit
 pub const FourDim = struct {
@@ -28,7 +41,7 @@ pub const FourDim = struct {
     source_fps: f32,
     playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
-    dims: [4]usize, // x y z t
+    dims: [4]usize, // time first, then domain specific spatial layout
     frame_size: usize,
     save_config: SaveConfiguration,
     normalizer: util.Normalizer,
@@ -74,7 +87,7 @@ pub const FourDim = struct {
             .playback_fps = playback_fps,
             .speed = speed,
             .dims = dims,
-            .frame_size = dims[0] * dims[1] * dims[2],
+            .frame_size = dims[1] * dims[2] * dims[3],
             .save_config = save_config,
             .normalizer = normalizer,
         };
@@ -119,7 +132,7 @@ pub const FourDim = struct {
         frame_num: usize,
         vdb: *vdb543.VDB,
     ) !void {
-        if (frame_num >= self.dims[3]) return AccessError.IndexOutOBounds;
+        if (frame_num >= self.dims[0]) return AccessError.IndexOutOBounds;
         //Assuming that there aren't headers or things in ndarrays
         //  (I should read the docs I guess)
         const start = frame_num * self.frame_size;
@@ -144,7 +157,7 @@ pub const FourDim = struct {
                 u32,
                 3,
                 &cart,
-                .{ self.dims[0], self.dims[1], self.dims[2] },
+                .{ self.dims[1], self.dims[2], self.dims[3] },
             )) break;
         }
     }
@@ -197,7 +210,7 @@ pub const Interpolator = struct {
         arena: *std.heap.ArenaAllocator,
         vol: *FourDim,
     ) !void {
-        for (0..vol.dims[3]) |n| {
+        for (0..vol.dims[0]) |n| {
             defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
             var vdb = try vdb543.VDB.build(arena.allocator());
             var buffer = std.array_list.Managed(u8).init(arena.allocator());

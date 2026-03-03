@@ -66,12 +66,8 @@ def prep_4D_ndarray(
         earlier in your pipeline
     transpose: tuple
         requires some domain knowledge about how your ndarray is laid out.
-        CRITICAL for 4D data: the time axis MUST be first (index 0) after
-        transposing so that frames are contiguous in C-order memory.
-        Zig's extractFrame slices data[n*frame_size..(n+1)*frame_size], which
-        only gives a correct single time-point when t is the slowest (leading) dim.
-        Example for nibabel/ANTs 4D (x,y,z,t): use (3, 0, 2, 1) → (t, x, z, y)
-
+        nibabel and ants are (x, y, z, t)
+        this function will always move t to index 0
     Returns:
     ------------
     np.ndarray
