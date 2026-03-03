@@ -76,14 +76,11 @@ pub export fn saveFourDim(
     ptr: ?*anyopaque,
     interpolation_mode: c_int, //0 for direct
 ) usize {
-    const allocator = std.heap.c_allocator;
     if (ptr) |p| { //LLM: unwrapping pattern
         const vol_ptr: *volume.FourDim = @ptrCast(@alignCast(p));
         vol_ptr.save(@as(volume.InterpolationMode, @enumFromInt(interpolation_mode))) catch |e| {
             return cErr(e).code;
         }; //LLM: casting pattern
-
-        allocator.destroy(vol_ptr);
     } //else would be a null ptr
     return 0;
 }

@@ -74,14 +74,14 @@ def test_hello():
 
 # TODO: Better testing! This is very incomplete as of now
 
-
-def test_pyramid():
-    pyramid, built = build_pyramid()
-    assert built, "Pyramid should build successfully"
-    output_arr = "./tests/data/vdb_out/pyramid.vdb"
-    nv.ndarray_to_VDB(pyramid, output_arr)
-    print("pyramid built")
-
+# TODO: rewrite this with the new functionality
+# def test_pyramid():
+#     pyramid, built = build_pyramid()
+#     assert built, "Pyramid should build successfully"
+#     output_arr = "./tests/data/vdb_out/pyramid.vdb"
+#     nv.ndarray_to_VDB(pyramid, output_arr)
+#     print("pyramid built")
+#
 
 # TODO:
 # move nibabel and other testing only
@@ -94,7 +94,11 @@ def test_bold_seq():
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float64)
     # just for safety:
-    prepped_data = nv.prep_4D_ndarray(data, {0, 2, 1})
+    # LLM: suggested adding an extra field here
+    # this squares with  my knowledge but
+    # is untested, so if the vdb is garbled
+    # this isn't a bad place to start debugging!
+    prepped_data = nv.prep_4D_ndarray(data, (0, 2, 1, 3))
     vol = nv.init_four_dim(
         base_name="bold_test",
         save_folder="/path/to/output",  # FIX: this field doesnt do anyhting right now

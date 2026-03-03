@@ -97,7 +97,7 @@ pub const FourDim = struct {
 
         //LLM: temp save for debug lines
         var buf: [256]u8 = undefined;
-        const output_filepath = try std.fmt.bufPrint(&buf, "../../output/tmp_{d}.vdb", .{frame_num});
+        const output_filepath = try std.fmt.bufPrint(&buf, "/Users/joachimpfefferkorn/repos/neurovolume/output/tmp_{d}.vdb", .{frame_num});
         //TODO: save logic based off versioning bool etc
         //in save config (to build in FourDim init)
         _ = v;
