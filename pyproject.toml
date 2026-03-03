@@ -12,7 +12,7 @@ dependencies = [
     "nibabel>=5.4.0",
     "numpy>=1.26,<2.0", # Match blener 5.0.0
     "pytest>=9.0.1",
-    "ziglang>=0.15.1",
+    "ziglang>=0.15.2",
 ]
 
 [build-system]
