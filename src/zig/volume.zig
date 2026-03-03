@@ -11,24 +11,63 @@ pub const SourceFormat = enum(c_int) {
     nifti1 = 1,
 };
 
+const ndarray_fyi = "FYI: To ensure compliance, use the prep_ndarray function in the python library. Ndarrays are assumed to be normalized f32s in C order";
+
 pub const SaveConfiguration = struct {
     basename: []const u8,
     folder: []const u8,
     overwrite: bool, // if false, saves version number
 };
 
-pub const ThreeDim = struct {
-    name: []const u8,
-    data: []const f32,
-    cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
-    source_format: SourceFormat,
-    affine_transform: [4][4]f64, //spatial transform only!
-    source_fps: f32,
-    dims: [3]usize, // x y z
-    frame_size: usize,
-    save_config: SaveConfiguration,
-    normalizer: util.Normalizer,
-};
+// pub const ThreeDim = struct {
+//     name: []const u8,
+//     data: []const f32,
+//     cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
+//     source_format: SourceFormat,
+//     affine_transform: [4][4]f64, //spatial transform only!
+//     source_fps: f32,
+//     dims: [3]usize, // x y z
+//     vol_size: usize,
+//     save_config: SaveConfiguration,
+//     normalizer: util.Normalizer,
+//     //ensure ndarray compliance with prep_4D_ndarray
+//     pub fn init(
+//         name: []const u8,
+//         data: []const f32,
+//         source_format: SourceFormat,
+//         transform: [4][4]f64,
+//         normalize: bool,
+//         dims: [3]usize,
+//         save_config: SaveConfiguration,
+//     ) !ThreeDim {
+//         var cart_ord: [3]usize = undefined;
+//         var normalizer: util.Normalizer = undefined;
+//
+//         switch (source_format) {
+//             .ndarray => {
+//                 cart_ord = .{ 0, 1, 2 };
+//                 if (normalize) {
+//                     std.debug.print(ndarray_fyi, .{});
+//                     return DataFormatError.UnsupportedUsage;
+//                 }
+//                 normalizer = util.Normalizer.init(false, 0.0, 1.0);
+//             },
+//             else => return DataFormatError.NotSupportedYet,
+//         }
+//
+//         return .{
+//             .name = name,
+//             .data = data,
+//             .cartesian_order = cart_ord,
+//             .source_format = source_format,
+//             .affine_transform = transform,
+//             .dims = dims,
+//             .vol_size = dims[1] * dims[2] * dims[3],
+//             .save_config = save_config,
+//             .normalizer = normalizer,
+//         };
+//     }
+// };
 
 //Four dimensional volume structure
 //nothing is allocated in this struct so no deinit
@@ -50,6 +89,7 @@ pub const FourDim = struct {
     pub fn init(
         name: []const u8,
         data: []const f32,
+        cartesian_order: [3]usize,
         source_format: SourceFormat,
         transform: [4][4]f64,
         normalize: bool,
@@ -59,15 +99,13 @@ pub const FourDim = struct {
         dims: [4]usize,
         save_config: SaveConfiguration,
     ) !FourDim {
-        var cart_ord: [3]usize = undefined;
         var normalizer: util.Normalizer = undefined;
 
         switch (source_format) {
             .ndarray => {
-                cart_ord = .{ 0, 1, 2 }; // identity: prep_4D_ndarray already handles axis reordering
                 if (normalize) {
                     std.debug.print(
-                        "FYI: To ensure compliance, use the prep_4D_ndarray function in the python library",
+                        ndarray_fyi,
                         .{},
                     );
                     return DataFormatError.UnsupportedUsage;
@@ -80,7 +118,7 @@ pub const FourDim = struct {
         return .{
             .name = name,
             .data = data,
-            .cartesian_order = cart_ord,
+            .cartesian_order = cartesian_order,
             .source_format = source_format,
             .affine_transform = transform,
             .source_fps = source_fps,
@@ -91,15 +129,6 @@ pub const FourDim = struct {
             .save_config = save_config,
             .normalizer = normalizer,
         };
-    }
-
-    //WIP:
-    fn buildPath(static: bool, frame: usize, save_config: SaveConfiguration) []const u8 {
-        _ = static;
-        _ = frame;
-        _ = save_config;
-        //WARNING: probably shouldn't be a []u8????
-        return "HAM/SPAM";
     }
 
     fn saveFrame(
@@ -233,3 +262,12 @@ pub const Interpolator = struct {
         }
     }
 };
+
+//WIP:
+fn buildPath(static: bool, frame: usize, save_config: SaveConfiguration) []const u8 {
+    _ = static;
+    _ = frame;
+    _ = save_config;
+    //WARNING: probably shouldn't be a []u8????
+    return "HAM/SPAM";
+}

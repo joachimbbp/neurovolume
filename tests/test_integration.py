@@ -97,7 +97,7 @@ def test_bold_seq():
     # Zig extractFrame slices data[n*frame_size..(n+1)*frame_size] — this only gives
     # a correct single time-point if t is the leading dimension.
     # (3, 0, 2, 1): t→dim0, x→dim1, z→dim2, y→dim3  (y/z swap kept from prior convention)
-    prepped_data = nv.prep_4D_ndarray(data, (3, 0, 2, 1))
+    prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
     # shape: (t, x, z, y), C-contiguous — frame n = prepped_data[n]
 
     # Normalize to [0, 1] — VDB requires float32 in this range
@@ -112,7 +112,6 @@ def test_bold_seq():
         base_name="bold_test",
         save_folder="/path/to/output",  # FIX: this field doesnt do anyhting right now
         overwrite=True,
-        source_format=0,  # 0=ndarray
         data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
         transform=np.eye(4),  # 4x4 affine float64
         source_fps=1.0,
@@ -122,23 +121,3 @@ def test_bold_seq():
     )
     nv.save_four_dim(vol, 0)
     nv.deinit_four_dim(vol)
-
-
-# DEPRECATED: we might move to ndarrays only
-# def test_nifti():
-#     pyramid, built = build_pyramid()
-#     assert built, "Pyramid should build successfully"
-#     print("writing bold seq...")
-#     bold_path = nv.nifti1_to_VDB(
-#         bold,
-#         vdb_out,
-#         True,
-#     )
-#     print("vdb bold seq written to ", bold_path)
-#     print("writing anat file...")
-#     anat_path = nv.nifti1_to_VDB(
-#         anat,
-#         vdb_out,
-#         True,
-#     )
-#     print("vdb anat saved to ", anat_path)

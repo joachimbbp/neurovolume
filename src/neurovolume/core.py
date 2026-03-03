@@ -49,7 +49,7 @@ def hello():
     nv.hello()
 
 
-def prep_4D_ndarray(
+def prep_ndarray(
     arr: np.ndarray,
     transpose: tuple,
 ) -> np.ndarray:
@@ -66,8 +66,7 @@ def prep_4D_ndarray(
         earlier in your pipeline
     transpose: tuple
         requires some domain knowledge about how your ndarray is laid out.
-        nibabel and ants are (x, y, z, t)
-        this function will always move t to index 0
+        nibabel and ants are (x, y, z, t) for 4D arrays
     Returns:
     ------------
     np.ndarray
@@ -79,66 +78,19 @@ def prep_4D_ndarray(
     return arr
 
 
-def nifti1_to_VDB(
-    nifti_path: str,
-    output_dir: str,
-    normalize: bool,
-) -> str:
-    """
-    Writes a VDB from a nifti1file
-
-    WARNING:
-    Uses native parsing which is currently in active development.
-    This may not cover all your use cases.
-    Recomend using ndarray_to_VDB paired with a third party NIfTI parser.
-    See neurovolume_examples for more
-    """
-    BUF_SIZE = 4096  # somewhat arbitrary, should be big enough for file name
-    save_location = c.create_string_buffer(BUF_SIZE)
-    nv.nifti1ToVDB_c.argtypes = [
-        c.c_char_p,
-        c.c_char_p,
-        c.c_bool,
-        c.POINTER(c.c_char),
-        c.c_size_t,
-    ]
-    nv.nifti1ToVDB_c.restype = c.c_size_t
-    nv.nifti1ToVDB_c(b(nifti_path), b(output_dir), normalize, save_location, BUF_SIZE)
-
-    return save_location.value.decode()
-
-
-# FIX: almost all of these `case "NIfTI1"` switches are redundant,
-# the same logic is following in the zig code
-
-
-def num_frames(filepath: str, filetype: str) -> int:
-    match filetype:
-        case "NIfTI1":
-            nv.numFrames_c.argtypes = [
-                c.c_char_p,
-                c.c_char_p,
-            ]
-            nv.numFrames_c.restype = c.c_size_t
-            num_frames = nv.numFrames_c(b(filepath), b(filetype))
-            return num_frames
-        case _:
-            err_msg = f"{filetype} is unsupported for num_frames access"
-            raise ValueError(err_msg)
-
-
 # LLM: claude wrote this function
 def init_four_dim(
     base_name: str,
     save_folder: str,
     overwrite: bool,
-    source_format: int,  # 0=ndarray, 1=nifti1 (mirrors volume.zig SourceFormat)
     data: np.ndarray,
     transform: np.ndarray,
     source_fps: float,
     playback_fps: float,
     speed: float,
     dims: tuple,
+    source_format: int = 0,  # 0=ndarray, 1=nifti1 (mirrors volume.zig SourceFormat)
+    cartesian_order: tuple = (0, 1, 2),  # almost always 0 1 2
 ) -> c.c_void_p:
     """
     Initializes a FourDim volume on the Zig heap and returns an opaque pointer.
@@ -164,6 +116,7 @@ def init_four_dim(
         *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
     )
     dims_arr = (c.c_size_t * 4)(*dims)
+    cartesian_arr = (c.c_size_t * 3)(*cartesian_order)  # LLM: fix on this line
 
     nv.initFourDim.argtypes = [
         c.c_char_p,  # base_name
@@ -171,6 +124,7 @@ def init_four_dim(
         c.c_bool,  # overwrite
         c.c_int,  # source_format
         c.POINTER(c.c_float),  # data
+        c.POINTER(c.c_size_t),  # cartesian_order [3]usize
         c.POINTER(c.c_double),  # transform_flat [16]f64
         c.c_float,  # source_fps
         c.c_float,  # playback_fps
@@ -185,6 +139,7 @@ def init_four_dim(
         overwrite,
         source_format,
         data.ctypes.data_as(c.POINTER(c.c_float)),
+        cartesian_arr,
         transform_arr,
         c.c_float(source_fps),
         c.c_float(playback_fps),

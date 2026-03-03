@@ -16,6 +16,7 @@ pub export fn initFourDim(
     overwrite: bool,
     source_format: volume.SourceFormat,
     data: [*]const f32, //all frames flattened
+    cartesian_order: *const [3]usize, //usually 0 1 2
     transform_flat: *const [16]f64,
     source_fps: f32,
     playback_fps: f32,
@@ -47,6 +48,7 @@ pub export fn initFourDim(
     vol_ptr.* = volume.FourDim.init(
         std.mem.span(base_name),
         data[0..len],
+        cartesian_order.*,
         source_format,
         transform,
         false,
