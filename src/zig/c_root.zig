@@ -45,7 +45,6 @@ pub export fn initFourDim(
         return null;
     };
     vol_ptr.* = volume.FourDim.init(
-        allocator,
         data[0..len],
         source_format,
         transform,
@@ -58,15 +57,35 @@ pub export fn initFourDim(
     ) catch {
         allocator.destroy(vol_ptr); //LLM: caught this potential memory leak and added this line
         return null;
-        //HACK: not sure about error handling on Python side
+        //WARN: not sure about error handling on Python side
     };
     return vol_ptr;
 }
 
-//BOOKMARK: up next: a save function with that takes in the above pointer!
-// pub export fn deinitFourDim
+pub export fn deinitFourDim(ptr: ?*anyopaque) void {
+    //LLM: wrote this function
+    const allocator = std.heap.c_allocator;
+    if (ptr) |p| {
+        const vol_ptr: *volume.FourDim = @ptrCast(@alignCast(p));
+        allocator.destroy(vol_ptr);
+    }
+}
 
-//TODO: volume deinit (either here or in volume.zig)
+pub export fn saveFourDim(
+    ptr: ?*anyopaque,
+    interpolation_mode: c_int, //0 for direct
+) void {
+    const allocator = std.heap.c_allocator;
+    if (ptr) |p| { //LLM: unwrapping pattern
+        const vol_ptr: *volume.FourDim = @ptrCast(@alignCast(p));
+        vol_ptr.save(@as(volume.InterpolationMode, @enumFromInt(interpolation_mode))); //LLM: casting pattern
+
+        allocator.destroy(vol_ptr);
+    } //else would be a null ptr
+}
+
+//BOOKMARK: up next: a save function with that takes in the above pointer!
+//Use the new volume.save() that you are writing rn
 
 //TODO: Volume apply effects and interpolation
 

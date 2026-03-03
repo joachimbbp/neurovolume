@@ -54,7 +54,10 @@ pub const FourDim = struct {
             .ndarray => {
                 cart_ord = .{ 2, 1, 0 };
                 if (normalize) {
-                    std.debug.print(".ndarrays must be normalized on the Python layer.\nUse the prep_4D_ndarray function", .{});
+                    std.debug.print(
+                        "FYI: To ensure compliance, use the prep_4D_ndarray function in the python library",
+                        .{},
+                    );
                     return DataFormatError.UnsupportedUsage;
                 }
                 normalizer = util.Normalizer.init(false, 0.0, 1.0);
@@ -85,11 +88,6 @@ pub const FourDim = struct {
         //WARNING: probably shouldn't be a []u8????
         return "HAM/SPAM";
     }
-
-    // pub fn save(interpolator: *const fn (std.mem.Allocator, *FourDim) !void, allocator: std.mem.Allocator,) !void {
-    //
-    //     try interpolator(allocator, &FourDim,
-    // }
 
     fn saveFrame(
         v: *FourDim,
@@ -146,20 +144,31 @@ pub const FourDim = struct {
             )) break;
         }
     }
-    //TODO: allocaotor destroy???
+    pub fn save(
+        self: *FourDim,
+        interpolation: InterpolationMode,
+    ) !void {
+        const interpolator = Interpolator{
+            .vol = self,
+            .mode = interpolation,
+        };
+        //TODO: save config to somewhere other than the hard coded temp dir
+        //see FourDim.saveFrame
+        interpolator.write();
+    }
 };
 
 const InterpolationError = error{ModeDoesNotExist};
 
-pub const InterolationMode = enum(c_int) {
+pub const InterpolationMode = enum(c_int) {
     direct = 0,
 };
 
-pub const Interpolate = struct {
+pub const Interpolator = struct {
     vol: *FourDim,
-    mode: InterolationMode,
+    mode: InterpolationMode,
 
-    pub fn write(self: *Interpolate) !void {
+    pub fn write(self: *Interpolator) !void {
         //HACK: I don't love this pattern, I feel like there is a more elegant way
         //to chose a function below without having to write it out in two places
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -169,41 +178,13 @@ pub const Interpolate = struct {
         defer arena.deinit();
 
         switch (self.mode) {
-            .direct => direct(arena.allocator(), self.vol),
+            .direct => direct(&arena, self.vol),
             else => {
                 std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
                 return InterpolationError.ModeDoesNotExist;
             },
         }
     }
-
-    //BOOKMARK:
-    //FIx this messy stuff that claude pushed you towards
-    //From claude:
-
-    //⏺ Yeah, it is weird — you're right to push back. Nesting an arena inside another arena's
-    //   interface is odd and unnecessary.
-    //
-    //   The cleaner fix is to just pass *std.heap.ArenaAllocator directly so direct owns the reset
-    //   logic:
-    //
-    //   fn direct(arena: *std.heap.ArenaAllocator, vol: *FourDim) !void {
-    //       for (0..vol.dims[3]) |n| {
-    //           defer _ = arena.reset(.retain_capacity);
-    //           var vdb = try vdb543.VDB.build(arena.allocator());
-    //           var buffer = std.array_list.Managed(u8).init(arena.allocator());
-    //           ...
-    //       }
-    //   }
-    //
-    //   And in write, pass &arena instead of arena.allocator():
-    //
-    //   .direct => try direct(&arena, self.vol),
-    //
-    //   Now write creates and destroys the arena, direct resets it per frame. No nesting, no
-    //   weirdness. The GPA → arena relationship is clean and the ownership is obvious.
-    //
-    //
 
     // No interpolation
     // Frames from source are written directly
