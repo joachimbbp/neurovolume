@@ -214,6 +214,18 @@ fn getFPS(hdr: *Header) !f32 {
     return fps;
 }
 
+// fn makeFrameList(n1u: Nifti1Unpacked) ![*][]f32 {
+//     const data_type: DataType = @enumFromInt(n1u.hdr_ptr.datatype);
+//     const bytes_per_voxel: u16 = @intCast(@divTrunc(n1u.hdr_ptr.bitpix, 8));
+//     const num_voxels = n1u.hdr.dim[1] * n1u.hdr.dim[2] * n1u.hdr.dim[3];
+//
+//     var frame_list: [*][]f32 = undefined;
+//     for (0..num_voxels) |v| {
+//         //BOOKMARK: increment cartesian or something here?
+//         if
+//     }
+// }
+
 pub fn toVolume(
     allocator: std.mem.Allocator,
     //take in the hader too built by loadFrames

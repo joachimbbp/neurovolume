@@ -83,23 +83,49 @@ def test_pyramid():
     print("pyramid built")
 
 
-def test_nifti():
-    pyramid, built = build_pyramid()
-    assert built, "Pyramid should build successfully"
+# TODO:
+# move nibabel and other testing only
+# dependencies to somewhere that doesn't
+# effect the rest of the project!# move nibabel and other testing only
+import nibabel as nib
 
-    print("writing bold seq...")
-    bold_path = nv.nifti1_to_VDB(
-        bold,
-        vdb_out,
-        True,
+
+def test_bold_seq():
+    img = nib.load(bold)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float64)
+    # just for safety:
+    prepped_data = nv.prep_4D_ndarray(data, {0, 2, 1})
+    vol = nv.init_four_dim(
+        base_name="bold_test",
+        save_folder="/path/to/output",  # FIX: this field doesnt do anyhting right now
+        overwrite=True,
+        source_format=0,  # 0=ndarray
+        data=prepped_data,  # float32, all frames flattened, C-contiguous
+        transform=np.eye(4),  # 4x4 affine float64
+        source_fps=1.0,
+        playback_fps=24.0,
+        speed=1.0,
+        dims=prepped_data.shape,
     )
-    print("vdb bold seq written to ", bold_path)
+    nv.save_four_dim(vol, 0)
+    nv.deinit_four_dim(vol)
 
-    print("writing anat file...")
-    anat_path = nv.nifti1_to_VDB(
-        anat,
-        vdb_out,
-        True,
-    )
 
-    print("vdb anat saved to ", anat_path)
+# DEPRECATED: we might move to ndarrays only
+# def test_nifti():
+#     pyramid, built = build_pyramid()
+#     assert built, "Pyramid should build successfully"
+#     print("writing bold seq...")
+#     bold_path = nv.nifti1_to_VDB(
+#         bold,
+#         vdb_out,
+#         True,
+#     )
+#     print("vdb bold seq written to ", bold_path)
+#     print("writing anat file...")
+#     anat_path = nv.nifti1_to_VDB(
+#         anat,
+#         vdb_out,
+#         True,
+#     )
+#     print("vdb anat saved to ", anat_path)

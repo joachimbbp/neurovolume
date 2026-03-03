@@ -82,53 +82,6 @@ def prep_4D_ndarray(
     return arr
 
 
-# def ndarray_to_VDB(
-#     arr: np.ndarray,
-#     save_path: str,
-#     transform: np.ndarray = None,  # DEPRECATED:
-# ):
-#     """
-#     Creates a VDB file from an ndarray.
-#     use prep_ndarray to prepprocess ndarrays coming straight
-#     out of nibabel or ANTs (might work on other data too)
-#
-#     Parameters:
-#     ---------
-#     arr: numpy.ndarray (must be 3 or 4D)
-#         The ndarray you wish to convert
-#     save_path: str
-#         Full filepath for the .vdb
-#     transform: numpy.ndarray
-#     """
-#     # LLM: full up copypasta error handling
-#     parent_dir = os.path.dirname(save_path)
-#     if parent_dir and not os.path.exists(parent_dir):
-#         raise FileNotFoundError(f"Parent directory does not exist: {parent_dir}")
-#
-#     # LOTS OF LLM: here
-#     if transform is None:  # WARN: I wonder if this should be an option????
-#         transform = np.eye(4, dtype=np.float64)
-#     affine_flat = transform.flatten().astype(np.float64)
-#
-#     dims = np.array(arr.shape, dtype=np.uint64)
-#
-#     nv.ndarrayToFrame.argtypes = [
-#         np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
-#         c.POINTER(c.c_size_t),
-#         np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
-#         c.c_char_p,
-#     ]
-#     # nvol.ndArrayToVDB_c.restype = c.c_size_t    # res = nvol.ndArrayToVDB_c(
-#     #     arr,
-#     #     dims.ctypes.data_as(c.POINTER(c.c_size_t)),
-#     #     affine_flat,
-#     #     save_path.encode("utf-8"),
-#     # )
-#     if res != 0:
-#         print(f"error of type {res}")
-#
-
-
 def nifti1_to_VDB(
     nifti_path: str,
     output_dir: str,
@@ -177,6 +130,102 @@ def num_frames(filepath: str, filetype: str) -> int:
             raise ValueError(err_msg)
 
 
+# LLM: claude wrote this function
+def init_four_dim(
+    base_name: str,
+    save_folder: str,
+    overwrite: bool,
+    source_format: int,  # 0=ndarray, 1=nifti1 (mirrors volume.zig SourceFormat)
+    data: np.ndarray,
+    transform: np.ndarray,
+    source_fps: float,
+    playback_fps: float,
+    speed: float,
+    dims: tuple,
+) -> c.c_void_p:
+    """
+    Initializes a FourDim volume on the Zig heap and returns an opaque pointer.
+
+    Parameters:
+    ------------
+    source_format: int
+        0 = ndarray, 1 = nifti1 (mirrors volume.zig SourceFormat enum)
+    data: np.ndarray
+        All frames flattened, C-contiguous float32.
+    transform: np.ndarray
+        4x4 affine as float64, shape (4,4) or (16,).
+    dims: tuple
+        (x, y, z, t) voxel dimensions.
+
+    Returns:
+    ------------
+    Opaque ctypes pointer to the FourDim on the Zig heap.
+    Must be freed by calling deinit_four_dim() or save_four_dim().
+    """
+    data = np.ascontiguousarray(data, dtype=np.float32)
+    transform_arr = (c.c_double * 16)(
+        *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
+    )
+    dims_arr = (c.c_size_t * 4)(*dims)
+
+    nv.initFourDim.argtypes = [
+        c.c_char_p,  # base_name
+        c.c_char_p,  # save_folder
+        c.c_bool,  # overwrite
+        c.c_int,  # source_format
+        c.POINTER(c.c_float),  # data
+        c.POINTER(c.c_double),  # transform_flat [16]f64
+        c.c_float,  # source_fps
+        c.c_float,  # playback_fps
+        c.c_float,  # speed
+        c.POINTER(c.c_size_t),  # dims [4]usize
+    ]
+    nv.initFourDim.restype = c.c_void_p
+
+    ptr = nv.initFourDim(
+        b(base_name),
+        b(save_folder),
+        overwrite,
+        source_format,
+        data.ctypes.data_as(c.POINTER(c.c_float)),
+        transform_arr,
+        c.c_float(source_fps),
+        c.c_float(playback_fps),
+        c.c_float(speed),
+        dims_arr,
+    )
+    if ptr is None:
+        raise RuntimeError("initFourDim returned null — allocation or init failed")
+    return ptr
+
+
+# LLM: claude wrote this function
+def deinit_four_dim(ptr: c.c_void_p) -> None:
+    """
+    Frees a FourDim volume allocated by init_four_dim() without saving.
+    """
+    nv.deinitFourDim.argtypes = [c.c_void_p]
+    nv.deinitFourDim.restype = None
+    nv.deinitFourDim(ptr)
+
+
+# LLM: claude wrote this function
+def save_four_dim(ptr: c.c_void_p, interpolation_mode: int) -> None:
+    """
+    Saves the FourDim volume to VDB files and frees it.
+    The pointer is invalid after this call.
+
+    Parameters:
+    ------------
+    ptr: opaque pointer returned by init_four_dim().
+    interpolation_mode: int
+        0 = direct (mirrors volume.zig InterpolationMode enum)
+    """
+    nv.saveFourDim.argtypes = [c.c_void_p, c.c_int]
+    nv.saveFourDim.restype = None
+    nv.saveFourDim(ptr, interpolation_mode)
+
+
 def pixdim(filepath: str, filetype: str, dim: int) -> float:
     match filetype:
         case "NIfTI1":
@@ -220,7 +269,7 @@ def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     return unit_name.value.decode()
 
 
-def source_fps(filepath: str, filetype: str) -> int:  # DEPRECATED:
+def source_fps(filepath: str, filetype: str) -> int:  # DEPRECATED: most likely
     match filetype:
         case "NIfTI1":
             if num_frames(filepath, filetype) == 1:
@@ -251,11 +300,3 @@ def source_fps(filepath: str, filetype: str) -> int:  # DEPRECATED:
         case _:
             err_msg = f"{filetype} is unsupported for num_frames access"
             raise ValueError(err_msg)
-
-
-#
-# def real_size():
-#     # TODO: will need to get measurement units and as well as the pixdim
-#
-#     # TODO: def runtime
-#     # which will include a lot fo the stuff in fps as well as temporal_offset
