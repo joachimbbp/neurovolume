@@ -174,7 +174,7 @@ pub const FourDim = struct {
         normalize: bool,
         source_fps: f32,
         playback_fps: f32,
-        speed: f32,
+        speed: f32, //0.5 for half speed, 2.0 for double speed etc
         dims: [4]usize,
         save_config: SaveConfiguration,
     ) !FourDim {
@@ -280,11 +280,31 @@ const InterpolationError = error{ModeDoesNotExist};
 
 pub const InterpolationMode = enum(c_int) {
     direct = 0,
+    crossfade = 1,
 };
 
 pub const Interpolator = struct {
     vol: *FourDim,
     mode: InterpolationMode,
+    length: usize, //number of frames after interpolation
+
+    pub fn init(vol: *FourDim, mode: InterpolationMode) !Interpolator {
+        if (mode == .direct) {
+            return .{
+                .vol = vol,
+                .mode = mode,
+                .length = vol.dims[0],
+            };
+        } else {
+            //LLM: calculated, it was late, don't judge me
+            const length: usize = @intFromFloat(@as(f32, @floatFromInt(vol.dims[0])) / vol.source_fps / vol.speed * vol.playback_fps);
+            return .{
+                .vol = vol,
+                .mode = mode,
+                .length = length,
+            };
+        }
+    }
 
     pub fn write(self: *Interpolator) !void {
         //HACK: I don't love this pattern, I feel like there is a more elegant way
@@ -296,7 +316,8 @@ pub const Interpolator = struct {
         defer arena.deinit();
 
         switch (self.mode) {
-            .direct => try direct(&arena, self.vol),
+            .direct => try direct(&arena),
+            .crossfade => try crossfade(&arena),
             // else => {
             //     std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
             //     return InterpolationError.ModeDoesNotExist;
@@ -308,16 +329,16 @@ pub const Interpolator = struct {
     // Frames from source are written directly
     // to the VDB sequene
     fn direct(
+        self: *Interpolator,
         arena: *std.heap.ArenaAllocator,
-        vol: *FourDim,
     ) !void {
-        for (0..vol.dims[0]) |n| {
+        for (0..self.vol.dims[0]) |n| {
             defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
             var vdb = try vdb543.VDB.build(arena.allocator());
             var buffer = std.array_list.Managed(u8).init(arena.allocator());
             // var buffer = std.ArrayList(u8).init(arena.allocator());
-            switch (vol.source_format) {
-                .ndarray => try vol.extractFrame(
+            switch (self.vol.source_format) {
+                .ndarray => try self.vol.extractFrame(
                     arena.allocator(),
                     n,
                     &vdb,
@@ -328,10 +349,17 @@ pub const Interpolator = struct {
             try vdb543.writeVDB(
                 &buffer,
                 &vdb,
-                vol.affine_transform,
+                self.vol.affine_transform,
             );
-            try vol.saveFrame(n, &buffer);
+            try self.vol.saveFrame(n, &buffer);
         }
+    }
+
+    fn crossfade(
+        arena: *std.heap.ArenaAllocator,
+        vol: *FourDim,
+    ) !void {
+        for (0..vol.dims[0]) |n| {}
     }
 };
 
