@@ -10,5 +10,4 @@ dist
 DS_Store
 ./src/neurovolume/_native/*
 
-CLAUDE.md
 .pytest_cache

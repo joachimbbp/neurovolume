@@ -178,6 +178,97 @@ def save_four_dim(ptr: c.c_void_p, interpolation_mode: int) -> None:
     nv.saveFourDim(ptr, interpolation_mode)
 
 
+# LLM: claude wrote this function
+def init_three_dim(
+    base_name: str,
+    save_folder: str,
+    overwrite: bool,
+    data: np.ndarray,
+    transform: np.ndarray,
+    dims: tuple,
+    source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
+    cartesian_order: tuple = (0, 1, 2),
+) -> c.c_void_p:
+    """
+    Initializes a ThreeDim volume on the Zig heap and returns an opaque pointer.
+
+    Parameters:
+    ------------
+    source_format: int
+        0 = ndarray (mirrors volume.zig SourceFormat enum)
+    data: np.ndarray
+        3D volume, C-contiguous float32, normalized to [0, 1].
+    transform: np.ndarray
+        4x4 affine as float64.
+    dims: tuple
+        (x, y, z) voxel dimensions.
+
+    Returns:
+    ------------
+    Opaque ctypes pointer to the ThreeDim on the Zig heap.
+    Must be freed by calling deinit_three_dim().
+    """
+    data = np.ascontiguousarray(data, dtype=np.float32)
+    transform_arr = (c.c_double * 16)(
+        *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
+    )
+    dims_arr = (c.c_size_t * 3)(*dims)
+    cartesian_arr = (c.c_size_t * 3)(*cartesian_order)
+
+    nv.initThreeDim.argtypes = [
+        c.c_char_p,  # base_name
+        c.c_char_p,  # save_folder
+        c.c_bool,  # overwrite
+        c.c_int,  # source_format
+        c.POINTER(c.c_float),  # data
+        c.POINTER(c.c_size_t),  # cartesian_order [3]usize
+        c.POINTER(c.c_double),  # transform_flat [16]f64
+        c.POINTER(c.c_size_t),  # dims [3]usize
+    ]
+    nv.initThreeDim.restype = c.c_void_p
+
+    ptr = nv.initThreeDim(
+        b(base_name),
+        b(save_folder),
+        overwrite,
+        source_format,
+        data.ctypes.data_as(c.POINTER(c.c_float)),
+        cartesian_arr,
+        transform_arr,
+        dims_arr,
+    )
+    if ptr is None:
+        raise RuntimeError("initThreeDim returned null — allocation or init failed")
+    return ptr
+
+
+# LLM: claude wrote this function
+def deinit_three_dim(ptr: c.c_void_p) -> None:
+    """
+    Frees a ThreeDim volume allocated by init_three_dim() without saving.
+    """
+    nv.deinitThreeDim.argtypes = [c.c_void_p]
+    nv.deinitThreeDim.restype = None
+    nv.deinitThreeDim(ptr)
+
+
+# LLM: claude wrote this function
+def save_three_dim(ptr: c.c_void_p) -> None:
+    """
+    Saves the ThreeDim volume to a single VDB file.
+    The pointer remains valid after this call; free with deinit_three_dim().
+
+    Parameters:
+    ------------
+    ptr: opaque pointer returned by init_three_dim().
+    """
+    nv.saveThreeDim.argtypes = [c.c_void_p]
+    nv.saveThreeDim.restype = c.c_size_t
+    result = nv.saveThreeDim(ptr)
+    if result != 0:
+        raise RuntimeError(f"saveThreeDim returned error code {result}")
+
+
 def pixdim(filepath: str, filetype: str, dim: int) -> float:
     match filetype:
         case "NIfTI1":

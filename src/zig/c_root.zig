@@ -35,18 +35,26 @@ pub export fn initFourDim(
     const frame_size = dims[0] * dims[1] * dims[2];
     const len = frame_size * dims[3];
 
+    // Dupe strings so the struct owns them past the Python call lifetime
+    const basename_owned = allocator.dupe(u8, std.mem.span(base_name)) catch return null;
+    const folder_owned = allocator.dupe(u8, std.mem.span(save_folder)) catch {
+        allocator.free(basename_owned);
+        return null;
+    };
+
     const save_config = volume.SaveConfiguration{
-        .basename = std.mem.span(base_name),
-        .folder = std.mem.span(save_folder),
+        .basename = basename_owned,
+        .folder = folder_owned,
         .overwrite = overwrite,
     };
 
-    //LLM: advice on heap allocating the volume
     const vol_ptr = allocator.create(volume.FourDim) catch {
+        allocator.free(basename_owned);
+        allocator.free(folder_owned);
         return null;
     };
     vol_ptr.* = volume.FourDim.init(
-        std.mem.span(base_name),
+        basename_owned,
         data[0..len],
         cartesian_order.*,
         source_format,
@@ -58,18 +66,20 @@ pub export fn initFourDim(
         dims.*,
         save_config,
     ) catch {
-        allocator.destroy(vol_ptr); //LLM: caught this potential memory leak and added this line
+        allocator.free(basename_owned);
+        allocator.free(folder_owned);
+        allocator.destroy(vol_ptr);
         return null;
-        //WARN: not sure about error handling on Python side
     };
     return vol_ptr;
 }
 
 pub export fn deinitFourDim(ptr: ?*anyopaque) void {
-    //LLM: wrote this function
     const allocator = std.heap.c_allocator;
     if (ptr) |p| {
         const vol_ptr: *volume.FourDim = @ptrCast(@alignCast(p));
+        allocator.free(vol_ptr.save_config.basename);
+        allocator.free(vol_ptr.save_config.folder);
         allocator.destroy(vol_ptr);
     }
 }
@@ -84,6 +94,85 @@ pub export fn saveFourDim(
             return cErr(e).code;
         }; //LLM: casting pattern
     } //else would be a null ptr
+    return 0;
+}
+
+//LLM: claude wrote this function
+pub export fn initThreeDim(
+    base_name: [*:0]const u8,
+    save_folder: [*:0]const u8,
+    overwrite: bool,
+    source_format: volume.SourceFormat,
+    data: [*]const f32,
+    cartesian_order: *const [3]usize,
+    transform_flat: *const [16]f64,
+    dims: *const [3]usize,
+) ?*anyopaque {
+    const allocator = std.heap.c_allocator;
+    var transform: [4][4]f64 = undefined;
+    for (0..4) |i| {
+        for (0..4) |j| {
+            transform[i][j] = transform_flat[i * 4 + j];
+        }
+    }
+
+    const len = dims[0] * dims[1] * dims[2];
+
+    // Dupe strings so the struct owns them past the Python call lifetime
+    const basename_owned = allocator.dupe(u8, std.mem.span(base_name)) catch return null;
+    const folder_owned = allocator.dupe(u8, std.mem.span(save_folder)) catch {
+        allocator.free(basename_owned);
+        return null;
+    };
+
+    const save_config = volume.SaveConfiguration{
+        .basename = basename_owned,
+        .folder = folder_owned,
+        .overwrite = overwrite,
+    };
+
+    const vol_ptr = allocator.create(volume.ThreeDim) catch {
+        allocator.free(basename_owned);
+        allocator.free(folder_owned);
+        return null;
+    };
+    vol_ptr.* = volume.ThreeDim.init(
+        basename_owned,
+        data[0..len],
+        cartesian_order.*,
+        source_format,
+        transform,
+        false,
+        dims.*,
+        save_config,
+    ) catch {
+        allocator.free(basename_owned);
+        allocator.free(folder_owned);
+        allocator.destroy(vol_ptr);
+        return null;
+    };
+    return vol_ptr;
+}
+
+//LLM: claude wrote this function
+pub export fn deinitThreeDim(ptr: ?*anyopaque) void {
+    const allocator = std.heap.c_allocator;
+    if (ptr) |p| {
+        const vol_ptr: *volume.ThreeDim = @ptrCast(@alignCast(p));
+        allocator.free(vol_ptr.save_config.basename);
+        allocator.free(vol_ptr.save_config.folder);
+        allocator.destroy(vol_ptr);
+    }
+}
+
+//LLM: claude wrote this function
+pub export fn saveThreeDim(ptr: ?*anyopaque) usize {
+    if (ptr) |p| {
+        const vol_ptr: *volume.ThreeDim = @ptrCast(@alignCast(p));
+        vol_ptr.save() catch |e| {
+            return cErr(e).code;
+        };
+    }
     return 0;
 }
 

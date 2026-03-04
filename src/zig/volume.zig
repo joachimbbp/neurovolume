@@ -1,3 +1,8 @@
+//TODO:
+// - [ ] DRY 3D and 4D volumes as much as possible wihtout getting over zealous
+// - [ ] change "FIX" to "LLM" and probably update claude file to reflect this
+// - [ ] crossfade interpolation
+// - [ ] move VDB saving functionality to the vdb module (and alert Robbie)
 const std = @import("std");
 const ndarray = @import("ndarray.zig");
 const util = @import("util.zig");
@@ -24,12 +29,12 @@ pub const ThreeDim = struct {
     cartesian_order: [3]usize,
     source_format: SourceFormat,
     affine_transform: [4][4]f64,
-    dims: [4]usize, // time first, then domain specific spatial layout
+    dims: [3]usize, // spatial layout only (x, y, z) — no time dimension
     frame_size: usize,
     save_config: SaveConfiguration,
     normalizer: util.Normalizer,
 
-    //ensure ndarray compliance with prep_4D_ndarray
+    //ensure ndarray compliance with prep_ndarray
     pub fn init(
         name: []const u8,
         data: []const f32,
@@ -39,7 +44,7 @@ pub const ThreeDim = struct {
         normalize: bool,
         dims: [3]usize,
         save_config: SaveConfiguration,
-    ) !FourDim {
+    ) !ThreeDim { // FIX: was !FourDim
         var normalizer: util.Normalizer = undefined;
 
         switch (source_format) {
@@ -63,7 +68,7 @@ pub const ThreeDim = struct {
             .source_format = source_format,
             .affine_transform = transform,
             .dims = dims,
-            .frame_size = dims[1] * dims[2] * dims[3],
+            .frame_size = dims[0] * dims[1] * dims[2], // FIX: was dims[1]*dims[2]*dims[3]
             .save_config = save_config,
             .normalizer = normalizer,
         };
@@ -73,27 +78,20 @@ pub const ThreeDim = struct {
         v: *ThreeDim,
         buffer: *std.array_list.Managed(u8),
     ) !void {
-
-        //LLM: temp save for debug lines
-        var buf: [256]u8 = undefined;
-        const output_filepath = try std.fmt.bufPrint(&buf, "/Users/joachimpfefferkorn/repos/neurovolume/output/tmp_Static.vdb", .{});
-        //TODO: save logic based off versioning bool etc
-        //in save config (to build in FourDim init)
-        _ = v;
-
-        const file = try std.fs.cwd().createFile(
-            output_filepath,
-            .{},
+        var buf: [512]u8 = undefined;
+        const output_filepath = try std.fmt.bufPrint(
+            &buf,
+            "{s}/{s}.vdb",
+            .{ v.save_config.folder, v.save_config.basename }, // FIX: was hardcoded path
         );
-
-        try file.writeAll(buffer.items);
-
+        const file = try std.fs.cwd().createFile(output_filepath, .{});
         defer file.close();
+        try file.writeAll(buffer.items);
     }
 
-    //extracts a 3D slice of a 4D ndarray to a VDB
+    //extracts the 3D ndarray volume into a VDB
     fn extractVol(
-        self: *FourDim,
+        self: *ThreeDim, // FIX: was *FourDim
         allocator: std.mem.Allocator,
         vdb: *vdb543.VDB,
     ) !void {
@@ -107,7 +105,7 @@ pub const ThreeDim = struct {
                     cart[self.cartesian_order[1]],
                     cart[self.cartesian_order[2]],
                 },
-                self.normalizer.apply(self.data),
+                self.normalizer.apply(self.data[i]), // FIX: was self.data (missing [i])
                 allocator,
             );
 
@@ -116,10 +114,11 @@ pub const ThreeDim = struct {
                 u32,
                 3,
                 &cart,
-                .{ self.dims[1], self.dims[2], self.dims[3] },
+                .{ self.dims[0], self.dims[1], self.dims[2] }, // FIX: was dims[1],[2],[3]
             )) break;
         }
     }
+
     pub fn save(
         v: *ThreeDim,
     ) !void {
@@ -129,10 +128,9 @@ pub const ThreeDim = struct {
         var arena = std.heap.ArenaAllocator.init(gpa_alloc);
         defer arena.deinit();
 
-        defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
+        defer _ = arena.reset(.retain_capacity);
         var vdb = try vdb543.VDB.build(arena.allocator());
         var buffer = std.array_list.Managed(u8).init(arena.allocator());
-        // var buffer = std.ArrayList(u8).init(arena.allocator());
         switch (v.source_format) {
             .ndarray => try v.extractVol(
                 arena.allocator(),
@@ -146,6 +144,7 @@ pub const ThreeDim = struct {
             &vdb,
             v.affine_transform,
         );
+        try v.writeVDB(&buffer); // FIX: was missing — buffer was never written to disk
     }
 };
 
@@ -216,22 +215,15 @@ pub const FourDim = struct {
         frame_num: usize,
         buffer: *std.array_list.Managed(u8),
     ) !void {
-
-        //LLM: temp save for debug lines
-        var buf: [256]u8 = undefined;
-        const output_filepath = try std.fmt.bufPrint(&buf, "/Users/joachimpfefferkorn/repos/neurovolume/output/tmp_{d}.vdb", .{frame_num});
-        //TODO: save logic based off versioning bool etc
-        //in save config (to build in FourDim init)
-        _ = v;
-
-        const file = try std.fs.cwd().createFile(
-            output_filepath,
-            .{},
+        var buf: [512]u8 = undefined;
+        const output_filepath = try std.fmt.bufPrint(
+            &buf,
+            "{s}/{s}_{d:0>4}.vdb",
+            .{ v.save_config.folder, v.save_config.basename, frame_num },
         );
-
-        try file.writeAll(buffer.items);
-
+        const file = try std.fs.cwd().createFile(output_filepath, .{});
         defer file.close();
+        try file.writeAll(buffer.items);
     }
 
     //extracts a 3D slice of a 4D ndarray to a VDB

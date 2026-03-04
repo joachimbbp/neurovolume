@@ -90,7 +90,36 @@ def test_hello():
 import nibabel as nib
 
 
+def test_anat_static():
+    import os
+    os.makedirs(vdb_out, exist_ok=True)
+    img = nib.load(anat)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    # nibabel loads anat as (x, y, z); swap y and z to match BOLD convention
+    prepped_data = nv.prep_ndarray(data, (0, 2, 1))
+    # shape: (x, z, y), C-contiguous
+
+    # Normalize to [0, 1] — VDB requires float32 in this range
+    max_val = prepped_data.max()
+    if max_val > 0:
+        prepped_data = prepped_data / max_val
+
+    dims = prepped_data.shape  # (x, z, y)
+
+    vol = nv.init_three_dim(
+        base_name="anat_test",
+        save_folder=vdb_out,
+        overwrite=True,
+        data=prepped_data,
+        transform=np.eye(4),
+        dims=dims,
+    )
+    nv.save_three_dim(vol)
+    nv.deinit_three_dim(vol)
+
+
 def test_bold_seq():
+    import os
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
     # Transpose: t must be FIRST (slowest) so frames are contiguous in C-order memory.
@@ -108,9 +137,10 @@ def test_bold_seq():
     # x y z t
     dims = prepped_data.shape
 
+    os.makedirs(vdb_out, exist_ok=True)
     vol = nv.init_four_dim(
         base_name="bold_test",
-        save_folder="/path/to/output",  # FIX: this field doesnt do anyhting right now
+        save_folder=vdb_out,
         overwrite=True,
         data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
         transform=np.eye(4),  # 4x4 affine float64
