@@ -18,56 +18,136 @@ pub const SaveConfiguration = struct {
     folder: []const u8,
     overwrite: bool, // if false, saves version number
 };
+pub const ThreeDim = struct {
+    name: []const u8,
+    data: []const f32,
+    cartesian_order: [3]usize,
+    source_format: SourceFormat,
+    affine_transform: [4][4]f64,
+    dims: [4]usize, // time first, then domain specific spatial layout
+    frame_size: usize,
+    save_config: SaveConfiguration,
+    normalizer: util.Normalizer,
 
-// pub const ThreeDim = struct {
-//     name: []const u8,
-//     data: []const f32,
-//     cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
-//     source_format: SourceFormat,
-//     affine_transform: [4][4]f64, //spatial transform only!
-//     source_fps: f32,
-//     dims: [3]usize, // x y z
-//     vol_size: usize,
-//     save_config: SaveConfiguration,
-//     normalizer: util.Normalizer,
-//     //ensure ndarray compliance with prep_4D_ndarray
-//     pub fn init(
-//         name: []const u8,
-//         data: []const f32,
-//         source_format: SourceFormat,
-//         transform: [4][4]f64,
-//         normalize: bool,
-//         dims: [3]usize,
-//         save_config: SaveConfiguration,
-//     ) !ThreeDim {
-//         var cart_ord: [3]usize = undefined;
-//         var normalizer: util.Normalizer = undefined;
-//
-//         switch (source_format) {
-//             .ndarray => {
-//                 cart_ord = .{ 0, 1, 2 };
-//                 if (normalize) {
-//                     std.debug.print(ndarray_fyi, .{});
-//                     return DataFormatError.UnsupportedUsage;
-//                 }
-//                 normalizer = util.Normalizer.init(false, 0.0, 1.0);
-//             },
-//             else => return DataFormatError.NotSupportedYet,
-//         }
-//
-//         return .{
-//             .name = name,
-//             .data = data,
-//             .cartesian_order = cart_ord,
-//             .source_format = source_format,
-//             .affine_transform = transform,
-//             .dims = dims,
-//             .vol_size = dims[1] * dims[2] * dims[3],
-//             .save_config = save_config,
-//             .normalizer = normalizer,
-//         };
-//     }
-// };
+    //ensure ndarray compliance with prep_4D_ndarray
+    pub fn init(
+        name: []const u8,
+        data: []const f32,
+        cartesian_order: [3]usize,
+        source_format: SourceFormat,
+        transform: [4][4]f64,
+        normalize: bool,
+        dims: [3]usize,
+        save_config: SaveConfiguration,
+    ) !FourDim {
+        var normalizer: util.Normalizer = undefined;
+
+        switch (source_format) {
+            .ndarray => {
+                if (normalize) {
+                    std.debug.print(
+                        ndarray_fyi,
+                        .{},
+                    );
+                    return DataFormatError.UnsupportedUsage;
+                }
+                normalizer = util.Normalizer.init(false, 0.0, 1.0);
+            },
+            else => return DataFormatError.NotSupportedYet,
+        }
+
+        return .{
+            .name = name,
+            .data = data,
+            .cartesian_order = cartesian_order,
+            .source_format = source_format,
+            .affine_transform = transform,
+            .dims = dims,
+            .frame_size = dims[1] * dims[2] * dims[3],
+            .save_config = save_config,
+            .normalizer = normalizer,
+        };
+    }
+
+    fn writeVDB(
+        v: *ThreeDim,
+        buffer: *std.array_list.Managed(u8),
+    ) !void {
+
+        //LLM: temp save for debug lines
+        var buf: [256]u8 = undefined;
+        const output_filepath = try std.fmt.bufPrint(&buf, "/Users/joachimpfefferkorn/repos/neurovolume/output/tmp_Static.vdb", .{});
+        //TODO: save logic based off versioning bool etc
+        //in save config (to build in FourDim init)
+        _ = v;
+
+        const file = try std.fs.cwd().createFile(
+            output_filepath,
+            .{},
+        );
+
+        try file.writeAll(buffer.items);
+
+        defer file.close();
+    }
+
+    //extracts a 3D slice of a 4D ndarray to a VDB
+    fn extractVol(
+        self: *FourDim,
+        allocator: std.mem.Allocator,
+        vdb: *vdb543.VDB,
+    ) !void {
+        var i: usize = 0;
+        var cart = [_]u32{ 0, 0, 0 };
+        while (true) {
+            try vdb543.setVoxel(
+                vdb,
+                .{
+                    cart[self.cartesian_order[0]],
+                    cart[self.cartesian_order[1]],
+                    cart[self.cartesian_order[2]],
+                },
+                self.normalizer.apply(self.data),
+                allocator,
+            );
+
+            i += 1;
+            if (!util.incrementCartesian(
+                u32,
+                3,
+                &cart,
+                .{ self.dims[1], self.dims[2], self.dims[3] },
+            )) break;
+        }
+    }
+    pub fn save(
+        v: *ThreeDim,
+    ) !void {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        const gpa_alloc = gpa.allocator();
+        defer _ = gpa.deinit();
+        var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+        defer arena.deinit();
+
+        defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
+        var vdb = try vdb543.VDB.build(arena.allocator());
+        var buffer = std.array_list.Managed(u8).init(arena.allocator());
+        // var buffer = std.ArrayList(u8).init(arena.allocator());
+        switch (v.source_format) {
+            .ndarray => try v.extractVol(
+                arena.allocator(),
+                &vdb,
+            ),
+            else => return DataFormatError.NotSupportedYet,
+        }
+
+        try vdb543.writeVDB(
+            &buffer,
+            &vdb,
+            v.affine_transform,
+        );
+    }
+};
 
 //Four dimensional volume structure
 //nothing is allocated in this struct so no deinit
