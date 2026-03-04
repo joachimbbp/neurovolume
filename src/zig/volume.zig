@@ -266,10 +266,8 @@ pub const FourDim = struct {
         self: *FourDim,
         interpolation: InterpolationMode,
     ) !void {
-        var interpolator = Interpolator{
-            .vol = self,
-            .mode = interpolation,
-        };
+        var interpolator = try Interpolator.init(self, interpolation);
+
         //TODO: save config to somewhere other than the hard coded temp dir
         //see FourDim.saveFrame
         try interpolator.write();
@@ -316,8 +314,8 @@ pub const Interpolator = struct {
         defer arena.deinit();
 
         switch (self.mode) {
-            .direct => try direct(&arena),
-            .crossfade => try crossfade(&arena),
+            .direct => try self.direct(&arena),
+            .crossfade => try self.crossfade(&arena),
             // else => {
             //     std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
             //     return InterpolationError.ModeDoesNotExist;
@@ -356,10 +354,13 @@ pub const Interpolator = struct {
     }
 
     fn crossfade(
+        self: *Interpolator,
         arena: *std.heap.ArenaAllocator,
-        vol: *FourDim,
     ) !void {
-        for (0..vol.dims[0]) |n| {}
+        //PLACEHOLDERS for now
+        _ = arena;
+        _ = self;
+        // for (0..vol.dims[0]) |n| {}
     }
 };
 
