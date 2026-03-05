@@ -289,7 +289,7 @@ pub const FourDim = struct {
             //should be a non issue presently for pre-normalized ndarrays
             const av = self.data[a_start..a_end][i]; //value of a frame voxel at this cart coord
             const bv = self.data[b_start..b_end][i]; //value of b frame voxel at this cart coord
-            const voxel_value = (av * a_scalar) * (bv * b_scalar);
+            const voxel_value = (av * a_scalar) + (bv * b_scalar);
             try vdb543.setVoxel(
                 vdb,
                 .{
@@ -406,38 +406,38 @@ pub const Interpolator = struct {
     ) !void {
         //original frames
         for (0..self.vol.dims[0]) |o| {
-            if (o != self.vol.dims[0]) { //not the last frame
-                //intraframes
-                for (0..self.hold_durration) |i| {
-                    //TODO: dry with other interpolation modes eventually
-                    defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
-                    var vdb = try vdb543.VDB.build(arena.allocator());
-                    var buffer = std.array_list.Managed(u8).init(arena.allocator());
+            //intraframes
+            for (0..self.hold_durration) |i| {
+                //TODO: dry with other interpolation modes eventually
+                defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
+                var vdb = try vdb543.VDB.build(arena.allocator());
+                var buffer = std.array_list.Managed(u8).init(arena.allocator());
 
-                    //NOTE: f32 because that is our current value for
-                    //the VDB voxels
-                    //in the future this type might be arbitrary
-                    const a_scalar: f32 = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(self.hold_durration));
-                    const b_scalar: f32 = 1.0 - a_scalar;
+                //NOTE: f32 because that is our current value for
+                //the VDB voxels
+                //in the future this type might be arbitrary
+                const b_scalar: f32 = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(self.hold_durration));
+                const a_scalar: f32 = 1.0 - b_scalar;
+                //LLM: I originally had this switched!
 
-                    switch (self.vol.source_format) {
-                        .ndarray => try self.vol.extractInterpolatedFrame(
-                            arena.allocator(),
-                            a_scalar,
-                            b_scalar,
-                            o,
-                            o + 1,
-                            &vdb,
-                        ),
-                        else => return DataFormatError.NotSupportedYet,
-                    }
-                    try vdb543.writeVDB(
-                        &buffer,
+                switch (self.vol.source_format) {
+                    .ndarray => try self.vol.extractInterpolatedFrame(
+                        arena.allocator(),
+                        a_scalar,
+                        b_scalar,
+                        o,
+                        o + 1,
                         &vdb,
-                        self.vol.affine_transform,
-                    );
-                    try self.vol.saveFrame(o, &buffer);
+                    ),
+                    else => return DataFormatError.NotSupportedYet,
                 }
+                try vdb543.writeVDB(
+                    &buffer,
+                    &vdb,
+                    self.vol.affine_transform,
+                );
+                const frame_num = o * self.hold_durration + i; //LLM: calculated
+                try self.vol.saveFrame(frame_num, &buffer);
             }
         }
     }
