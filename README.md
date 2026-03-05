@@ -1,6 +1,6 @@
 ![Render of a non-skull stripped MNI Template](readme_media/mni_template_render.png)
 
-Neurovolume is a Python library for manipulating and visualizing volumetric data. It includes a custom-built, scientific data-focused, VDB writer. The VDB writer is written in Zig with no external dependencies. Currently some `NIfTI1` files can be parsed natively.
+Neurovolume is a Python library for manipulating and visualizing volumetric data. It includes a custom-built, scientific data-focused, VDB writer. The VDB writer is written in Zig with no external dependencies.
 
 While this project focuses on neuroscience, it includes `ndarray` to `VDB` to support virtually any volumetric data pipeline.
 
@@ -10,7 +10,6 @@ This project is available as a pre-release alpha on [pypi](https://pypi.org/proj
 
 # 🏗️ Usage
 
-Native NIfTI1 Parsing
 ````python
 #                  path to .nii, output folder, normalization
 vdb_path = nv.nifti1_to_VDB(anat, output, True)

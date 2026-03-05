@@ -54,27 +54,18 @@ def prep_ndarray(
     transpose: tuple,
 ) -> np.ndarray:
     """
-    Preparation steps needed for ndarrays derrived from nibabel or ANTs
-
-    Parameters:
-    ------------
-    arr: np.ndarray
-        Input numpy array.
-    normalize: bool
-        VDBs must be float32 normalized between 0 and 1
-        By default this is true, but skip if you have already done so
-        earlier in your pipeline
-    transpose: tuple
-        requires some domain knowledge about how your ndarray is laid out.
-        nibabel and ants are (x, y, z, t) for 4D arrays
-    Returns:
-    ------------
-    np.ndarray
-        prepared np.ndarray (should be of type float32)
+    Returns an ndarray that is useable by neurovolume
     """
     # order matters here:
     arr = np.transpose(arr, transpose)
     arr = np.array(arr, order="C", dtype=np.float32)
+
+    max_val = arr.max()
+
+    # LLM: had this in the test suite
+    # completes 0-1 f32 normalization
+    if max_val > 0:
+        arr = arr / max_val
     return arr
 
 
