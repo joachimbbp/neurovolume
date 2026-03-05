@@ -262,6 +262,56 @@ pub const FourDim = struct {
             )) break;
         }
     }
+
+    //TODO: DRY maybe
+    pub fn extractInterpolatedFrame(
+        self: *FourDim,
+        allocator: std.mem.Allocator,
+        //HACK: there are better ways to do this I am sure
+        // very naive but should work
+        a_scalar: f32,
+        b_scalar: f32,
+        a_frame_num: usize,
+        b_frame_num: usize,
+        vdb: *vdb543.VDB,
+    ) !void {
+        if ((a_frame_num >= self.dims[0]) or (b_frame_num >= self.dims[0])) return AccessError.IndexOutOBounds;
+
+        const a_start = a_frame_num * self.frame_size;
+        const a_end = ((a_frame_num + 1) * self.frame_size);
+        const b_start = b_frame_num * self.frame_size;
+        const b_end = ((b_frame_num + 1) * self.frame_size);
+
+        var i: usize = 0;
+        var cart = [_]u32{ 0, 0, 0 };
+        while (true) {
+            //WARN: not sure if normalizer is needed here
+            //or if it should be applied when calculating av and bv
+            //should be a non issue presently for pre-normalized ndarrays
+            const av = self.data[a_start..a_end][i]; //value of a frame voxel at this cart coord
+            const bv = self.data[b_start..b_end][i]; //value of b frame voxel at this cart coord
+            const voxel_value = (av * a_scalar) * (bv * b_scalar);
+            try vdb543.setVoxel(
+                vdb,
+                .{
+                    cart[self.cartesian_order[0]],
+                    cart[self.cartesian_order[1]],
+                    cart[self.cartesian_order[2]],
+                },
+                voxel_value,
+                allocator,
+            );
+
+            i += 1;
+            if (!util.incrementCartesian(
+                u32,
+                3,
+                &cart,
+                .{ self.dims[1], self.dims[2], self.dims[3] },
+            )) break;
+        }
+    }
+
     pub fn save(
         self: *FourDim,
         interpolation: InterpolationMode,
@@ -284,22 +334,25 @@ pub const InterpolationMode = enum(c_int) {
 pub const Interpolator = struct {
     vol: *FourDim,
     mode: InterpolationMode,
-    length: usize, //number of frames after interpolation
+    total_frames: usize, //number of frames after interpolation
+    hold_durration: usize,
 
     pub fn init(vol: *FourDim, mode: InterpolationMode) !Interpolator {
         if (mode == .direct) {
             return .{
                 .vol = vol,
                 .mode = mode,
-                .length = vol.dims[0],
+                .total_frames = vol.dims[0],
+                .hold_durration = 1,
             };
         } else {
             //LLM: calculated, it was late, don't judge me
-            const length: usize = @intFromFloat(@as(f32, @floatFromInt(vol.dims[0])) / vol.source_fps / vol.speed * vol.playback_fps);
+            const total_frames: usize = @intFromFloat(@as(f32, @floatFromInt(vol.dims[0])) / vol.source_fps / vol.speed * vol.playback_fps);
             return .{
                 .vol = vol,
                 .mode = mode,
-                .length = length,
+                .total_frames = total_frames,
+                .hold_durration = total_frames / vol.dims[0], //WARN: edge cases abound for non-int results!
             };
         }
     }
@@ -325,7 +378,7 @@ pub const Interpolator = struct {
 
     // No interpolation
     // Frames from source are written directly
-    // to the VDB sequene
+    // to the VDB sequence
     fn direct(
         self: *Interpolator,
         arena: *std.heap.ArenaAllocator,
@@ -334,7 +387,6 @@ pub const Interpolator = struct {
             defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
             var vdb = try vdb543.VDB.build(arena.allocator());
             var buffer = std.array_list.Managed(u8).init(arena.allocator());
-            // var buffer = std.ArrayList(u8).init(arena.allocator());
             switch (self.vol.source_format) {
                 .ndarray => try self.vol.extractFrame(
                     arena.allocator(),
@@ -357,10 +409,39 @@ pub const Interpolator = struct {
         self: *Interpolator,
         arena: *std.heap.ArenaAllocator,
     ) !void {
-        //PLACEHOLDERS for now
-        _ = arena;
-        _ = self;
-        // for (0..vol.dims[0]) |n| {}
+        //original frames
+        for (0..self.vol.dims[0]) |o| {
+            if (o != self.vol.dims[0]) { //not the last frame
+                //intraframes
+                for (0..self.hold_durration) |i| {
+                    //TODO: dry with other interpolation modes eventually
+                    defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
+                    var vdb = try vdb543.VDB.build(arena.allocator());
+                    var buffer = std.array_list.Managed(u8).init(arena.allocator());
+
+                    //NOTE: f32 because that is our current value for
+                    //the VDB voxels
+                    //in the future this type might be arbitrary
+                    const a_scalar: f32 = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(self.hold_durration));
+                    const b_scalar: f32 = 1.0 - a_scalar;
+
+                    switch (self.vol.source_format) {
+                        .ndarray => try self.vol.extractFrame(
+                            arena.allocator(),
+                            o,
+                            &vdb,
+                        ),
+                        else => return DataFormatError.NotSupportedYet,
+                    }
+                    try vdb543.writeVDB(
+                        &buffer,
+                        &vdb,
+                        self.vol.affine_transform,
+                    );
+                    try self.vol.saveFrame(o, &buffer);
+                }
+            }
+        }
     }
 };
 
