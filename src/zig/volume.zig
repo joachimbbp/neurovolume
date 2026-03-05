@@ -426,9 +426,12 @@ pub const Interpolator = struct {
                     const b_scalar: f32 = 1.0 - a_scalar;
 
                     switch (self.vol.source_format) {
-                        .ndarray => try self.vol.extractFrame(
+                        .ndarray => try self.vol.extractInterpolatedFrame(
                             arena.allocator(),
+                            a_scalar,
+                            b_scalar,
                             o,
+                            o + 1,
                             &vdb,
                         ),
                         else => return DataFormatError.NotSupportedYet,
