@@ -3,6 +3,7 @@ import neurovolume as nv
 from urllib.request import urlretrieve
 import gzip
 import shutil
+import os
 
 # INSTRUCTIONS: must be run from project root, NOT ./tests
 
@@ -92,6 +93,7 @@ import nibabel as nib
 
 def test_anat_static():
     import os
+
     os.makedirs(vdb_out, exist_ok=True)
     img = nib.load(anat)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
@@ -118,8 +120,7 @@ def test_anat_static():
     nv.deinit_three_dim(vol)
 
 
-def test_bold_seq():
-    import os
+def test_bold_seq_direct():
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
     # Transpose: t must be FIRST (slowest) so frames are contiguous in C-order memory.
@@ -137,10 +138,12 @@ def test_bold_seq():
     # x y z t
     dims = prepped_data.shape
 
-    os.makedirs(vdb_out, exist_ok=True)
+    #LLM: put sequence output in its own subfolder
+    seq_out = os.path.join(vdb_out, "bold_test")
+    os.makedirs(seq_out, exist_ok=True)
     vol = nv.init_four_dim(
         base_name="bold_test",
-        save_folder=vdb_out,
+        save_folder=seq_out,
         overwrite=True,
         data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
         transform=np.eye(4),  # 4x4 affine float64
@@ -150,4 +153,40 @@ def test_bold_seq():
         dims=dims,  # (x, z, y, t)
     )
     nv.save_four_dim(vol, 0)
+    nv.deinit_four_dim(vol)
+
+
+def test_bold_seq_crossfade():
+    img = nib.load(bold)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    # Transpose: t must be FIRST (slowest) so frames are contiguous in C-order memory.
+    # Zig extractFrame slices data[n*frame_size..(n+1)*frame_size] — this only gives
+    # a correct single time-point if t is the leading dimension.
+    # (3, 0, 2, 1): t→dim0, x→dim1, z→dim2, y→dim3  (y/z swap kept from prior convention)
+    prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
+    # shape: (t, x, z, y), C-contiguous — frame n = prepped_data[n]
+
+    # Normalize to [0, 1] — VDB requires float32 in this range
+    max_val = prepped_data.max()
+    if max_val > 0:
+        prepped_data = prepped_data / max_val
+
+    # x y z t
+    dims = prepped_data.shape
+
+    #LLM: put sequence output in its own subfolder
+    seq_out = os.path.join(vdb_out, "bold_test_fade")
+    os.makedirs(seq_out, exist_ok=True)
+    vol = nv.init_four_dim(
+        base_name="bold_test_fade",
+        save_folder=seq_out,
+        overwrite=True,
+        data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
+        transform=np.eye(4),  # 4x4 affine float64
+        source_fps=1.0,
+        playback_fps=24.0,
+        speed=1.0,
+        dims=dims,  # (x, z, y, t)
+    )
+    nv.save_four_dim(vol, 1)
     nv.deinit_four_dim(vol)

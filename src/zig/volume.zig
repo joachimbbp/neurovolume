@@ -368,10 +368,6 @@ pub const Interpolator = struct {
         switch (self.mode) {
             .direct => try self.direct(&arena),
             .crossfade => try self.crossfade(&arena),
-            else => {
-                std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
-                return InterpolationError.ModeDoesNotExist;
-            },
         }
     }
 
