@@ -31,43 +31,46 @@ with gzip.open(bold_gz, "rb") as f_in:
 vdb_out = "./tests/data/vdb_out"
 
 
-# def build_pyramid(size=64):
-#     # LLM: generated this for testing
-#     """
-#     Build a 3D pyramid in a numpy array.
-#
-#     Args:
-#         size: Size of the cubic array (default 64x64x64)
-#
-#     Returns:
-#         3D numpy array with pyramid structure (1.0 inside, 0.0 outside)
-#     """
-#     arr = np.zeros((size, size, size), dtype=np.float32)
-#
-#     center = size // 2
-#
-#     # Build pyramid layer by layer from bottom to top
-#     for z in range(size):
-#         # Calculate the radius at this height
-#         # Pyramid tapers from base (bottom) to point (top)
-#         height_ratio = 1.0 - (z / size)
-#         max_radius = center * height_ratio
-#
-#         # Fill the square cross-section at this height
-#         for y in range(size):
-#             for x in range(size):
-#                 # Distance from center in x and y
-#                 dx = abs(x - center)
-#                 dy = abs(y - center)
-#
-#                 # Check if point is inside pyramid at this height
-#                 # Using Chebyshev distance (square pyramid)
-#                 if max(dx, dy) <= max_radius:
-#                     arr[z, y, x] = 1.0
-#
-#     print("Pyramid build")
-#     return arr, True
-#
+# TODO:
+# this is blocky and making it higher resolution makes it gigantic
+# once we add transform, make this much MUCH larger and then scale down
+# so it matches the default cube!
+def build_pyramid(size=64):
+    # LLM: generated this for testing
+    """
+    Build a 3D pyramid in a numpy array.
+
+    Args:
+        size: Size of the cubic array (default 64x64x64)
+
+    Returns:
+        3D numpy array with pyramid structure (1.0 inside, 0.0 outside)
+    """
+    arr = np.zeros((size, size, size), dtype=np.float32)
+
+    center = size // 2
+
+    # Build pyramid layer by layer from bottom to top
+    for z in range(size):
+        # Calculate the radius at this height
+        # Pyramid tapers from base (bottom) to point (top)
+        height_ratio = 1.0 - (z / size)
+        max_radius = center * height_ratio
+
+        # Fill the square cross-section at this height
+        for y in range(size):
+            for x in range(size):
+                # Distance from center in x and y
+                dx = abs(x - center)
+                dy = abs(y - center)
+
+                # Check if point is inside pyramid at this height
+                # Using Chebyshev distance (square pyramid)
+                if max(dx, dy) <= max_radius:
+                    arr[z, y, x] = 1.0
+
+    print("Pyramid build")
+    return arr, True
 
 
 def test_hello():
@@ -76,86 +79,104 @@ def test_hello():
 
 # TODO: Better testing! This is very incomplete as of now
 
+
 # TODO: rewrite this with the new functionality
-# def test_pyramid():
-#     pyramid, built = build_pyramid()
-#     assert built, "Pyramid should build successfully"
-#     output_arr = "./tests/data/vdb_out/pyramid.vdb"
-#     nv.ndarray_to_VDB(pyramid, output_arr)
-#     print("pyramid built")
+def test_pyramid():
+    pyramid, built = build_pyramid()
+    assert built, "Pyramid should build successfully"
+
+    prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
+
+    os.makedirs(vdb_out, exist_ok=True)
+    # LLM: was init_four_dim (wrong API — FourDim* passed to save_three_dim caused Zig panic)
+    vol = nv.init_three_dim(
+        base_name="pyramid",
+        save_folder=vdb_out,
+        overwrite=True,
+        data=prepped_pyramid,
+        transform=np.eye(4),
+        dims=prepped_pyramid.shape,
+    )
+    nv.save_three_dim(vol)
+    nv.deinit_three_dim(vol)
+
+    print("pyramid saved")
+
+
 #
 
 # TODO:
 # move nibabel and other testing only
 # dependencies to somewhere that doesn't
 # effect the rest of the project!# move nibabel and other testing only
+# import nibabel as nib
+
 import nibabel as nib
 
 
-# def test_anat_static():
-#     import os
-#
-#     os.makedirs(vdb_out, exist_ok=True)
-#     img = nib.load(anat)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-#     # nibabel loads anat as (x, y, z); swap y and z to match BOLD convention
-#     prepped_data = nv.prep_ndarray(data, (0, 2, 1))
-#     # shape: (x, z, y), C-contiguous
-#
-#     # Normalize to [0, 1] — VDB requires float32 in this range
-#     max_val = prepped_data.max()
-#     if max_val > 0:
-#         prepped_data = prepped_data / max_val
-#
-#     dims = prepped_data.shape  # (x, z, y)
-#
-#     vol = nv.init_three_dim(
-#         base_name="anat_test",
-#         save_folder=vdb_out,
-#         overwrite=True,
-#         data=prepped_data,
-#         transform=np.eye(4),
-#         dims=dims,
-#     )
-#     nv.save_three_dim(vol)
-#     nv.deinit_three_dim(vol)
-#
-#
-# def test_bold_seq_direct():
-#     img = nib.load(bold)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-#     # Transpose: t must be FIRST (slowest) so frames are contiguous in C-order memory.
-#     # Zig extractFrame slices data[n*frame_size..(n+1)*frame_size] — this only gives
-#     # a correct single time-point if t is the leading dimension.
-#     # (3, 0, 2, 1): t→dim0, x→dim1, z→dim2, y→dim3  (y/z swap kept from prior convention)
-#     prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
-#     # shape: (t, x, z, y), C-contiguous — frame n = prepped_data[n]
-#
-#     # Normalize to [0, 1] — VDB requires float32 in this range
-#     max_val = prepped_data.max()
-#     if max_val > 0:
-#         prepped_data = prepped_data / max_val
-#
-#     # x y z t
-#     dims = prepped_data.shape
-#
-#     #LLM: put sequence output in its own subfolder
-#     seq_out = os.path.join(vdb_out, "bold_test")
-#     os.makedirs(seq_out, exist_ok=True)
-#     vol = nv.init_four_dim(
-#         base_name="bold_test",
-#         save_folder=seq_out,
-#         overwrite=True,
-#         data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
-#         transform=np.eye(4),  # 4x4 affine float64
-#         source_fps=1.0,
-#         playback_fps=24.0,
-#         speed=1.0,
-#         dims=dims,  # (x, z, y, t)
-#     )
-#     nv.save_four_dim(vol, 0)
-#     nv.deinit_four_dim(vol)
-#
+def test_anat_static():
+    import os
+
+    os.makedirs(vdb_out, exist_ok=True)
+    img = nib.load(anat)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    # nibabel loads anat as (x, y, z); swap y and z to match BOLD convention
+    prepped_data = nv.prep_ndarray(data, (0, 2, 1))
+    # shape: (x, z, y), C-contiguous
+
+    # Normalize to [0, 1] — VDB requires float32 in this range
+    max_val = prepped_data.max()
+    if max_val > 0:
+        prepped_data = prepped_data / max_val
+
+    dims = prepped_data.shape  # (x, z, y)
+
+    vol = nv.init_three_dim(
+        base_name="anat_test",
+        save_folder=vdb_out,
+        overwrite=True,
+        data=prepped_data,
+        transform=np.eye(4),
+        dims=dims,
+    )
+    nv.save_three_dim(vol)
+    nv.deinit_three_dim(vol)
+
+
+def test_bold_seq_direct():
+    img = nib.load(bold)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    # Transpose: t must be FIRST (slowest) so frames are contiguous in C-order memory.
+    # Zig extractFrame slices data[n*frame_size..(n+1)*frame_size] — this only gives
+    # a correct single time-point if t is the leading dimension.
+    # (3, 0, 2, 1): t→dim0, x→dim1, z→dim2, y→dim3  (y/z swap kept from prior convention)
+    prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
+    # shape: (t, x, z, y), C-contiguous — frame n = prepped_data[n]
+
+    # Normalize to [0, 1] — VDB requires float32 in this range
+    max_val = prepped_data.max()
+    if max_val > 0:
+        prepped_data = prepped_data / max_val
+
+    # x y z t
+    dims = prepped_data.shape
+
+    # LLM: put sequence output in its own subfolder
+    seq_out = os.path.join(vdb_out, "bold_test")
+    os.makedirs(seq_out, exist_ok=True)
+    vol = nv.init_four_dim(
+        base_name="bold_test",
+        save_folder=seq_out,
+        overwrite=True,
+        data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
+        transform=np.eye(4),  # 4x4 affine float64
+        source_fps=1.0,
+        playback_fps=24.0,
+        speed=1.0,
+        dims=dims,  # (x, z, y, t)
+    )
+    nv.save_four_dim(vol, 0)
+    nv.deinit_four_dim(vol)
 
 
 def test_bold_seq_crossfade():
