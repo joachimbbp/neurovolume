@@ -59,7 +59,8 @@ The project is a two-layer system:
 
 - VDB data must be `f32` normalized between 0.0 and 1.0. Use `prep_ndarray()` or pass `normalize=True` to convert before writing.
 - The `config.zig.zon` file contains absolute paths — update them when working on a new machine.
-- Code annotations used throughout: `//LLM:` marks AI-generated code, `//BOOKMARK:` marks WIP stopping points, `//WARN:` flags known issues, `//FIX:` marks bugs, `//DEPRECATED:` marks unused code left for reference. In Python files use `#LLM:` instead.
+- Code annotations used throughout: `//LLM:` marks AI-generated or AI-modified code, `//BOOKMARK:` marks WIP stopping points, `//WARN:` flags known issues, `//FIX:` marks **bugs that still need to be fixed** (not bugs that were fixed), `//DEPRECATED:` marks unused code left for reference. In Python files use `#LLM:` instead.
 - When Claude Code writes or substantially modifies a function, annotate it with `#LLM: claude wrote this function` (Python) or `//LLM: claude wrote this function` (Zig) on the line before `def`/`pub fn`.
+- IMPORTANT: Never use `//FIX:` to describe a change you made. Use `//LLM:` instead (e.g. `//LLM: was hardcoded path`). `//FIX:` is reserved for flagging bugs that the human developer still needs to address.
 - The `interpolate` branch is the active development branch for frame interpolation. The pattern being established is that every data format (`nifti1`, `ndarray`) needs a `getAt4D` function so the interpolation code can access voxels uniformly.
 - Test data files (`.nii`, `.nii.gz`) are gitignored and must be downloaded separately (links in README and `test_integration.py`).

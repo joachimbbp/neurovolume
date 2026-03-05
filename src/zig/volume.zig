@@ -1,6 +1,5 @@
 //TODO:
 // - [ ] DRY 3D and 4D volumes as much as possible wihtout getting over zealous
-// - [ ] change "FIX" to "LLM" and probably update claude file to reflect this
 // - [ ] crossfade interpolation
 // - [ ] move VDB saving functionality to the vdb module (and alert Robbie)
 const std = @import("std");
@@ -44,7 +43,7 @@ pub const ThreeDim = struct {
         normalize: bool,
         dims: [3]usize,
         save_config: SaveConfiguration,
-    ) !ThreeDim { // FIX: was !FourDim
+    ) !ThreeDim { //LLM: was !FourDim
         var normalizer: util.Normalizer = undefined;
 
         switch (source_format) {
@@ -68,7 +67,7 @@ pub const ThreeDim = struct {
             .source_format = source_format,
             .affine_transform = transform,
             .dims = dims,
-            .frame_size = dims[0] * dims[1] * dims[2], // FIX: was dims[1]*dims[2]*dims[3]
+            .frame_size = dims[0] * dims[1] * dims[2], //LLM: was dims[1]*dims[2]*dims[3]
             .save_config = save_config,
             .normalizer = normalizer,
         };
@@ -82,7 +81,7 @@ pub const ThreeDim = struct {
         const output_filepath = try std.fmt.bufPrint(
             &buf,
             "{s}/{s}.vdb",
-            .{ v.save_config.folder, v.save_config.basename }, // FIX: was hardcoded path
+            .{ v.save_config.folder, v.save_config.basename }, //LLM: was hardcoded path
         );
         const file = try std.fs.cwd().createFile(output_filepath, .{});
         defer file.close();
@@ -91,7 +90,7 @@ pub const ThreeDim = struct {
 
     //extracts the 3D ndarray volume into a VDB
     fn extractVol(
-        self: *ThreeDim, // FIX: was *FourDim
+        self: *ThreeDim, //LLM: was *FourDim
         allocator: std.mem.Allocator,
         vdb: *vdb543.VDB,
     ) !void {
@@ -105,7 +104,7 @@ pub const ThreeDim = struct {
                     cart[self.cartesian_order[1]],
                     cart[self.cartesian_order[2]],
                 },
-                self.normalizer.apply(self.data[i]), // FIX: was self.data (missing [i])
+                self.normalizer.apply(self.data[i]), //LLM: was self.data (missing [i])
                 allocator,
             );
 
@@ -114,7 +113,7 @@ pub const ThreeDim = struct {
                 u32,
                 3,
                 &cart,
-                .{ self.dims[0], self.dims[1], self.dims[2] }, // FIX: was dims[1],[2],[3]
+                .{ self.dims[0], self.dims[1], self.dims[2] }, //LLM: was dims[1],[2],[3]
             )) break;
         }
     }
@@ -144,7 +143,7 @@ pub const ThreeDim = struct {
             &vdb,
             v.affine_transform,
         );
-        try v.writeVDB(&buffer); // FIX: was missing — buffer was never written to disk
+        try v.writeVDB(&buffer); //LLM: was missing — buffer was never written to disk
     }
 };
 
@@ -369,10 +368,10 @@ pub const Interpolator = struct {
         switch (self.mode) {
             .direct => try self.direct(&arena),
             .crossfade => try self.crossfade(&arena),
-            // else => {
-            //     std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
-            //     return InterpolationError.ModeDoesNotExist;
-            // },
+            else => {
+                std.debug.print("Interpolation mode {any} does not exist", .{self.mode});
+                return InterpolationError.ModeDoesNotExist;
+            },
         }
     }
 
