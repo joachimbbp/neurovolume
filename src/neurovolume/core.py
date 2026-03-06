@@ -299,3 +299,20 @@ def ndarray_to_vdb(
     else:
         print(f"{arr.dim}D not supported")
         return
+
+
+# LLM: mostly
+def get_fps(img, loud=False):
+    header = img.header
+    tr = header["pixdim"][4]
+    time_unit = header.get_xyzt_units()[1]
+
+    if time_unit == "msec":
+        tr /= 1000
+    elif time_unit == "usec":
+        tr /= 1_000_000
+
+    fps = 1.0 / tr if tr > 0 else None
+    if loud:
+        print(f"time unit {time_unit}, FPS: {fps}")
+    return fps
