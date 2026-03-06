@@ -84,6 +84,11 @@ def test_hello():
 def test_pyramid():
     pyramid, built = build_pyramid()
     assert built, "Pyramid should build successfully"
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(pyramid, (2, 1, 0)),
+        "pyramid",
+        output_dir=vdb_out,
+    )
 
     prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
 
@@ -118,52 +123,22 @@ def test_anat_static():
     os.makedirs(vdb_out, exist_ok=True)
     img = nib.load(anat)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-    prepped_data = nv.prep_ndarray(data, (0, 2, 1))
 
-    dims = prepped_data.shape  # (x, z, y)
-
-    vol = nv.init_three_dim(
-        base_name="anat_test",
-        save_folder=vdb_out,
-        overwrite=True,  # presently the only option
-        data=prepped_data,
-        transform=np.eye(4),
-        dims=dims,
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(data, (0, 2, 1)),
+        "bold_direct",
+        output_dir=vdb_out,
     )
-    nv.save_three_dim(vol)
-    nv.deinit_three_dim(vol)
 
 
-#
-#
 def test_bold_seq_direct():
-    seq_out = os.path.join(vdb_out, "bold_test_direct")
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
     source_fps = nv.get_fps(img, loud=True)
-    nv.ndarray_to_vdb(data, "bold_direct", source_fps)
 
-
-# def test_bold_seq_crossfade():
-#     img = nib.load(bold)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-#     d2 = np.roll(data, shift=1, axis=0)
-#     diff_arr = abs(d2 - data)
-#     prepped_data = nv.prep_ndarray(diff_arr, (3, 0, 2, 1))
-#     dims = prepped_data.shape
-#
-#     seq_out = os.path.join(vdb_out, "bold_test_fade")
-#     os.makedirs(seq_out, exist_ok=True)
-#     vol = nv.init_four_dim(
-#         base_name="bold_sub_test_fade",
-#         save_folder=seq_out,
-#         overwrite=True,
-#         data=prepped_data,
-#         transform=np.eye(4),  # 4x4 affine float64
-#         source_fps=1.0,
-#         playback_fps=24.0,
-#         speed=1.0,
-#         dims=dims,  # (x, z, y, t)
-#     )
-#     nv.save_four_dim(vol, 1)
-#     nv.deinit_four_dim(vol)
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(data, (3, 0, 2, 1)),
+        "bold_direct",
+        source_fps=source_fps,
+        output_dir=vdb_out,
+    )

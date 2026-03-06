@@ -260,11 +260,11 @@ def save_three_dim(ptr: c.c_void_p) -> None:
         raise RuntimeError(f"saveThreeDim returned error code {result}")
 
 
+# LLM: claude fixed bugs (nv.* calls → direct calls, four_dim→three_dim for 3D branch, arr.dim→arr.ndim)
 def ndarray_to_vdb(
-    arr: np.ndarray,
+    arr: np.ndarray,  # dont for get to prep this!
     basename: str,
-    source_fps: int,
-    transpose=(3, 0, 2, 1),
+    source_fps=1,  # static default
     output_dir="../../output/",
     overwrite=True,  # presently the only option
     transform=np.eye(4),
@@ -274,30 +274,44 @@ def ndarray_to_vdb(
 ):
     if arr.ndim == 3:
         print("3D array")
-        prepped_data = nv.prep_ndarray(arr, transpose)
 
-        dims = prepped_data.shape
+        dims = arr.shape
 
         seq_out = os.path.join(output_dir, basename)
         os.makedirs(seq_out, exist_ok=True)
-        vol = nv.init_four_dim(
+        vol = init_three_dim(
             base_name=basename,
             save_folder=seq_out,
             overwrite=True,
-            data=prepped_data,
+            data=arr,
             transform=transform,  # 4x4 affine float64
-            source_fps=source_fps,
-            playback_fps=playback_fps,
-            speed=speed,
-            dims=dims,  # (x, z, y, t)
+            dims=dims,  # (x, y, z)
         )
-        nv.save_four_dim(vol, interpolation_flag)
-        nv.deinit_four_dim(vol)
+        save_three_dim(vol)
+        deinit_three_dim(vol)
 
     elif arr.ndim == 4:
         print("4D array")
+
+        dims = arr.shape  # (x, z, y, t) after transpose
+
+        seq_out = os.path.join(output_dir, basename)
+        os.makedirs(seq_out, exist_ok=True)
+        vol = init_four_dim(
+            base_name=basename,
+            save_folder=seq_out,
+            overwrite=True,
+            data=arr,
+            transform=transform,
+            source_fps=source_fps,
+            playback_fps=playback_fps,
+            speed=speed,
+            dims=dims,
+        )
+        save_four_dim(vol, interpolation_flag)
+        deinit_four_dim(vol)
     else:
-        print(f"{arr.dim}D not supported")
+        print(f"{arr.ndim}D not supported")
         return
 
 
