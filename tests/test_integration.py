@@ -3,6 +3,7 @@ import neurovolume as nv
 from urllib.request import urlretrieve
 import gzip
 import shutil
+import os
 
 # INSTRUCTIONS: must be run from project root, NOT ./tests
 
@@ -30,6 +31,10 @@ with gzip.open(bold_gz, "rb") as f_in:
 vdb_out = "./tests/data/vdb_out"
 
 
+# TODO:
+# this is blocky and making it higher resolution makes it gigantic
+# once we add transform, make this much MUCH larger and then scale down
+# so it matches the default cube!
 def build_pyramid(size=64):
     # LLM: generated this for testing
     """
@@ -75,31 +80,102 @@ def test_hello():
 # TODO: Better testing! This is very incomplete as of now
 
 
+# TODO: rewrite this with the new functionality
 def test_pyramid():
     pyramid, built = build_pyramid()
     assert built, "Pyramid should build successfully"
-    output_arr = "./tests/data/vdb_out/pyramid.vdb"
-    nv.ndarray_to_VDB(pyramid, output_arr)
-    print("pyramid built")
 
+    prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
 
-def test_nifti():
-    pyramid, built = build_pyramid()
-    assert built, "Pyramid should build successfully"
-
-    print("writing bold seq...")
-    bold_path = nv.nifti1_to_VDB(
-        bold,
-        vdb_out,
-        True,
+    os.makedirs(vdb_out, exist_ok=True)
+    # LLM: was init_four_dim (wrong API — FourDim* passed to save_three_dim caused Zig panic)
+    vol = nv.init_three_dim(
+        base_name="pyramid",
+        save_folder=vdb_out,
+        overwrite=True,  # presently the only option
+        data=prepped_pyramid,
+        transform=np.eye(4),
+        dims=prepped_pyramid.shape,
     )
-    print("vdb bold seq written to ", bold_path)
+    nv.save_three_dim(vol)
+    nv.deinit_three_dim(vol)
 
-    print("writing anat file...")
-    anat_path = nv.nifti1_to_VDB(
-        anat,
-        vdb_out,
-        True,
+    print("pyramid saved")
+
+
+#
+
+# TODO:
+# move nibabel and other testing only
+# dependencies to somewhere that doesn't
+# effect the rest of the project!# move nibabel and other testing only
+# import nibabel as nib
+
+import nibabel as nib
+
+
+def test_anat_static():
+    os.makedirs(vdb_out, exist_ok=True)
+    img = nib.load(anat)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    prepped_data = nv.prep_ndarray(data, (0, 2, 1))
+
+    dims = prepped_data.shape  # (x, z, y)
+
+    vol = nv.init_three_dim(
+        base_name="anat_test",
+        save_folder=vdb_out,
+        overwrite=True,  # presently the only option
+        data=prepped_data,
+        transform=np.eye(4),
+        dims=dims,
     )
+    nv.save_three_dim(vol)
+    nv.deinit_three_dim(vol)
 
-    print("vdb anat saved to ", anat_path)
+
+def test_bold_seq_direct():
+    img = nib.load(bold)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
+
+    dims = prepped_data.shape
+
+    seq_out = os.path.join(vdb_out, "bold_test")  # LLM:
+    os.makedirs(seq_out, exist_ok=True)
+    vol = nv.init_four_dim(
+        base_name="bold_test",
+        save_folder=seq_out,
+        overwrite=True,  # presently the only option
+        data=prepped_data,
+        transform=np.eye(4),  # 4x4 affine float64
+        source_fps=1.0,
+        playback_fps=24.0,
+        speed=1.0,
+        dims=dims,  # (x, z, y, t)
+    )
+    nv.save_four_dim(vol, 0)
+    nv.deinit_four_dim(vol)
+
+
+def test_bold_seq_crossfade():
+    img = nib.load(bold)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
+    dims = prepped_data.shape
+
+    seq_out = os.path.join(vdb_out, "bold_test_fade")  # LLM:
+    os.makedirs(seq_out, exist_ok=True)
+    vol = nv.init_four_dim(
+        base_name="bold_test_fade",
+        save_folder=seq_out,
+        overwrite=True,
+        data=prepped_data,
+        transform=np.eye(4),  # 4x4 affine float64
+        source_fps=1.0,
+        playback_fps=24.0,
+        speed=1.0,
+        dims=dims,  # (x, z, y, t)
+    )
+    nv.save_four_dim(vol, 1)
+    nv.deinit_four_dim(vol)

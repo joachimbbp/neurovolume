@@ -1,14 +1,9 @@
-//NOTE:
-//I am presently only using f32 (and should implement that in the vdb as well)
-//This is because the slslope and slinter are f32, which thus sets the data
-//to sort of always be this. I am curious what the larger datatypes
-//typically do (do the super big ones just not use slope and inter?)
-
 //TODO:
+// [ ] True Sparcity (I believe this includes "tiles")
 // [ ] Add multiple grids
-// [ ] Add tiles
-// [ ] Arbitrary input data
-// [ ]  setVoxels one 3-node at a time to reduce syscalls
+// [ ] Arbitrary input data (presently locked at f32)
+// [ ] Optimizations (if needed)
+//      [ ]  setVoxels one 3-node at a time to reduce syscalls (
 // [ ] Improve error handling
 //DEPRECATED: remove this abstraction eventually
 const ArrayList = std.array_list.Managed;
@@ -75,8 +70,8 @@ pub const VDB = struct {
     five_node: *Node5,
     //NOTE:  to make this arbitrarily large:
     //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    pub fn build(arena_allocator: std.mem.Allocator) !VDB { //WARN: should be arena
-        const five_node = try Node5.build(arena_allocator);
+    pub fn build(allocator: std.mem.Allocator) !VDB { //WARN: should be arena
+        const five_node = try Node5.build(allocator);
         return VDB{ .five_node = five_node };
     }
 };
@@ -144,7 +139,12 @@ fn getBitIndex0(position: [3]u32) u32 {
     return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
 
-pub fn setVoxel(vdb: *VDB, position: [3]u32, value: f32, allocator: std.mem.Allocator) !void {
+pub fn setVoxel(
+    vdb: *VDB,
+    position: [3]u32,
+    value: f32,
+    allocator: std.mem.Allocator,
+) !void {
     var node_5: *Node5 = vdb.five_node;
 
     const bit_index_4 = getBitIndex4(position);
@@ -331,6 +331,9 @@ fn writeGrid(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
 }
 
 pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
+    //CRAZY: this seems to just infer the dimensions from
+    //the transform? Idk i wrote this a while ago...
+
     //Magic Number (needed it spells out BDV)
     try writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
 
@@ -377,26 +380,6 @@ pub fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
 pub fn lengthSquared(v: [3]f32) f32 {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
-//SECTION: writing frames
-
-// Writes a static VDB frame to disk
-pub fn writeFrame(
-    buffer: *ArrayList(u8),
-    vdb: *VDB,
-    path_string: []const u8,
-    arena_alloc: std.mem.Allocator,
-    transform: [4][4]f64,
-) !ArrayList(u8) {
-    try writeVDB(buffer, vdb, transform);
-
-    const vdb_filepath = try save.versionFile(
-        path_string,
-        buffer.*, //EXORCISE: This pointer pattern seems cursed
-        arena_alloc,
-    );
-
-    return vdb_filepath;
-}
 
 //SECTION: Tests:
 const constants = @import("constants.zig");
@@ -405,15 +388,15 @@ const test_patterns = @import("test_patterns.zig");
 //Use "tmp" to use the tmp folder in zig cache
 pub fn sphereTest(comptime save_dir: []const u8) !void {
     //NICE: I think this is a good convention for allocators and arena allocators
+    //FIX: upon using this, it's a little clunky. See nifti1.toVolume for a better option
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-    var arena_alloc = arena.allocator();
+    const arena_alloc = arena.allocator();
 
     var buffer = std.array_list.Managed(u8).init(arena_alloc);
-    defer buffer.deinit();
     const R: u32 = 128;
     const D: u32 = R * 2;
     var sphere_vdb = try VDB.build(arena_alloc);
@@ -443,7 +426,7 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
     try test_patterns.saveTestPattern(
         save_dir,
         "sphere_test_pattern",
-        &arena_alloc,
+        arena_alloc,
         &buffer,
     );
 }
@@ -453,10 +436,9 @@ pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
     defer _ = gpa.deinit();
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-    var arena_alloc = arena.allocator();
+    const arena_alloc = arena.allocator();
 
     var buffer = ArrayList(u8).init(arena_alloc);
-    defer buffer.deinit();
 
     var single_voxel = try VDB.build(arena_alloc);
 
@@ -475,7 +457,7 @@ pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
     try test_patterns.saveTestPattern(
         save_dir,
         "one_pixel_test_pattern",
-        &arena_alloc,
+        arena_alloc,
         &buffer,
     );
 }

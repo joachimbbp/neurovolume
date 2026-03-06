@@ -9,3 +9,5 @@ zig-out
 dist
 DS_Store
 ./src/neurovolume/_native/*
+
+.pytest_cache

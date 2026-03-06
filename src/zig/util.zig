@@ -3,6 +3,69 @@ const random = std.crypto.random;
 const eql = std.mem.eql;
 const ArrayList = std.array_list.Managed;
 
+//and a function to do so to boot!
+pub const Normalizer = struct {
+    //Initializes the normalizer
+    //You need to get your min and max
+    //values from your volume.
+    //Set active to false if you don't
+    //want to normalize
+    pub fn init(
+        active: bool,
+        min_value: f32,
+        max_value: f32,
+    ) Normalizer {
+        //Note: f32 for now but one day this
+        //might be an arbitrary type to
+        //match the VDB functionality
+        const minmax_delta = min_value - max_value;
+        return .{
+            .active = active,
+            .min_val = min_value,
+            .minmax_delta = minmax_delta,
+        };
+    }
+    active: bool,
+    min_val: f32,
+    minmax_delta: f32,
+
+    pub fn apply(self: Normalizer, value: f32) f32 {
+        if (!self.active) {
+            return value;
+        }
+        return (value - self.min_val) / self.minmax_delta;
+    }
+};
+
+//from "/path/to/hamspam.nii.gz"
+//returns "hamspam"
+pub fn stripped_basename(path: []const u8) []const u8 {
+    //CURSED: shared reference with what zig calls a "basename" but so be it!
+    const filename = std.fs.path.basename(path);
+    var splits = std.mem.splitSequence(u8, filename, ".");
+    return splits.first();
+}
+
+pub fn incrementCartesian(
+    comptime T: type,
+    comptime num_dims: comptime_int,
+    cart_coord: *[num_dims]T,
+    dim_sizes: [num_dims]usize,
+) bool {
+    //false if overflow occurs, true if otherwise
+    //C-order (row-major): last index changes fastest, matching numpy C-contiguous layout
+    var i: usize = num_dims;
+    while (i > 0) {
+        i -= 1;
+        cart_coord[i] += 1;
+        if (cart_coord[i] < dim_sizes[i]) {
+            return true;
+        }
+        cart_coord[i] = 0;
+    }
+    return false;
+}
+
 //entirely random uuid
 pub fn UUIDv4() [36]u8 {
     var result: [36]u8 = undefined;

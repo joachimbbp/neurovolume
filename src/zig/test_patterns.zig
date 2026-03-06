@@ -1,3 +1,8 @@
+//DEPRECATED:
+//These were abandoned long ago,
+//we will return to them when a zig
+//library is to be built
+
 const std = @import("std");
 const print = std.debug.print;
 const t = @import("timer.zig");
