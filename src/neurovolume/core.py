@@ -301,36 +301,3 @@ def unit(filepath: str, filetype: str, unit_kind: str) -> str:
     nv.unit_c.restype = c.c_size_t
     nv.unit_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
     return unit_name.value.decode()
-
-
-def source_fps(filepath: str, filetype: str) -> int:  # DEPRECATED: most likely
-    match filetype:
-        case "NIfTI1":
-            if num_frames(filepath, filetype) == 1:
-                # staic file, frames per second is zero
-                return 0
-
-            time_unit = unit(filepath, filetype, "time")
-            time_value = pixdim(filepath, filetype, 4)
-            match time_unit:
-                # time_in_seconds / time_value
-                case "Seconds":
-                    return 1 / time_value
-                case "Miliseconds":
-                    return 0.001 / time_value
-                case "Microseconds":
-                    return 0.000001 / time_value
-
-                # These will probably be different
-                case "Hertz":
-                    raise ValueError("hz not implemented yet")
-                case "Parts_per_million":
-                    raise ValueError("ppm not implemented yet")
-                case "Radians_per_second":
-                    raise ValueError("rpm not implemented yet")
-                case _:
-                    raise ValueError(unit, "is an unknown unit, not implemented yet")
-
-        case _:
-            err_msg = f"{filetype} is unsupported for num_frames access"
-            raise ValueError(err_msg)

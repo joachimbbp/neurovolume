@@ -10,16 +10,42 @@ This project is available as a pre-release alpha on [pypi](https://pypi.org/proj
 
 # 🏗️ Usage
 
+The Python library is a bit verbose. We hope to pair it down to something more manageable. In the meantime, this is how you could save a BOLD sequence from a .niii file
+
 ````python
-#                  path to .nii, output folder, normalization
-vdb_path = nv.nifti1_to_VDB(anat, output, True)
-# note output folder should look like "./output/" (slash on the end)
+img = nib.load(bold)
+data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
+dims = prepped_data.shape
+
+seq_out = os.path.join(vdb_out, "bold_test_fade")  # LLM:
+os.makedirs(seq_out, exist_ok=True)
+vol = nv.init_four_dim(
+    base_name="bold_test_fade",
+    save_folder=seq_out,
+    overwrite=True,
+    data=prepped_data,
+    transform=np.eye(4),  # 4x4 affine float64
+    source_fps=1.0,
+    playback_fps=24.0,
+    speed=1.0,
+    dims=dims,  # (x, z, y, t)
+)
+nv.save_four_dim(vol, 1) # 1 indicates a cross-dissolve frame interpolation
+nv.deinit_four_dim(vol)
 ````
-A full script, as well as a nibabel and ndarray examples, can be found in the [Neurovolume Examples](https://github.com/joachimbbp/neurovolume_examples).
+
+If you are building locally, we use uv to build and test the project:
+```bash
+uv run python -m ziglang build && uv run pytest tests
+```
+
+
 
 # 📀 Projects
 - [BoldViz](https://github.com/joachimbbp/boldviz): a Blender plugin for fMRI and MRI visualizations. It was used to create the renders in this README. A great place to start if you don't want to deal with writing any Python.
-- [Neurovolume Examples](https://github.com/joachimbbp/neurovolume_examples) and [Physarum](https://github.com/joachimbbp/physarum) include some good starting points for how one might use this library with numpy. The [nibabel example](https://github.com/joachimbbp/neurovolume_examples/blob/master/nibabel_example.py) shows how to use an external NIfTI parser, which could be of use for not-yet-supported filetypes.
+- [Neurovolume Examples](https://github.com/joachimbbp/neurovolume_examples) and [Physarum](https://github.com/joachimbbp/physarum) include some good starting points for how one might use this library with numpy.
+- The [nibabel example](https://github.com/joachimbbp/neurovolume_examples/blob/master/nibabel_example.py) shows how to use an external NIfTI parser, which could be of use for not-yet-supported filetypes. We're moving away from native file parsing as everyone seems to use numpy, but please reach out if this is something that you'd want!
 
 # ☁️ Why VDB?
 VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Our volume-based approach aims to provide easy access to the original density data throughout the visualization and analysis pipeline. Unlike the [openVDB repo](https://www.openvdb.org/), our smaller version is much more readable and does not need to be run in a docker container.
@@ -27,8 +53,6 @@ VDBs are a highly performant, art-directable, volumetric data structure that sup
 # 🛠️ Missing Features
 While a comprehensive road-map will be published soon, there are a few important considerations to take into account now.
 - Presently the VDB writer isn't sparse nor does it support multiple grids. Tiles and multiple grids are in development.
-- Neurovolume currently only natively supports `NIfTI1` files (and only some variants). Full coverage and `NIfTI2` will be supported soon. Until then, you can use an `ndarray` as an intermediary (see Python Usage).
-- Frame interpolation (present in the original Go prototype) is currently under development on this branch. If you wish to access the old Go code, check out [the archive](https://github.com/joachimbbp/neurovolume_archive)
 - Documentation has not been written yet.
 - pypi package presently only supports arm64. Coverage for linux and windows is in the works.
 

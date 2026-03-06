@@ -147,7 +147,7 @@ def test_bold_seq_direct():
         base_name="bold_test",
         save_folder=seq_out,
         overwrite=True,  # presently the only option
-        data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
+        data=prepped_data,
         transform=np.eye(4),  # 4x4 affine float64
         source_fps=1.0,
         playback_fps=24.0,
@@ -170,7 +170,7 @@ def test_bold_seq_crossfade():
         base_name="bold_test_fade",
         save_folder=seq_out,
         overwrite=True,
-        data=prepped_data,  # float32, t-first C-contiguous, normalized to [0,1]
+        data=prepped_data,
         transform=np.eye(4),  # 4x4 affine float64
         source_fps=1.0,
         playback_fps=24.0,
