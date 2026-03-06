@@ -260,44 +260,42 @@ def save_three_dim(ptr: c.c_void_p) -> None:
         raise RuntimeError(f"saveThreeDim returned error code {result}")
 
 
-def pixdim(filepath: str, filetype: str, dim: int) -> float:
-    match filetype:
-        case "NIfTI1":
-            nv.pixdim_c.argtypes = [c.c_char_p, c.c_char_p, c.c_int]
-            nv.pixdim_c.restype = c.c_float
-            pixdim = nv.pixdim_c(b(filepath), b(filetype), dim)
-            return pixdim
-        case _:
-            err_msg = f"{filetype} is unsupported for pixdim access"
-            raise ValueError(err_msg)
+def ndarray_to_vdb(
+    arr: np.ndarray,
+    basename: str,
+    source_fps: int,
+    transpose=(3, 0, 2, 1),
+    output_dir="../../output/",
+    overwrite=True,  # presently the only option
+    transform=np.eye(4),
+    playback_fps=24.0,
+    speed=1.0,
+    interpolation_flag=0,  # default to direct, chose 1 for cross
+):
+    if arr.ndim == 3:
+        print("3D array")
+        prepped_data = nv.prep_ndarray(arr, transpose)
 
+        dims = prepped_data.shape
 
-# WARN: never tested or used and test file just puts this as 0 for some reason
-def slice_duration(filepath: str, filetype: str) -> int:
-    match filetype:
-        case "NIfTI1":
-            nv.sliceDuration_c.argtypes = [
-                c.c_char_p,
-                c.c_char_p,
-            ]
-            nv.sliceDuration_c.restype = c.c_size_t
-            slice_duration = nv.sliceDuration_c(b(filepath), b(filetype))
-            return slice_duration
-        case _:
-            err_msg = f"{filetype} is unsupported for slice_duration access"
-            raise ValueError(err_msg)
+        seq_out = os.path.join(output_dir, basename)
+        os.makedirs(seq_out, exist_ok=True)
+        vol = nv.init_four_dim(
+            base_name=basename,
+            save_folder=seq_out,
+            overwrite=True,
+            data=prepped_data,
+            transform=transform,  # 4x4 affine float64
+            source_fps=source_fps,
+            playback_fps=playback_fps,
+            speed=speed,
+            dims=dims,  # (x, z, y, t)
+        )
+        nv.save_four_dim(vol, interpolation_flag)
+        nv.deinit_four_dim(vol)
 
-
-def unit(filepath: str, filetype: str, unit_kind: str) -> str:
-    BUF_SIZE = 64  # generously padded, tbh
-    unit_name = c.create_string_buffer(BUF_SIZE)
-    nv.unit_c.argtypes = [
-        c.c_char_p,
-        c.c_char_p,
-        c.c_char_p,
-        c.POINTER(c.c_char),
-        c.c_size_t,
-    ]
-    nv.unit_c.restype = c.c_size_t
-    nv.unit_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
-    return unit_name.value.decode()
+    elif arr.ndim == 4:
+        print("4D array")
+    else:
+        print(f"{arr.dim}D not supported")
+        return
