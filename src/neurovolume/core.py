@@ -260,44 +260,71 @@ def save_three_dim(ptr: c.c_void_p) -> None:
         raise RuntimeError(f"saveThreeDim returned error code {result}")
 
 
-def pixdim(filepath: str, filetype: str, dim: int) -> float:
-    match filetype:
-        case "NIfTI1":
-            nv.pixdim_c.argtypes = [c.c_char_p, c.c_char_p, c.c_int]
-            nv.pixdim_c.restype = c.c_float
-            pixdim = nv.pixdim_c(b(filepath), b(filetype), dim)
-            return pixdim
-        case _:
-            err_msg = f"{filetype} is unsupported for pixdim access"
-            raise ValueError(err_msg)
+# LLM: claude fixed bugs (nv.* calls → direct calls, four_dim→three_dim for 3D branch, arr.dim→arr.ndim)
+def ndarray_to_vdb(
+    arr: np.ndarray,  # dont for get to prep this!
+    basename: str,
+    source_fps=1,  # static default
+    output_dir="../../output/",
+    overwrite=True,  # presently the only option
+    transform=np.eye(4),
+    playback_fps=24.0,
+    speed=1.0,
+    interpolation_flag=0,  # default to direct, chose 1 for cross
+):
+    if arr.ndim == 3:
+        print("3D array")
+
+        dims = arr.shape
+
+        vol = init_three_dim(
+            base_name=basename,
+            save_folder=output_dir,
+            overwrite=True,
+            data=arr,
+            transform=transform,  # 4x4 affine float64
+            dims=dims,  # (x, y, z)
+        )
+        save_three_dim(vol)
+        deinit_three_dim(vol)
+
+    elif arr.ndim == 4:
+        print("4D array")
+
+        dims = arr.shape  # (x, z, y, t) after transpose
+
+        seq_out = os.path.join(output_dir, basename)
+        os.makedirs(seq_out, exist_ok=True)
+        vol = init_four_dim(
+            base_name=basename,
+            save_folder=seq_out,
+            overwrite=True,
+            data=arr,
+            transform=transform,
+            source_fps=source_fps,
+            playback_fps=playback_fps,
+            speed=speed,
+            dims=dims,
+        )
+        save_four_dim(vol, interpolation_flag)
+        deinit_four_dim(vol)
+    else:
+        print(f"{arr.ndim}D not supported")
+        return
 
 
-# WARN: never tested or used and test file just puts this as 0 for some reason
-def slice_duration(filepath: str, filetype: str) -> int:
-    match filetype:
-        case "NIfTI1":
-            nv.sliceDuration_c.argtypes = [
-                c.c_char_p,
-                c.c_char_p,
-            ]
-            nv.sliceDuration_c.restype = c.c_size_t
-            slice_duration = nv.sliceDuration_c(b(filepath), b(filetype))
-            return slice_duration
-        case _:
-            err_msg = f"{filetype} is unsupported for slice_duration access"
-            raise ValueError(err_msg)
+# LLM: mostly
+def get_fps(img, loud=False):
+    header = img.header
+    tr = header["pixdim"][4]
+    time_unit = header.get_xyzt_units()[1]
 
+    if time_unit == "msec":
+        tr /= 1000
+    elif time_unit == "usec":
+        tr /= 1_000_000
 
-def unit(filepath: str, filetype: str, unit_kind: str) -> str:
-    BUF_SIZE = 64  # generously padded, tbh
-    unit_name = c.create_string_buffer(BUF_SIZE)
-    nv.unit_c.argtypes = [
-        c.c_char_p,
-        c.c_char_p,
-        c.c_char_p,
-        c.POINTER(c.c_char),
-        c.c_size_t,
-    ]
-    nv.unit_c.restype = c.c_size_t
-    nv.unit_c(b(filepath), b(filetype), b(unit_kind), unit_name, BUF_SIZE)
-    return unit_name.value.decode()
+    fps = 1.0 / tr if tr > 0 else None
+    if loud:
+        print(f"time unit {time_unit}, FPS: {fps}")
+    return fps
