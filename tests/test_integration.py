@@ -126,7 +126,7 @@ def test_anat_static():
 
     nv.ndarray_to_vdb(
         nv.prep_ndarray(data, (0, 2, 1)),
-        "bold_direct",
+        "anat_test",
         output_dir=vdb_out,
     )
 
@@ -141,4 +141,18 @@ def test_bold_seq_direct():
         "bold_direct",
         source_fps=source_fps,
         output_dir=vdb_out,
+    )
+
+
+def test_bold_seq_fade():
+    img = nib.load(bold)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    source_fps = nv.get_fps(img, loud=True)
+
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(data, (3, 0, 2, 1)),
+        "bold_fade",
+        source_fps=source_fps,
+        output_dir=vdb_out,
+        interpolation_flag=1,  # TODO: enum on python side with named interpolations
     )

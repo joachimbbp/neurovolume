@@ -9,30 +9,24 @@ This project is under active development and might not have everything you need 
 This project is available as a pre-release alpha on [pypi](https://pypi.org/project/neurovolume/). Presently it is only available for arm64. More operating systems coming soon!
 
 # 🏗️ Usage
-
-The Python library is a bit verbose. We hope to pair it down to something more manageable. In the meantime, this is how you could save a BOLD sequence from a .niii file
+This is how you could save a BOLD sequence from a .niii file
 
 ````python
-img = nib.load(bold)
-data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-prepped_data = nv.prep_ndarray(data, (3, 0, 2, 1))
-dims = prepped_data.shape
+import nibabel as nib
+import numpy as np
+import neurovolume as nv
 
-seq_out = os.path.join(vdb_out, "bold_test_fade")  # LLM:
-os.makedirs(seq_out, exist_ok=True)
-vol = nv.init_four_dim(
-    base_name="bold_test_fade",
-    save_folder=seq_out,
-    overwrite=True,
-    data=prepped_data,
-    transform=np.eye(4),  # 4x4 affine float64
-    source_fps=1.0,
-    playback_fps=24.0,
-    speed=1.0,
-    dims=dims,  # (x, z, y, t)
+img = nib.load("/path/to/fmri.nii")
+data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+source_fps = nv.get_fps(img)
+
+nv.ndarray_to_vdb(
+    nv.prep_ndarray(data, (3, 0, 2, 1)), # transpose for nibabel img
+    "bold",
+    source_fps=source_fps,
+    output_dir=vdb_out,
 )
-nv.save_four_dim(vol, 1) # 1 indicates a cross-dissolve frame interpolation
-nv.deinit_four_dim(vol)
+
 ````
 
 If you are building locally, we use uv to build and test the project:

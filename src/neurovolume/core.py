@@ -277,11 +277,9 @@ def ndarray_to_vdb(
 
         dims = arr.shape
 
-        seq_out = os.path.join(output_dir, basename)
-        os.makedirs(seq_out, exist_ok=True)
         vol = init_three_dim(
             base_name=basename,
-            save_folder=seq_out,
+            save_folder=output_dir,
             overwrite=True,
             data=arr,
             transform=transform,  # 4x4 affine float64
