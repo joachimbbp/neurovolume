@@ -1,3 +1,4 @@
+# INSTRUCTIONS: must be run from project root, NOT ./tests
 import numpy as np
 import neurovolume as nv
 from urllib.request import urlretrieve
@@ -5,7 +6,13 @@ import gzip
 import shutil
 import os
 
-# INSTRUCTIONS: must be run from project root, NOT ./tests
+# TODO:
+# move nibabel and other testing only
+# dependencies to somewhere that doesn't
+# effect the rest of the project!# move nibabel and other testing only
+# import nibabel as nib
+import nibabel as nib  # DEPENDENCY: it's only for testing, see above todo
+
 
 anat_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
 bold_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q"
@@ -93,30 +100,12 @@ def test_pyramid():
     prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
 
     os.makedirs(vdb_out, exist_ok=True)
-    # LLM: was init_four_dim (wrong API — FourDim* passed to save_three_dim caused Zig panic)
-    vol = nv.init_three_dim(
-        base_name="pyramid",
-        save_folder=vdb_out,
-        overwrite=True,  # presently the only option
-        data=prepped_pyramid,
-        transform=np.eye(4),
-        dims=prepped_pyramid.shape,
+    nv.ndarray_to_vdb(
+        prepped_pyramid,
+        "pyramid",
+        output_dir=vdb_out,
     )
-    nv.save_three_dim(vol)
-    nv.deinit_three_dim(vol)
-
     print("pyramid saved")
-
-
-#
-
-# TODO:
-# move nibabel and other testing only
-# dependencies to somewhere that doesn't
-# effect the rest of the project!# move nibabel and other testing only
-# import nibabel as nib
-
-import nibabel as nib
 
 
 def test_anat_static():
@@ -131,15 +120,33 @@ def test_anat_static():
     )
 
 
+def _get_fps(img, loud=False):
+    # this should probably live in whatever
+    # fMRI processing pipeline you are working on
+    header = img.header
+    tr = header["pixdim"][4]
+    time_unit = header.get_xyzt_units()[1]
+
+    if time_unit == "msec":
+        tr /= 1000
+    elif time_unit == "usec":
+        tr /= 1_000_000
+
+    fps = 1.0 / tr if tr > 0 else None
+    if loud:
+        print(f"time unit {time_unit}, FPS: {fps}")
+    return fps
+    fps = img.header["pixdim"][4]
+
+
 def test_bold_seq_direct():
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-    source_fps = nv.get_fps(img, loud=True)
 
     nv.ndarray_to_vdb(
         nv.prep_ndarray(data, (3, 0, 2, 1)),
         "bold_direct",
-        source_fps=source_fps,
+        source_fps=_get_fps(img),
         output_dir=vdb_out,
     )
 
@@ -147,12 +154,11 @@ def test_bold_seq_direct():
 def test_bold_seq_fade():
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-    source_fps = nv.get_fps(img, loud=True)
 
     nv.ndarray_to_vdb(
         nv.prep_ndarray(data, (3, 0, 2, 1)),
         "bold_fade",
-        source_fps=source_fps,
+        source_fps=_get_fps(img),
         output_dir=vdb_out,
         interpolation_flag=1,  # TODO: enum on python side with named interpolations
     )
