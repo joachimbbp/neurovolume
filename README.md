@@ -17,7 +17,7 @@ This is how you could save a BOLD sequence from a .niii file
 
 If you are building locally, we use uv to build and test the project:
 ```bash
-uv run python -m ziglang build && uv run pytest tests
+uv run python -m ziglang build && uv run pytest tests -s
 ```
 
 

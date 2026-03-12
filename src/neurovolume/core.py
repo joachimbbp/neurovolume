@@ -8,6 +8,7 @@ from neurovolume._internal import (
     _deinit_four_dim,
 )
 import os
+import sys
 import numpy as np  # DEPENDENCY: really the only one we should have!
 
 
@@ -34,6 +35,23 @@ def prep_ndarray(
     if max_val > 0:
         arr = arr / max_val
     return arr
+
+
+def scale(affine: np.ndarray, scale: float) -> np.ndarray:
+    """
+    usage: scale is the percentage to scale by
+            0.5 is 50% etc
+    """
+    print(f"input: {input}")
+    if len(affine) != 4:
+        sys.exit(f"Invalid affine len, must be 4: {len(affine)}")
+    output = affine
+    output[0][0] *= scale
+    output[1][1] *= scale
+    output[2][2] *= scale
+    # and then the last one stays the same as it's not
+    # used for scale transormations
+    return output
 
 
 def ndarray_to_vdb(
