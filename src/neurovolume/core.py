@@ -39,18 +39,25 @@ def prep_ndarray(
 
 def scale(affine: np.ndarray, scale: float) -> np.ndarray:
     """
+    modifies the affine matrix's scale
     usage: scale is the percentage to scale by
             0.5 is 50% etc
     """
     print(f"input: {input}")
     if len(affine) != 4:
-        sys.exit(f"Invalid affine len, must be 4: {len(affine)}")
-    output = affine
-    output[0][0] *= scale
-    output[1][1] *= scale
-    output[2][2] *= scale
-    # and then the last one stays the same as it's not
-    # used for scale transormations
+        sys.exit(
+            f"Invalid affine len, must be 4 (3D plus homogonized coordinate): {len(affine)}"
+        )
+    output = affine.copy()
+
+    # LLM: wrote all of these
+    output[0][0] *= scale  # sx
+    output[1][1] *= scale  # sy
+    output[2][2] *= scale  # sz
+    output[0][3] *= scale  # tx
+    output[1][3] *= scale  # ty
+    output[2][3] *= scale  # tz
+
     return output
 
 
