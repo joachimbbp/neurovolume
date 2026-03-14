@@ -12,7 +12,19 @@ This project is available as a pre-release alpha on [pypi](https://pypi.org/proj
 This is how you could save a BOLD sequence from a .niii file
 
 ````python
-#TODO:
+import numpy as np
+import neurovolume as nv
+import nibabel as nib
+
+img = nib.load(anat)
+data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+
+nv.ndarray_to_vdb(
+    nv.prep_ndarray(data, (0, 2, 1)),
+    "anat_offset",
+    output_dir=vdb_out,
+    transform=nv.scale(img.affine, 0.01), # scaled for blender viewport
+)
 ````
 
 If you are building locally, we use uv to build and test the project:
