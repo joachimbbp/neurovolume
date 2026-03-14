@@ -115,7 +115,8 @@ def test_pyramid(size=64000):
     print(f"scaled affine: \n{scaled}")
     translated = nv.translate(scaled, 5, 5, 5)
     print(f"translated affine:\n{translated}")
-
+    rotated = nv.rotate(translated, 1, 1, 1)
+    print(f"rotated matrix: \n{rotated}")
     nv.ndarray_to_vdb(
         nv.prep_ndarray(pyramid, (2, 1, 0)),
         "pyramid",
@@ -127,9 +128,9 @@ def test_pyramid(size=64000):
     os.makedirs(vdb_out, exist_ok=True)
     nv.ndarray_to_vdb(
         prepped_pyramid,
-        "translated_5",
+        "trs_pyramid",
         output_dir=vdb_out,
-        transform=translated,
+        transform=rotated,
     )
     print("pyramid saved")
 

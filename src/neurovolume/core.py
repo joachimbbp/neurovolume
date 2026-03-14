@@ -51,11 +51,11 @@ def scale(affine: np.ndarray, scale: float) -> np.ndarray:
     usage: scale is the percentage to scale by
             0.5 is 50% etc
     """
-    output = _verify_and_copy_affine(affine)
+    o = _verify_and_copy_affine(affine)
     # LLM: scale full 3x3 submatrix (not just diagonal) to preserve oblique orientation
-    output[:3, :3] *= scale  # scale+rotation columns
-    output[:3, 3] *= scale  # translation
-    return output
+    o[:3, :3] *= scale  # scale+rotation columns
+    o[:3, 3] *= scale  # translation
+    return o
 
 
 def translate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
@@ -63,11 +63,53 @@ def translate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
     modifies the affine matrix's translation
     usage: x y and z inputs are added to the translation column
     """
-    output = _verify_and_copy_affine(affine)
-    output[0][3] += x
-    output[1][3] += y
-    output[2][3] += z
-    return output
+    # o for output
+    o = _verify_and_copy_affine(affine)
+    o[0][3] += x
+    o[1][3] += y
+    o[2][3] += z
+    return o
+
+
+def rotate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
+    """
+    modifies the affine matrix's rotation
+    usage: x y and z are respective theta in the 3D rotation
+    (i think its radians...)
+    """
+    o = _verify_and_copy_affine(affine)
+    # LLM: all below (I am way too lazy)
+    Rx = np.array(
+        [
+            [1, 0, 0],
+            [0, np.cos(x), -np.sin(x)],
+            [0, np.sin(x), np.cos(x)],
+        ]
+    )
+
+    Ry = np.array(
+        [
+            [np.cos(y), 0, np.sin(y)],
+            [0, 1, 0],
+            [-np.sin(y), 0, np.cos(y)],
+        ]
+    )
+
+    Rz = np.array(
+        [
+            [np.cos(z), -np.sin(z), 0],
+            [np.sin(z), np.cos(z), 0],
+            [0, 0, 1],
+        ]
+    )
+
+    # Combined rotation: R = Rz @ Ry @ Rx (applied right-to-left)
+    R = Rz @ Ry @ Rx
+
+    # Insert into the affine matrix (top-left 3x3)
+    o[:3, :3] = R
+
+    return o
 
 
 def ndarray_to_vdb(
