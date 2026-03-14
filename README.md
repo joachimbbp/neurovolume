@@ -12,26 +12,24 @@ This project is available as a pre-release alpha on [pypi](https://pypi.org/proj
 This is how you could save a BOLD sequence from a .niii file
 
 ````python
-import nibabel as nib
 import numpy as np
 import neurovolume as nv
+import nibabel as nib
 
-img = nib.load("/path/to/fmri.nii")
+img = nib.load(anat)
 data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-source_fps = nv.get_fps(img)
 
 nv.ndarray_to_vdb(
-    nv.prep_ndarray(data, (3, 0, 2, 1)), # transpose for nibabel img
-    "bold",
-    source_fps=source_fps,
+    nv.prep_ndarray(data, (0, 2, 1)),
+    "anat_offset",
     output_dir=vdb_out,
+    transform=nv.scale(img.affine, 0.01), # scaled for blender viewport
 )
-
 ````
 
 If you are building locally, we use uv to build and test the project:
 ```bash
-uv run python -m ziglang build && uv run pytest tests
+uv run python -m ziglang build && uv run pytest tests -s
 ```
 
 

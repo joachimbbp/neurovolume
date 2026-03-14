@@ -1,3 +1,4 @@
+# INSTRUCTIONS: must be run from project root, NOT ./tests
 import numpy as np
 import neurovolume as nv
 from urllib.request import urlretrieve
@@ -5,11 +6,17 @@ import gzip
 import shutil
 import os
 
-# INSTRUCTIONS: must be run from project root, NOT ./tests
+# TODO:
+# move nibabel and other testing only
+# dependencies to somewhere that doesn't
+# effect the rest of the project!# move nibabel and other testing only
+# import nibabel as nib
+import nibabel as nib  # DEPENDENCY: it's only for testing, see above todo
+
 
 anat_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
 bold_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q"
-# HACK: this whole thing is a little hacky/messy
+# # HACK: this whole thing is a little hacky/messy
 anat_gz = "./tests/data/sub-01_T1w.nii.gz"
 anat = "./tests/data/sub-01_t1w.nii"
 bold_gz = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii.gz"
@@ -31,11 +38,30 @@ with gzip.open(bold_gz, "rb") as f_in:
 vdb_out = "./tests/data/vdb_out"
 
 
+def _get_fps(img, loud=False):
+    # this should probably live in whatever
+    # fMRI processing pipeline you are working on
+    header = img.header
+    tr = header["pixdim"][4]
+    time_unit = header.get_xyzt_units()[1]
+
+    if time_unit == "msec":
+        tr /= 1000
+    elif time_unit == "usec":
+        tr /= 1_000_000
+
+    fps = 1.0 / tr if tr > 0 else None
+    if loud:
+        print(f"time unit {time_unit}, FPS: {fps}")
+    return fps
+    fps = img.header["pixdim"][4]
+
+
 # TODO:
 # this is blocky and making it higher resolution makes it gigantic
 # once we add transform, make this much MUCH larger and then scale down
 # so it matches the default cube!
-def build_pyramid(size=64):
+def _build_pyramid(size=64):
     # LLM: generated this for testing
     """
     Build a 3D pyramid in a numpy array.
@@ -81,42 +107,38 @@ def test_hello():
 
 
 # TODO: rewrite this with the new functionality
-def test_pyramid():
-    pyramid, built = build_pyramid()
+def test_pyramid(size=64000):
+    pyramid, built = _build_pyramid()
     assert built, "Pyramid should build successfully"
-    nv.ndarray_to_vdb(
-        nv.prep_ndarray(pyramid, (2, 1, 0)),
-        "pyramid",
-        output_dir=vdb_out,
-    )
+
+    identity = np.eye(4)
+    # perhaps this pattern isn't the best?
+    print(f"identity matrix: \n{identity}")
+    scaled = nv.scale(identity, 0.030)
+    print(f"scaled affine: \n{scaled}")
+    translated = nv.translate(scaled, 1.6, 0.7, 0.2)
+    print(f"translated affine:\n{translated}")
+    rotated = nv.rotate(translated, 0, 0, np.deg2rad(44))
+    print(f"rotated matrix: \n{rotated}")
 
     prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
 
     os.makedirs(vdb_out, exist_ok=True)
-    # LLM: was init_four_dim (wrong API — FourDim* passed to save_three_dim caused Zig panic)
-    vol = nv.init_three_dim(
-        base_name="pyramid",
-        save_folder=vdb_out,
-        overwrite=True,  # presently the only option
-        data=prepped_pyramid,
-        transform=np.eye(4),
-        dims=prepped_pyramid.shape,
+    nv.ndarray_to_vdb(
+        prepped_pyramid,
+        "pyramid_offset",
+        output_dir=vdb_out,
+        transform=rotated,
     )
-    nv.save_three_dim(vol)
-    nv.deinit_three_dim(vol)
-
-    print("pyramid saved")
+    print("pyramids saved")
 
 
-#
-
-# TODO:
-# move nibabel and other testing only
-# dependencies to somewhere that doesn't
-# effect the rest of the project!# move nibabel and other testing only
-# import nibabel as nib
-
-import nibabel as nib
+def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
+    brain_scale = 0.01
+    brain_y_move = -2.38251
+    scaled = nv.scale(affine, brain_scale)
+    moved = nv.translate(scaled, 0, brain_y_move, 0)
+    return moved
 
 
 def test_anat_static():
@@ -126,33 +148,37 @@ def test_anat_static():
 
     nv.ndarray_to_vdb(
         nv.prep_ndarray(data, (0, 2, 1)),
-        "anat_test",
+        "anat_offset",
         output_dir=vdb_out,
+        transform=_test_pattern_pos(img.affine),
     )
 
 
 def test_bold_seq_direct():
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-    source_fps = nv.get_fps(img, loud=True)
 
-    nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (3, 0, 2, 1)),
-        "bold_direct",
-        source_fps=source_fps,
-        output_dir=vdb_out,
+    (
+        nv.ndarray_to_vdb(
+            nv.prep_ndarray(data, (3, 0, 2, 1)),
+            "bold_direct_offset",
+            source_fps=_get_fps(img),
+            output_dir=vdb_out,
+            transform=_test_pattern_pos(img.affine),
+        ),
     )
 
 
-def test_bold_seq_fade():
-    img = nib.load(bold)
-    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-    source_fps = nv.get_fps(img, loud=True)
-
-    nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (3, 0, 2, 1)),
-        "bold_fade",
-        source_fps=source_fps,
-        output_dir=vdb_out,
-        interpolation_flag=1,  # TODO: enum on python side with named interpolations
-    )
+#
+#
+# # def test_bold_seq_fade():
+# #     img = nib.load(bold)
+# #     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+# #
+# #     nv.ndarray_to_vdb(
+# #         nv.prep_ndarray(data, (3, 0, 2, 1)),
+# #         "bold_fade",
+# #         source_fps=_get_fps(img),
+# #         output_dir=vdb_out,
+# #         interpolation_flag=1,  # TODO: enum on python side with named interpolations
+# #     )
