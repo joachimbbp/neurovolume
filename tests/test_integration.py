@@ -13,28 +13,28 @@ import os
 # import nibabel as nib
 import nibabel as nib  # DEPENDENCY: it's only for testing, see above todo
 
-#
-# anat_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
-# bold_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q"
+
+anat_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
+bold_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q"
 # # HACK: this whole thing is a little hacky/messy
-# anat_gz = "./tests/data/sub-01_T1w.nii.gz"
+anat_gz = "./tests/data/sub-01_T1w.nii.gz"
 anat = "./tests/data/sub-01_t1w.nii"
-# bold_gz = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii.gz"
+bold_gz = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii.gz"
 bold = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
-# print("Downloading test data...")
-# # TODO: check if not present?
-# urlretrieve(anat_url, anat_gz)
-# urlretrieve(bold_url, bold_gz)
-# print("Test data downloaded")
-# print("Unzipping...")
-# # TODO: DRY:
-# with gzip.open(anat_gz, "rb") as f_in:
-#     with open(anat, "wb") as f_out:
-#         shutil.copyfileobj(f_in, f_out)
-# with gzip.open(bold_gz, "rb") as f_in:
-#     with open(bold, "wb") as f_out:
-#         shutil.copyfileobj(f_in, f_out)
-#
+print("Downloading test data...")
+# TODO: check if not present?
+urlretrieve(anat_url, anat_gz)
+urlretrieve(bold_url, bold_gz)
+print("Test data downloaded")
+print("Unzipping...")
+# TODO: DRY:
+with gzip.open(anat_gz, "rb") as f_in:
+    with open(anat, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+with gzip.open(bold_gz, "rb") as f_in:
+    with open(bold, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+
 vdb_out = "./tests/data/vdb_out"
 
 
@@ -111,67 +111,74 @@ def test_pyramid(size=64000):
     pyramid, built = _build_pyramid()
     assert built, "Pyramid should build successfully"
 
-    scaled = nv.scale(np.eye(4), 0.030)
+    identity = np.eye(4)
+    # perhaps this pattern isn't the best?
+    print(f"identity matrix: \n{identity}")
+    scaled = nv.scale(identity, 0.030)
     print(f"scaled affine: \n{scaled}")
-    translated = nv.translate(scaled, 5, 5, 5)
+    translated = nv.translate(scaled, 1.6, 0.7, 0.2)
     print(f"translated affine:\n{translated}")
-    rotated = nv.rotate(translated, 1, 1, 1)
+    rotated = nv.rotate(translated, 0, 0, np.deg2rad(44))
     print(f"rotated matrix: \n{rotated}")
-    nv.ndarray_to_vdb(
-        nv.prep_ndarray(pyramid, (2, 1, 0)),
-        "pyramid",
-        output_dir=vdb_out,
-    )
 
     prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
 
     os.makedirs(vdb_out, exist_ok=True)
     nv.ndarray_to_vdb(
         prepped_pyramid,
-        "new_trs_pyramid",
+        "pyramid_offset",
         output_dir=vdb_out,
         transform=rotated,
     )
-    print("pyramid saved")
+    print("pyramids saved")
 
 
-brain_scaler = 0.01
+def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
+    brain_scale = 0.01
+    brain_y_move = -2.38251
+    scaled = nv.scale(affine, brain_scale)
+    moved = nv.translate(scaled, 0, brain_y_move, 0)
+    return moved
 
 
-# def test_anat_static():
-#     os.makedirs(vdb_out, exist_ok=True)
-#     img = nib.load(anat)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+def test_anat_static():
+    os.makedirs(vdb_out, exist_ok=True)
+    img = nib.load(anat)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(data, (0, 2, 1)),
+        "anat_offset",
+        output_dir=vdb_out,
+        transform=_test_pattern_pos(img.affine),
+    )
+
+
+def test_bold_seq_direct():
+    img = nib.load(bold)
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+
+    (
+        nv.ndarray_to_vdb(
+            nv.prep_ndarray(data, (3, 0, 2, 1)),
+            "bold_direct_offset",
+            source_fps=_get_fps(img),
+            output_dir=vdb_out,
+            transform=_test_pattern_pos(img.affine),
+        ),
+    )
+
+
 #
-#     nv.ndarray_to_vdb(
-#         nv.prep_ndarray(data, (0, 2, 1)),
-#         "anat_test",
-#         output_dir=vdb_out,
-#         transform=nv.scale(img.affine, brain_scaler),
-#     )
 #
-#
-# def test_bold_seq_direct():
-#     img = nib.load(bold)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-#
-#     nv.ndarray_to_vdb(
-#         nv.prep_ndarray(data, (3, 0, 2, 1)),
-#         "bold_direct",
-#         source_fps=_get_fps(img),
-#         output_dir=vdb_out,
-#         transform=nv.scale(img.affine, brain_scaler),
-#     )
-
-
-# def test_bold_seq_fade():
-#     img = nib.load(bold)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-#
-#     nv.ndarray_to_vdb(
-#         nv.prep_ndarray(data, (3, 0, 2, 1)),
-#         "bold_fade",
-#         source_fps=_get_fps(img),
-#         output_dir=vdb_out,
-#         interpolation_flag=1,  # TODO: enum on python side with named interpolations
-#     )
+# # def test_bold_seq_fade():
+# #     img = nib.load(bold)
+# #     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+# #
+# #     nv.ndarray_to_vdb(
+# #         nv.prep_ndarray(data, (3, 0, 2, 1)),
+# #         "bold_fade",
+# #         source_fps=_get_fps(img),
+# #         output_dir=vdb_out,
+# #         interpolation_flag=1,  # TODO: enum on python side with named interpolations
+# #     )
