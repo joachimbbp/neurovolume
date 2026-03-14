@@ -128,7 +128,7 @@ def test_pyramid(size=64000):
     os.makedirs(vdb_out, exist_ok=True)
     nv.ndarray_to_vdb(
         prepped_pyramid,
-        "trs_pyramid",
+        "new_trs_pyramid",
         output_dir=vdb_out,
         transform=rotated,
     )

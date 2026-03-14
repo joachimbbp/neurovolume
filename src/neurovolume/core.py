@@ -106,8 +106,7 @@ def rotate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
     # Combined rotation: R = Rz @ Ry @ Rx (applied right-to-left)
     R = Rz @ Ry @ Rx
 
-    # Insert into the affine matrix (top-left 3x3)
-    o[:3, :3] = R
+    o[:3, :3] = R @ o[:3, :3]
 
     return o
 
