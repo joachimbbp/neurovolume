@@ -43,20 +43,15 @@ def scale(affine: np.ndarray, scale: float) -> np.ndarray:
     usage: scale is the percentage to scale by
             0.5 is 50% etc
     """
-    print(f"input: {input}")
     if len(affine) != 4:
         sys.exit(
             f"Invalid affine len, must be 4 (3D plus homogonized coordinate): {len(affine)}"
         )
     output = affine.copy()
 
-    # LLM: wrote all of these
-    output[0][0] *= scale  # sx
-    output[1][1] *= scale  # sy
-    output[2][2] *= scale  # sz
-    output[0][3] *= scale  # tx
-    output[1][3] *= scale  # ty
-    output[2][3] *= scale  # tz
+    # LLM: scale full 3x3 submatrix (not just diagonal) to preserve oblique orientation
+    output[:3, :3] *= scale  # scale+rotation columns
+    output[:3, 3] *= scale   # translation
 
     return output
 
