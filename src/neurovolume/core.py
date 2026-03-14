@@ -37,22 +37,36 @@ def prep_ndarray(
     return arr
 
 
+def _verify_and_copy_affine(affine: np.ndarray) -> np.ndarray:
+    if len(affine) != 4:
+        sys.exit(
+            f"Invalid affine len, must be 4 (3D plus homogonized coordinate): {len(affine)}"
+        )
+    return affine.copy()
+
+
 def scale(affine: np.ndarray, scale: float) -> np.ndarray:
     """
     modifies the affine matrix's scale
     usage: scale is the percentage to scale by
             0.5 is 50% etc
     """
-    if len(affine) != 4:
-        sys.exit(
-            f"Invalid affine len, must be 4 (3D plus homogonized coordinate): {len(affine)}"
-        )
-    output = affine.copy()
-
+    output = _verify_and_copy_affine(affine)
     # LLM: scale full 3x3 submatrix (not just diagonal) to preserve oblique orientation
     output[:3, :3] *= scale  # scale+rotation columns
-    output[:3, 3] *= scale   # translation
+    output[:3, 3] *= scale  # translation
+    return output
 
+
+def translate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
+    """
+    modifies the affine matrix's translation
+    usage: x y and z inputs are added to the translation column
+    """
+    output = _verify_and_copy_affine(affine)
+    output[0][3] += x
+    output[1][3] += y
+    output[2][3] += z
     return output
 
 

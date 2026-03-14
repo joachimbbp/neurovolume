@@ -111,7 +111,10 @@ def test_pyramid(size=64000):
     pyramid, built = _build_pyramid()
     assert built, "Pyramid should build successfully"
 
-    transform = nv.scale(np.eye(4), 0.030)
+    scaled = nv.scale(np.eye(4), 0.030)
+    print(f"scaled affine: \n{scaled}")
+    translated = nv.translate(scaled, 5, 5, 5)
+    print(f"translated affine:\n{translated}")
 
     nv.ndarray_to_vdb(
         nv.prep_ndarray(pyramid, (2, 1, 0)),
@@ -124,41 +127,40 @@ def test_pyramid(size=64000):
     os.makedirs(vdb_out, exist_ok=True)
     nv.ndarray_to_vdb(
         prepped_pyramid,
-        "pyramid",
+        "translated_5",
         output_dir=vdb_out,
-        transform=transform,
+        transform=translated,
     )
     print("pyramid saved")
 
 
 brain_scaler = 0.01
-# FIX: this isn't working!
 
 
-def test_anat_static():
-    os.makedirs(vdb_out, exist_ok=True)
-    img = nib.load(anat)
-    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-
-    nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (0, 2, 1)),
-        "anat_test",
-        output_dir=vdb_out,
-        transform=nv.scale(img.affine, brain_scaler),
-    )
-
-
-def test_bold_seq_direct():
-    img = nib.load(bold)
-    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-
-    nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (3, 0, 2, 1)),
-        "bold_direct",
-        source_fps=_get_fps(img),
-        output_dir=vdb_out,
-        transform=nv.scale(img.affine, brain_scaler),
-    )
+# def test_anat_static():
+#     os.makedirs(vdb_out, exist_ok=True)
+#     img = nib.load(anat)
+#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+#
+#     nv.ndarray_to_vdb(
+#         nv.prep_ndarray(data, (0, 2, 1)),
+#         "anat_test",
+#         output_dir=vdb_out,
+#         transform=nv.scale(img.affine, brain_scaler),
+#     )
+#
+#
+# def test_bold_seq_direct():
+#     img = nib.load(bold)
+#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+#
+#     nv.ndarray_to_vdb(
+#         nv.prep_ndarray(data, (3, 0, 2, 1)),
+#         "bold_direct",
+#         source_fps=_get_fps(img),
+#         output_dir=vdb_out,
+#         transform=nv.scale(img.affine, brain_scaler),
+#     )
 
 
 # def test_bold_seq_fade():
