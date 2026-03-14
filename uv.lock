@@ -31,7 +31,7 @@ wheels = [
 
 [[package]]
 name = "neurovolume"
-version = "0.1.0a13"
+version = "0.1.0a14"
 source = { editable = "." }
 dependencies = [
     { name = "nibabel" },
