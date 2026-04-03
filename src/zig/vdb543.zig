@@ -292,6 +292,69 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                 return vdb.values.items[c_node.data_offset][c_off];
             }
 
+            /// Returns error.Tile when the larger node containing the new tile is already a tile
+            pub fn putTile(self: *Accessor, vdb: *Self, gpa: std.mem.Allocator, containing: Point, val: V, which: Level) (std.mem.Allocator.Error || error{Tile})!void {
+                switch (which) {
+                    .a => {
+                        const key = pointToKey(containing);
+                        const gop = try vdb.map.getOrPut(gpa, key);
+                        gop.value_ptr.* = .{
+                            .active = true,
+                            .tile_value = val,
+                            .child_off = null,
+                        };
+                    },
+                    .b => {
+                        const node = self.getNode(vdb, .a, containing) catch |err| switch (err) {
+                            error.Tile => return error.Tile,
+                            error.NoNode => a_node: {
+                                const key = pointToKey(containing);
+                                const a_node = try vdb.nodes_A.addOne(gpa);
+                                a_node.* = .init(containing.maskLower(A + B + C));
+                                try vdb.map.putNoClobber(gpa, key, .{
+                                    .active = true,
+                                    .child_off = vdb.nodes_A.items.len - 1,
+                                    .tile_value = undefined,
+                                });
+                                self.a = .{ .key = containing.maskLower(A + B + C), .value = vdb.nodes_A.items.len - 1 };
+                                break :a_node a_node;
+                            },
+                        };
+                        const a_off = containing.offsetOf(A + B + C, B + C);
+                        node.value_mask.set(a_off);
+                        node.data[a_off] = .{ .tile = val };
+                    },
+                    .c => {
+                        const node = self.getNode(vdb, .b, containing) catch |err| switch (err) {
+                            error.Tile => return error.Tile,
+                            error.NoNode => b_node: {
+                                const a_node = self.getNodeCached(vdb, .a, containing) catch a_node: {
+                                    const key = pointToKey(containing);
+                                    const a_node = try vdb.nodes_A.addOne(gpa);
+                                    a_node.* = .init(containing.maskLower(A + B + C));
+                                    try vdb.map.putNoClobber(gpa, key, .{
+                                        .active = true,
+                                        .child_off = vdb.nodes_A.items.len - 1,
+                                        .tile_value = undefined,
+                                    });
+                                    self.a = .{ .key = containing.maskLower(A + B + C), .value = vdb.nodes_A.items.len - 1 };
+                                    break :a_node a_node;
+                                };
+                                const a_off = containing.offsetOf(A + B + C, B + C);
+                                const b_node = try vdb.nodes_B.addOne(gpa);
+                                b_node.* = .init(containing.maskLower(B + C));
+                                a_node.child_mask.set(a_off);
+                                a_node.data[a_off] = .{ .child = vdb.nodes_B.items.len - 1 };
+                                break :b_node b_node;
+                            },
+                        };
+                        const b_off = containing.offsetOf(B + C, C);
+                        node.value_mask.set(b_off);
+                        node.data[b_off] = .{ .tile = val };
+                    },
+                }
+            }
+
             // FIXME: audit the sad paths
             pub fn putVoxel(self: *Accessor, vdb: *Self, gpa: std.mem.Allocator, at: Point, val: V) (std.mem.Allocator.Error || error{Tile})!void {
                 const node = self.getNode(vdb, .c, at) catch |err| switch (err) {
@@ -338,14 +401,21 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
             }
         };
 
-        // returns self.background if no voxel is found
-        // prefer using an Accessor if doing multiple operations.
+        /// returns self.background if no voxel is found
+        /// prefer using an Accessor if doing multiple operations.
         pub fn get(self: *Self, at: Point) V {
             var accessor: Self.Accessor = .init;
             return accessor.get(self, at);
         }
 
-        // prefer using an Accessor if doing multiple operations.
+        /// prefer using an Accessor if doing multiple operations.
+        /// returns error.Tile if the region is already contained in a larger tile
+        pub fn putTile(self: *Self, gpa: std.mem.Allocator, containing: Point, val: V, which: Accessor.Level) (std.mem.Allocator.Error || error{Tile})!void {
+            var accessor: Self.Accessor = .init;
+            return accessor.putTile(self, gpa, containing, val, which);
+        }
+
+        /// prefer using an Accessor if doing multiple operations.
         pub fn putVoxel(self: *Self, gpa: std.mem.Allocator, at: Point, val: V) (std.mem.Allocator.Error || error{Tile})!void {
             var accessor: Self.Accessor = .init;
             return accessor.putVoxel(self, gpa, at, val);
@@ -445,6 +515,7 @@ fn writeMetadata(w: *Writer) Writer.Error!void {
     try w.print("{f}{f}{f}", .{ alt("class"), alt("string"), alt("unknown") });
     try w.print("{f}{f}{f}", .{ alt("file_compression"), alt("string"), alt("none") });
     try w.print("{f}{f}", .{ alt("is_saved_as_half_float"), alt("bool") });
+    try w.writeInt(u32, 1, .little); // size of bool is larger than the boolean lol
     try w.writeByte(@intFromBool(false));
     try w.print("{f}{f}{f}", .{ alt("name"), alt("string"), alt("density") });
 }
@@ -459,7 +530,7 @@ fn writeTransform(w: *Writer, affine: [4][4]f64) Writer.Error!void {
     }
 }
 
-fn writeGrid(w: *Writer, vdb: *VDB, affine: [4][4]f64) Writer.Error!void {
+fn writeGrid(w: *Writer, vdb: *VDB, affine: [4][4]f64, offset: u64) Writer.Error!void {
     var counter: std.Io.Writer.Discarding = .init(&.{});
     //grid name (should be dynamic when doing multiple grids)
     try w.print("{f}", .{alt("density")});
@@ -475,7 +546,7 @@ fn writeGrid(w: *Writer, vdb: *VDB, affine: [4][4]f64) Writer.Error!void {
     try counter.writer.writeInt(u32, 0, .little);
 
     //Grid descriptor stream position
-    const position = counter.fullCount() + (@sizeOf(u64) * 3);
+    const position = offset + counter.fullCount() + (@sizeOf(u64) * 3);
     try w.writeInt(u64, position, .little);
     try w.writeInt(u64, 0, .little);
     try w.writeInt(u64, 0, .little);
@@ -489,30 +560,39 @@ fn writeGrid(w: *Writer, vdb: *VDB, affine: [4][4]f64) Writer.Error!void {
 }
 
 pub fn writeVDB(w: *Writer, vdb: *VDB, affine: [4][4]f64) !void {
+    var counter: std.Io.Writer.Discarding = .init(&.{});
     //Magic Number (needed it spells out BDV)
     try w.writeAll(&.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 });
+    try counter.writer.writeAll(&.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 });
 
     //File Version
     try w.writeInt(u32, 224, .little);
+    try counter.writer.writeInt(u32, 224, .little);
 
     //Library version (pretend OpenVDB 8.1)
     try w.writeInt(u32, 8, .little);
+    try counter.writer.writeInt(u32, 8, .little);
     try w.writeInt(u32, 1, .little);
+    try counter.writer.writeInt(u32, 1, .little);
 
     //no grid offsets
     try w.writeByte(0);
+    try counter.writer.writeByte(0);
 
     // write UUID
     const uuid = uuidv4(); // Feel free to replace with your own
     try w.writeAll(&uuid);
+    try counter.writer.writeAll(&uuid);
 
     //No Metadata for now
     try w.writeInt(u32, 0, .little);
+    try counter.writer.writeInt(u32, 0, .little);
 
     //One Grid
     try w.writeInt(u32, 1, .little);
+    try counter.writer.writeInt(u32, 0, .little);
 
-    try writeGrid(w, vdb, affine);
+    try writeGrid(w, vdb, affine, counter.fullCount());
 }
 
 //SECTION: Utility functions
