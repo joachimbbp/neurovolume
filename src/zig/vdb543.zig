@@ -490,6 +490,7 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                             _ = try w.splatByte(0, @sizeOf(V) * (entry - index)); // inactive values are zero
                             try w.writeAll(std.mem.asBytes(&data[entry]));
                         }
+                        _ = try w.splatByte(0, @sizeOf(V) * (c_node.value_mask.capacity() - index));
                     }
                 }
             }
