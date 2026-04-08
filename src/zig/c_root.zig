@@ -65,6 +65,7 @@ pub export fn initFourDim(
         speed,
         dims.*,
         save_config,
+        4 * std.math.floatEps(f32),
     ) catch {
         allocator.free(basename_owned);
         allocator.free(folder_owned);
@@ -145,6 +146,7 @@ pub export fn initThreeDim(
         false,
         dims.*,
         save_config,
+        4 * std.math.floatEps(f32),
     ) catch {
         allocator.free(basename_owned);
         allocator.free(folder_owned);

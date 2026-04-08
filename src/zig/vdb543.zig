@@ -19,9 +19,9 @@ const Writer = std.Io.Writer;
 //SECTION: VDB nodes
 
 pub const Point = packed struct {
-    x: i32,
-    y: i32,
     z: i32,
+    y: i32,
+    x: i32,
 
     pub fn from(array: [3]i32) Point {
         return .{ .x = array[0], .y = array[1], .z = array[2] };
@@ -33,6 +33,23 @@ pub const Point = packed struct {
         const y: u32 = @bitCast((p.y & ((1 << n) - 1)) >> m);
         const z: u32 = @bitCast((p.z & ((1 << n) - 1)) >> m);
         return (x << (o + o)) + (y << o) + z;
+    }
+
+    test offsetOf {
+        const p: Point = .from(.{ 3, 7, 4 });
+        const expected: u32 = (1 << 2) + (1 << 1) + 0;
+        try std.testing.expectEqual(expected, p.offsetOf(2, 1));
+    }
+
+    pub fn compareUpper(p: Point, q: Point, comptime n: u5) bool {
+        return p.maskLower(n) == q.maskLower(n);
+    }
+
+    test compareUpper {
+        const p: Point = .{ .x = 69, .y = 67, .z = 137 };
+        const q: Point = .{ .x = 0, .y = 0, .z = 0 };
+        try std.testing.expect(p.compareUpper(q, 8));
+        try std.testing.expect(!p.compareUpper(q, 7));
     }
 
     pub fn maskLower(p: Point, comptime n: u5) Point {
@@ -56,6 +73,18 @@ pub const Point = packed struct {
 
 pub const VDB = VDBType(f32, 5, 4, 3, false);
 
+test VDB {
+    _ = VDB;
+}
+
+fn equalTolerance(comptime V: type, a: V, b: V, tolerance: V) bool {
+    if (tolerance == 0) return a == b;
+    // if a is small, approxEqAbs works better
+    if (std.math.approxEqAbs(V, 0, a, tolerance))
+        return std.math.approxEqAbs(V, a, b, tolerance);
+    return std.math.approxEqRel(V, a, b, tolerance);
+}
+
 pub fn InternalNode(comptime V: type, comptime N: u5) type {
     return struct {
         pub const dim = N + N + N;
@@ -65,11 +94,56 @@ pub fn InternalNode(comptime V: type, comptime N: u5) type {
             child: usize,
         };
         data: [size]Data,
-        value_mask: std.bit_set.ArrayBitSet(usize, size),
-        child_mask: std.bit_set.ArrayBitSet(usize, size),
+        value_mask: Mask,
+        child_mask: Mask,
         origin: Point,
 
         const Node = @This();
+        const Mask = std.bit_set.ArrayBitSet(usize, size);
+
+        pub fn isConstant(self: *const Node, tolerance: V) bool {
+            if (self.child_mask.count() != 0) return false;
+            const count = self.value_mask.count();
+            if (count == 0) return true;
+            if (count != self.value_mask.capacity()) return false;
+            var it = self.iterateValues();
+            const first = it.next().?;
+            while (it.next()) |second|
+                if (!equalTolerance(V, first, second, tolerance)) return false;
+            return true;
+        }
+
+        pub const Iterator = struct {
+            n: *const Node,
+            it: Mask.Iterator(.{}),
+
+            pub fn next(self: *Iterator) ?V {
+                const idx = self.it.next() orelse return null;
+                return self.n.data[idx].value;
+            }
+        };
+
+        pub fn iterateValues(self: *const Node) Iterator {
+            std.debug.assert(self.child_mask.intersectWith(self.value_mask).count() == 0); // child and value masks must be disjoint
+            return .{
+                .n = self,
+                .it = self.value_mask.iterator(.{}),
+            };
+        }
+
+        test isConstant {
+            var node: Node = .init(.from(.{ 0, 0, 0 }));
+            try std.testing.expect(node.isConstant(0));
+            node.child_mask.set(0);
+            try std.testing.expect(!node.isConstant(0));
+            node.child_mask.unset(0);
+            node.value_mask.set(0);
+            try std.testing.expect(!node.isConstant(0));
+            node.value_mask.unset(0);
+            node.value_mask.toggleAll();
+            node.data = @splat(.{ .value = 1 });
+            try std.testing.expect(node.isConstant(0));
+        }
 
         pub fn init(origin: Point) Node {
             return .{
@@ -81,17 +155,24 @@ pub fn InternalNode(comptime V: type, comptime N: u5) type {
         }
 
         pub fn format(self: *const Node, w: *Writer) Writer.Error!void {
-            for (&self.child_mask.masks) |mask| try w.writeInt(usize, mask, .little);
-            for (&self.value_mask.masks) |mask| try w.writeInt(usize, mask, .little);
+            std.debug.assert(self.child_mask.intersectWith(self.value_mask).count() == 0); // child mask and value mask must be disjoint
+            try w.writeAll(@ptrCast(&self.child_mask.masks));
+            try w.writeAll(@ptrCast(&self.value_mask.masks));
             // FIXME: compression?
             try w.writeByte(6);
-            var it = self.value_mask.iterator(.{ .direction = .forward, .kind = .set });
-            var index: usize = 0;
-            while (it.next()) |entry| : (index = entry + 1) {
-                _ = try w.splatByte(0, @sizeOf(V) * (entry - index)); // inactive values are zero
-                try w.writeAll(std.mem.asBytes(&self.data[entry]));
+            for (0..self.value_mask.capacity()) |i| {
+                if (self.value_mask.isSet(i))
+                    try w.writeAll(std.mem.asBytes(&self.data[i].value))
+                else
+                    try w.splatByteAll(0, @sizeOf(V));
             }
-            _ = try w.splatByte(0, @sizeOf(V) * (size - index));
+        }
+
+        test format {
+            const n: Node = .init(.from(.{ 0, 0, 0 }));
+            var w: std.Io.Writer.Discarding = .init(&.{});
+            try w.writer.print("{f}", .{&n});
+            try std.testing.expectEqual((size / 8) + (size / 8) + 1 + (size * @sizeOf(V)), w.fullCount());
         }
     };
 }
@@ -109,6 +190,14 @@ pub fn LeafNode(comptime N: u5, comptime include_inside: bool) type {
                 x: i20,
                 y: i20,
                 z: i20,
+
+                pub fn toPoint(self: @This()) Point {
+                    return .{
+                        .x = self.x << N,
+                        .y = self.y << N,
+                        .z = self.z << N,
+                    };
+                }
             },
 
             pub fn init(p: Point) Flags {
@@ -128,7 +217,23 @@ pub fn LeafNode(comptime N: u5, comptime include_inside: bool) type {
         flags: Flags,
 
         pub fn format(self: *const @This(), w: *Writer) Writer.Error!void {
-            for (&self.value_mask.masks) |mask| try w.writeInt(usize, mask, .little);
+            try w.writeAll(@ptrCast(&self.value_mask.masks));
+        }
+
+        pub fn prune(self: *@This(), comptime V: type, data: []const V, background: V, tolerance: V) void {
+            var it = self.value_mask.iterator(.{});
+            while (it.next()) |i| {
+                if (equalTolerance(V, background, data[i], tolerance)) self.value_mask.unset(i);
+            }
+        }
+
+        pub fn isConstant(self: *const @This(), comptime V: type, data: []const V, tolerance: V) bool {
+            const count = self.value_mask.count();
+            if (count == 0) return true;
+            if (count != self.value_mask.capacity()) return false;
+            const first = data[0];
+            for (data) |second| if (!equalTolerance(V, first, second, tolerance)) return false;
+            return true;
         }
     };
 }
@@ -181,17 +286,78 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
             return .{ masked.x, masked.y, masked.z };
         }
 
-        pub const Accessor = struct {
-            pub const KV = struct {
-                key: Point,
-                value: usize,
-            };
-            a: ?KV,
-            b: ?KV,
-            c: ?KV,
+        pub fn Iterator(comptime which: Level) type {
+            return struct {
+                vdb: *const Self,
+                parent: switch (which) {
+                    .a => []const Data,
+                    .b => *NodeA,
+                    .c => *NodeB,
+                },
+                it: switch (which) {
+                    .a => usize,
+                    .b => NodeA.Mask.Iterator(.{}),
+                    .c => NodeB.Mask.Iterator(.{}),
+                },
+                n: usize,
 
-            pub const Level = enum { a, b, c };
-            pub const init: Accessor = .{ .a = null, .b = null, .c = null };
+                const Which = switch (which) {
+                    .a => *NodeA,
+                    .b => *NodeB,
+                    .c => *NodeC,
+                };
+
+                pub fn next(self: *@This()) ?Which {
+                    if (comptime which == .a) {
+                        while (self.it < self.parent.len) {
+                            const dat = self.parent[self.it];
+                            self.n = self.it;
+                            self.it += 1;
+                            const offset = dat.child_off orelse continue;
+                            if (!dat.active) continue;
+                            return &self.vdb.nodes_A.items[offset];
+                        }
+                        return null;
+                    }
+                    const idx = self.it.next() orelse return null;
+                    self.n = idx;
+                    return switch (which) {
+                        .a => comptime unreachable,
+                        .b => &self.vdb.nodes_B.items[self.parent.data[idx].child],
+                        .c => &self.vdb.nodes_C.items[self.parent.data[idx].child],
+                    };
+                }
+            };
+        }
+
+        pub fn iterateChildren(self: *const Self, comptime which: Level, of: switch (which) {
+            .a => void,
+            .b => *NodeA,
+            .c => *NodeB,
+        }) Iterator(which) {
+            return .{
+                .vdb = self,
+                .parent = switch (which) {
+                    .a => self.map.values(),
+                    else => of,
+                },
+                .it = switch (which) {
+                    .a => 0,
+                    else => of.child_mask.iterator(.{}),
+                },
+                .n = 0,
+            };
+        }
+
+        pub const Level = enum { a, b, c };
+
+        pub const Accessor = struct {
+            point: Point,
+            a: ?usize,
+            b: ?usize,
+            c: ?usize,
+
+            pub const init: Accessor = .{ .point = undefined, .a = null, .b = null, .c = null };
 
             // Pointers may become invalidated by modifications to the VDB
             pub fn getNodeCached(
@@ -199,29 +365,26 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                 vdb: *const Self,
                 comptime which: Level,
                 at: Point,
-            ) error{CacheMiss}!switch (which) {
-                .a => *NodeA,
-                .b => *NodeB,
-                .c => *NodeC,
+            ) switch (which) {
+                .a => ?*NodeA,
+                .b => ?*NodeB,
+                .c => ?*NodeC,
             } {
                 switch (which) {
                     .a => {
-                        const a_key = at.maskLower(A + B + C);
-                        const cached = self.a orelse return error.CacheMiss;
-                        if (cached.key != a_key) return error.CacheMiss;
-                        return &vdb.nodes_A.items[cached.value];
+                        const cached = self.a orelse return null;
+                        if (!self.point.compareUpper(at, A + B + C)) return null;
+                        return &vdb.nodes_A.items[cached];
                     },
                     .b => {
-                        const b_key = at.maskLower(B + C);
-                        const cached = self.b orelse return error.CacheMiss;
-                        if (cached.key != b_key) return error.CacheMiss;
-                        return &vdb.nodes_B.items[cached.value];
+                        const cached = self.b orelse return null;
+                        if (!self.point.compareUpper(at, B + C)) return null;
+                        return &vdb.nodes_B.items[cached];
                     },
                     .c => {
-                        const c_key = at.maskLower(C);
-                        const cached = self.c orelse return error.CacheMiss;
-                        if (cached.key != c_key) return error.CacheMiss;
-                        return &vdb.nodes_C.items[cached.value];
+                        const cached = self.c orelse return null;
+                        if (!self.point.compareUpper(at, C)) return null;
+                        return &vdb.nodes_C.items[cached];
                     },
                 }
             }
@@ -236,44 +399,51 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                 .b => *NodeB,
                 .c => *NodeC,
             } {
-                return self.getNodeCached(vdb, which, at) catch switch (which) {
-                    .a => {
-                        self.a = null;
-                        const key = pointToKey(at);
-                        const data = vdb.map.get(key) orelse return error.NoNode;
-                        if (!data.active) return error.NoNode;
-                        const child = data.child_off orelse return error.Tile;
-                        self.a = .{ .key = at.maskLower(A + B + C), .value = child };
-                        return &vdb.nodes_A.items[child];
-                    },
-                    .b => {
-                        self.b = null;
-                        const a_node = try self.getNode(vdb, .a, at);
-                        const a_off = at.offsetOf(A + B + C, B + C);
-                        if (!a_node.child_mask.isSet(a_off)) return error.NoNode;
-                        if (a_node.value_mask.isSet(a_off)) return error.Tile;
-                        const child = a_node.data[a_off].child;
-                        self.b = .{ .key = at.maskLower(B + C), .value = child };
-                        return &vdb.nodes_B.items[child];
-                    },
-                    .c => {
-                        self.c = null;
-                        const b_node = try self.getNode(vdb, .b, at);
-                        const b_off = at.offsetOf(B + C, C);
-                        if (!b_node.child_mask.isSet(b_off)) return error.NoNode;
-                        if (b_node.value_mask.isSet(b_off)) return error.Tile;
-                        const child = b_node.data[b_off].child;
-                        self.c = .{ .key = at.maskLower(C), .value = child };
-                        return &vdb.nodes_C.items[child];
-                    },
+                return self.getNodeCached(vdb, which, at) orelse {
+                    switch (which) {
+                        .a => {
+                            self.a = null;
+                            const key = pointToKey(at);
+                            const data = vdb.map.get(key) orelse return error.NoNode;
+                            const child = data.child_off orelse {
+                                if (!data.active) return error.NoNode;
+                                return error.Tile;
+                            };
+                            self.a = child;
+                            self.point = at;
+                            return &vdb.nodes_A.items[child];
+                        },
+                        .b => {
+                            self.b = null;
+                            const a_node = try self.getNode(vdb, .a, at);
+                            const a_off = at.offsetOf(A + B + C, B + C);
+                            if (a_node.value_mask.isSet(a_off)) return error.Tile;
+                            if (!a_node.child_mask.isSet(a_off)) return error.NoNode;
+                            const child = a_node.data[a_off].child;
+                            self.b = child;
+                            self.point = at;
+                            return &vdb.nodes_B.items[child];
+                        },
+                        .c => {
+                            self.c = null;
+                            const b_node = try self.getNode(vdb, .b, at);
+                            const b_off = at.offsetOf(B + C, C);
+                            if (b_node.value_mask.isSet(b_off)) return error.Tile;
+                            if (!b_node.child_mask.isSet(b_off)) return error.NoNode;
+                            const child = b_node.data[b_off].child;
+                            self.c = child;
+                            self.point = at;
+                            return &vdb.nodes_C.items[child];
+                        },
+                    }
                 };
             }
 
             pub fn get(self: *Accessor, vdb: *const Self, at: Point) V {
                 const c_node = self.getNode(vdb, .c, at) catch |err| switch (err) {
                     error.Tile => {
-                        const b_node = self.getNodeCached(vdb, .b, at) catch return tile: {
-                            const a_node = self.getNodeCached(vdb, .a, at) catch {
+                        const b_node = self.getNodeCached(vdb, .b, at) orelse return tile: {
+                            const a_node = self.getNodeCached(vdb, .a, at) orelse {
                                 const key = pointToKey(at);
                                 const data = vdb.map.get(key).?; // we would have gotten NoNode otherwise
                                 break :tile data.tile_value;
@@ -309,68 +479,77 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                             error.Tile => return error.Tile,
                             error.NoNode => a_node: {
                                 const key = pointToKey(containing);
+                                const gop = try vdb.map.getOrPut(gpa, key);
+                                gop.value_ptr.* = .{
+                                    .active = true,
+                                    .child_off = vdb.nodes_A.items.len,
+                                    .tile_value = undefined,
+                                };
                                 const a_node = try vdb.nodes_A.addOne(gpa);
                                 a_node.* = .init(containing.maskLower(A + B + C));
-                                try vdb.map.putNoClobber(gpa, key, .{
-                                    .active = true,
-                                    .child_off = vdb.nodes_A.items.len - 1,
-                                    .tile_value = undefined,
-                                });
-                                self.a = .{ .key = containing.maskLower(A + B + C), .value = vdb.nodes_A.items.len - 1 };
+                                self.a = vdb.nodes_A.items.len - 1;
                                 break :a_node a_node;
                             },
                         };
                         const a_off = containing.offsetOf(A + B + C, B + C);
+                        node.child_mask.unset(a_off);
                         node.value_mask.set(a_off);
-                        node.data[a_off] = .{ .tile = val };
+                        node.data[a_off] = .{ .value = val };
                     },
                     .c => {
                         const node = self.getNode(vdb, .b, containing) catch |err| switch (err) {
                             error.Tile => return error.Tile,
                             error.NoNode => b_node: {
-                                const a_node = self.getNodeCached(vdb, .a, containing) catch a_node: {
+                                const a_node = self.getNodeCached(vdb, .a, containing) orelse a_node: {
                                     const key = pointToKey(containing);
+                                    const gop = try vdb.map.getOrPut(gpa, key);
+                                    gop.value_ptr.* = .{
+                                        .active = true,
+                                        .child_off = vdb.nodes_A.items.len,
+                                        .tile_value = undefined,
+                                    };
                                     const a_node = try vdb.nodes_A.addOne(gpa);
                                     a_node.* = .init(containing.maskLower(A + B + C));
-                                    try vdb.map.putNoClobber(gpa, key, .{
-                                        .active = true,
-                                        .child_off = vdb.nodes_A.items.len - 1,
-                                        .tile_value = undefined,
-                                    });
-                                    self.a = .{ .key = containing.maskLower(A + B + C), .value = vdb.nodes_A.items.len - 1 };
+                                    self.a = vdb.nodes_A.items.len - 1;
                                     break :a_node a_node;
                                 };
                                 const a_off = containing.offsetOf(A + B + C, B + C);
+                                a_node.child_mask.set(a_off);
+                                a_node.data[a_off] = .{ .child = vdb.nodes_B.items.len };
                                 const b_node = try vdb.nodes_B.addOne(gpa);
                                 b_node.* = .init(containing.maskLower(B + C));
-                                a_node.child_mask.set(a_off);
-                                a_node.data[a_off] = .{ .child = vdb.nodes_B.items.len - 1 };
+                                self.b = vdb.nodes_B.items.len - 1;
                                 break :b_node b_node;
                             },
                         };
                         const b_off = containing.offsetOf(B + C, C);
+                        node.child_mask.unset(b_off);
                         node.value_mask.set(b_off);
-                        node.data[b_off] = .{ .tile = val };
+                        node.data[b_off] = .{ .value = val };
                     },
                 }
             }
 
             // FIXME: audit the sad paths
             pub fn putVoxel(self: *Accessor, vdb: *Self, gpa: std.mem.Allocator, at: Point, val: V) (std.mem.Allocator.Error || error{Tile})!void {
+                // special case: don't create voxels for the background value
+                if (val == vdb.background) return;
                 const node = self.getNode(vdb, .c, at) catch |err| switch (err) {
                     error.Tile => return error.Tile,
                     error.NoNode => node: {
-                        const b_node = self.getNodeCached(vdb, .b, at) catch b_node: {
-                            const a_node = self.getNodeCached(vdb, .a, at) catch a_node: {
+                        const b_node = self.getNodeCached(vdb, .b, at) orelse b_node: {
+                            const a_node = self.getNodeCached(vdb, .a, at) orelse a_node: {
                                 const key = pointToKey(at);
                                 const a_node = try vdb.nodes_A.addOne(gpa);
                                 a_node.* = .init(at.maskLower(A + B + C));
-                                try vdb.map.putNoClobber(gpa, key, .{
+                                const gop = try vdb.map.getOrPut(gpa, key);
+                                gop.value_ptr.* = .{
                                     .active = true,
                                     .child_off = vdb.nodes_A.items.len - 1,
                                     .tile_value = undefined,
-                                });
-                                self.a = .{ .key = at.maskLower(A + B + C), .value = vdb.nodes_A.items.len - 1 };
+                                };
+                                self.a = vdb.nodes_A.items.len - 1;
+                                self.point = at;
                                 break :a_node a_node;
                             };
                             const a_off = at.offsetOf(A + B + C, B + C);
@@ -378,6 +557,8 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                             b_node.* = .init(at.maskLower(B + C));
                             a_node.child_mask.set(a_off);
                             a_node.data[a_off] = .{ .child = vdb.nodes_B.items.len - 1 };
+                            self.b = vdb.nodes_B.items.len - 1;
+                            self.point = at;
                             break :b_node b_node;
                         };
                         const b_off = at.offsetOf(B + C, C);
@@ -392,6 +573,8 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                         };
                         b_node.child_mask.set(b_off);
                         b_node.data[b_off] = .{ .child = vdb.nodes_C.items.len - 1 };
+                        self.c = vdb.nodes_C.items.len - 1;
+                        self.point = at;
                         break :node c_node;
                     },
                 };
@@ -410,7 +593,7 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
 
         /// prefer using an Accessor if doing multiple operations.
         /// returns error.Tile if the region is already contained in a larger tile
-        pub fn putTile(self: *Self, gpa: std.mem.Allocator, containing: Point, val: V, which: Accessor.Level) (std.mem.Allocator.Error || error{Tile})!void {
+        pub fn putTile(self: *Self, gpa: std.mem.Allocator, containing: Point, val: V, which: Level) (std.mem.Allocator.Error || error{Tile})!void {
             var accessor: Self.Accessor = .init;
             return accessor.putTile(self, gpa, containing, val, which);
         }
@@ -421,10 +604,137 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
             return accessor.putVoxel(self, gpa, at, val);
         }
 
+        /// creates and returns a new VDB which has all of the data reachable from the current VDB
+        pub fn dupe(self: *const Self, gpa: std.mem.Allocator) std.mem.Allocator.Error!Self {
+            var vdb: Self = .init(self.background);
+            for (self.map.keys(), self.map.values()) |key, val| {
+                if (val.child_off == null and !val.active) continue;
+                const gop = try vdb.map.getOrPut(gpa, key);
+                gop.value_ptr.* = val;
+                const old_a_node = &self.nodes_A.items[val.child_off orelse continue];
+                gop.value_ptr.child_off = vdb.nodes_A.items.len;
+                const new_a_node = try vdb.nodes_A.addOne(gpa);
+                new_a_node.* = old_a_node.*;
+                std.debug.assert(old_a_node.child_mask.intersectWith(old_a_node.value_mask).count() == 0);
+                var b_it = self.iterateChildren(.b, old_a_node);
+                while (b_it.next()) |old_b_node| {
+                    new_a_node.data[b_it.n] = .{ .child = vdb.nodes_B.items.len };
+                    const new_b_node = try vdb.nodes_B.addOne(gpa);
+                    new_b_node.* = old_b_node.*;
+                    std.debug.assert(old_b_node.child_mask.intersectWith(old_b_node.value_mask).count() == 0);
+                    var c_it = self.iterateChildren(.c, old_b_node);
+                    while (c_it.next()) |old_c_node| {
+                        new_b_node.data[c_it.n] = .{ .child = vdb.nodes_C.items.len };
+                        const new_c_node = try vdb.nodes_C.addOne(gpa);
+                        new_c_node.* = old_c_node.*;
+                        new_c_node.data_offset = vdb.values.items.len;
+                        const new_data_ptr = try vdb.values.addOne(gpa);
+                        new_data_ptr.* = try gpa.dupe(V, self.values.items[old_c_node.data_offset]);
+                    }
+                }
+            }
+            return vdb;
+        }
+
+        /// replaces nodes whose values are all constant with tiles
+        /// leaves "dangling" nodes; call dupe afterward to produce a new tree without dangling nodes
+        pub fn prune(self: *Self, tolerance: V) void {
+            var a_it = self.iterateChildren(.a, {});
+            while (a_it.next()) |a_node| {
+                var b_it = self.iterateChildren(.b, a_node);
+                while (b_it.next()) |b_node| {
+                    var c_it = self.iterateChildren(.c, b_node);
+                    while (c_it.next()) |c_node| {
+                        const data = self.values.items[c_node.data_offset];
+                        c_node.prune(V, data, self.background, tolerance);
+                        if (c_node.isConstant(V, data, tolerance)) {
+                            b_node.child_mask.unset(c_it.n);
+                            if (c_node.value_mask.count() != 0) {
+                                b_node.value_mask.set(c_it.n);
+                                b_node.data[c_it.n] = .{ .value = data[0] };
+                            }
+                        }
+                    }
+                    if (b_node.isConstant(tolerance)) {
+                        a_node.child_mask.unset(b_it.n);
+                        if (b_node.value_mask.count() != 0) {
+                            a_node.value_mask.set(b_it.n);
+                            a_node.data[b_it.n] = .{ .value = b_node.data[0].value };
+                        }
+                    }
+                }
+                if (a_node.isConstant(tolerance)) {
+                    const count = a_node.value_mask.count();
+                    self.map.values()[a_it.n] = .{
+                        .active = count != 0,
+                        .child_off = null,
+                        .tile_value = if (count == 0) undefined else a_node.data[0].value,
+                    };
+                }
+            }
+        }
+
+        test prune {
+            var vdb: Self = .init(0);
+            const gpa = std.testing.allocator;
+            defer vdb.deinit(gpa);
+            const p: Point = .from(.{ 0, 0, 0 });
+            try vdb.putVoxel(gpa, p, 1);
+            vdb.prune(0);
+            var accessor: Accessor = .init;
+            try std.testing.expectEqual(1, accessor.get(&vdb, p));
+            {
+                const c_node = accessor.getNodeCached(&vdb, .c, p).?;
+                const b_node = accessor.getNodeCached(&vdb, .b, p).?;
+                const a_node = accessor.getNodeCached(&vdb, .a, p).?;
+                try std.testing.expectEqual(1, c_node.value_mask.count());
+                try std.testing.expectEqual(1, b_node.child_mask.count() + b_node.value_mask.count());
+                try std.testing.expectEqual(1, a_node.child_mask.count() + a_node.value_mask.count());
+                try std.testing.expectEqual(0, vdb.countTopTiles());
+                try std.testing.expectEqual(1, vdb.countTopNodes());
+                c_node.value_mask.unset(0);
+            }
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(0, accessor.get(&vdb, p));
+            try std.testing.expectEqual(0, vdb.countTopTiles());
+            try std.testing.expectEqual(0, vdb.countTopNodes());
+            vdb.deinit(gpa);
+            vdb = .init(0);
+            try vdb.putTile(gpa, p, 1, .c);
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(1, accessor.get(&vdb, p));
+            try std.testing.expectEqual(0, vdb.countTopTiles());
+            try std.testing.expectEqual(1, vdb.countTopNodes());
+            const b_node = accessor.getNodeCached(&vdb, .b, p).?;
+            try std.testing.expectEqual(1, b_node.value_mask.count());
+            try std.testing.expectEqual(0, b_node.child_mask.count());
+            b_node.child_mask.set(0);
+            b_node.value_mask.unset(0);
+            b_node.data[0] = .{ .child = vdb.nodes_C.items.len };
+            const c_node = try vdb.nodes_C.addOne(gpa);
+            c_node.* = .{ .flags = .init(p), .data_offset = vdb.values.items.len };
+            const data = try vdb.values.addOne(gpa);
+            data.* = try gpa.alloc(V, NodeC.size);
+            @memset(data.*, 2);
+            data.*[0] = 1;
+            c_node.value_mask.toggleAll();
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(1, accessor.get(&vdb, p));
+            _ = try accessor.getNode(&vdb, .c, p);
+            data.*[0] = 2;
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(2, accessor.get(&vdb, p));
+            try std.testing.expectError(error.Tile, accessor.getNode(&vdb, .c, p));
+        }
+
         pub fn countTopTiles(self: *const Self) u32 {
             var num: u32 = 0;
             for (self.map.values()) |val| {
-                if (val.child_off == null) num += 1;
+                if (val.child_off == null and val.active) num += 1;
             }
             return num;
         }
@@ -452,45 +762,60 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
             // write children (topology)
             for (self.map.keys(), self.map.values()) |key, val| {
                 const offset = val.child_off orelse continue;
+                if (!val.active) continue;
                 for (&key) |k| try w.writeInt(i32, k, .little); // origin
-                const a_node = self.nodes_A.items[offset];
+                var c: std.Io.Writer.Discarding = .init(&.{});
+                const p = &c.writer;
+                for (&key) |k| try p.writeInt(i32, k, .little); // origin
+                const a_node = &self.nodes_A.items[offset];
                 try w.print("{f}", .{a_node});
+                try p.print("{f}", .{a_node});
+                var count = c.fullCount();
+                count = c.fullCount();
+                if (count != 12 + 4096 + 4096 + 1 + 131_072) std.debug.panic("diff: {d}", .{count});
                 // write children
-                var it = a_node.child_mask.iterator(.{ .direction = .forward, .kind = .set });
-                while (it.next()) |active_child| {
-                    const b_offset = a_node.data[active_child].child;
-                    const b_node = self.nodes_B.items[b_offset];
+                var a_it = self.iterateChildren(.b, a_node);
+                while (a_it.next()) |b_node| {
                     try w.print("{f}", .{b_node});
-                    var iit = b_node.child_mask.iterator(.{ .direction = .forward, .kind = .set });
-                    while (iit.next()) |active_leaf| {
-                        const c_offset = b_node.data[active_leaf].child;
-                        const c_node = self.nodes_C.items[c_offset];
+                    try p.print("{f}", .{b_node});
+                    const b_diff = c.fullCount() - count;
+                    count = c.fullCount();
+                    std.debug.assert(512 + 512 + 1 + 16_384 == b_diff);
+                    var b_it = self.iterateChildren(.c, b_node);
+                    while (b_it.next()) |c_node| {
                         try w.print("{f}", .{c_node});
+                        try p.print("{f}", .{c_node});
+                        const c_diff = c.fullCount() - count;
+                        count = c.fullCount();
+                        std.debug.assert(c_diff == 64);
                     }
                 }
             }
             // write children (values)
             for (self.map.values()) |val| {
                 const a_offset = val.child_off orelse continue;
-                const a_node = self.nodes_A.items[a_offset];
-                var it = a_node.child_mask.iterator(.{ .direction = .forward, .kind = .set });
-                while (it.next()) |active_child| {
-                    const b_offset = a_node.data[active_child].child;
-                    const b_node = self.nodes_B.items[b_offset];
-                    var iit = b_node.child_mask.iterator(.{ .direction = .forward, .kind = .set });
-                    while (iit.next()) |active_leaf| {
-                        const c_offset = b_node.data[active_leaf].child;
-                        const c_node = self.nodes_C.items[c_offset];
+                if (!val.active) continue;
+                const a_node = &self.nodes_A.items[a_offset];
+                var a_it = self.iterateChildren(.b, a_node);
+                while (a_it.next()) |b_node| {
+                    var b_it = self.iterateChildren(.c, b_node);
+                    while (b_it.next()) |c_node| {
                         try w.print("{f}", .{c_node});
                         try w.writeByte(6); // TODO: this indicates no compression
                         const data = self.values.items[c_node.data_offset];
-                        var iiit = c_node.value_mask.iterator(.{ .direction = .forward, .kind = .set });
-                        var index: usize = 0;
-                        while (iiit.next()) |entry| : (index = entry + 1) {
-                            _ = try w.splatByte(0, @sizeOf(V) * (entry - index)); // inactive values are zero
-                            try w.writeAll(std.mem.asBytes(&data[entry]));
+                        switch (@import("builtin").mode) {
+                            .Debug => {
+                                for (0..c_node.value_mask.capacity()) |i| {
+                                    if (c_node.value_mask.isSet(i))
+                                        try w.writeAll(std.mem.asBytes(&data[i]))
+                                    else
+                                        try w.splatByteAll(0, @sizeOf(V));
+                                }
+                            },
+                            else => { // in Release modes, we write the bytes directly
+                                try w.writeAll(@ptrCast(data));
+                            },
                         }
-                        _ = try w.splatByte(0, @sizeOf(V) * (c_node.value_mask.capacity() - index));
                     }
                 }
             }
@@ -531,7 +856,7 @@ fn writeTransform(w: *Writer, affine: [4][4]f64) Writer.Error!void {
     }
 }
 
-fn writeGrid(w: *Writer, vdb: *VDB, affine: [4][4]f64, offset: u64) Writer.Error!void {
+fn writeGrid(w: *Writer, vdb: *const VDB, affine: [4][4]f64, offset: u64) Writer.Error!void {
     var counter: std.Io.Writer.Discarding = .init(&.{});
     //grid name (should be dynamic when doing multiple grids)
     try w.print("{f}", .{alt("density")});
@@ -560,7 +885,7 @@ fn writeGrid(w: *Writer, vdb: *VDB, affine: [4][4]f64, offset: u64) Writer.Error
     try w.print("{f}", .{vdb});
 }
 
-pub fn writeVDB(w: *Writer, vdb: *VDB, affine: [4][4]f64) !void {
+pub fn writeVDB(w: *Writer, vdb: *const VDB, affine: [4][4]f64) !void {
     var counter: std.Io.Writer.Discarding = .init(&.{});
     //Magic Number (needed it spells out BDV)
     try w.writeAll(&.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 });
