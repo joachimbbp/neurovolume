@@ -202,7 +202,7 @@ pub const CError = extern struct {
 
 // Print "hello neurovolume" to terminal for testing purposes
 pub export fn hello() void {
-    std.debug.print("hello neurovolume\n", .{});
+    std.debug.print("hello neurovolume! Sparse time!\n", .{});
 }
 test "hello" {
     hello();
