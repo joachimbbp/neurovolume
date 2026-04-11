@@ -32,6 +32,7 @@ pub const ThreeDim = struct {
     frame_size: usize,
     save_config: SaveConfiguration,
     normalizer: util.Normalizer,
+    sparse: ?f32,
 
     //ensure ndarray compliance with prep_ndarray
     pub fn init(
@@ -43,6 +44,7 @@ pub const ThreeDim = struct {
         normalize: bool,
         dims: [3]usize,
         save_config: SaveConfiguration,
+        sparse: ?f32,
     ) !ThreeDim { //LLM: was !FourDim
         var normalizer: util.Normalizer = undefined;
 
@@ -70,6 +72,7 @@ pub const ThreeDim = struct {
             .frame_size = dims[0] * dims[1] * dims[2], //LLM: was dims[1]*dims[2]*dims[3]
             .save_config = save_config,
             .normalizer = normalizer,
+            .sparse = sparse,
         };
     }
 
@@ -95,27 +98,23 @@ pub const ThreeDim = struct {
         vdb: *vdb543.VDB,
     ) !void {
         var i: usize = 0;
-        var cart = [_]u32{ 0, 0, 0 };
+        var cart = [_]i32{ 0, 0, 0 };
         while (true) {
-            try vdb543.setVoxel(
-                vdb,
-                .{
-                    cart[self.cartesian_order[0]],
-                    cart[self.cartesian_order[1]],
-                    cart[self.cartesian_order[2]],
-                },
-                self.normalizer.apply(self.data[i]), //LLM: was self.data (missing [i])
+            try vdb.putVoxel(
                 allocator,
+                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
+                self.normalizer.apply(self.data[i]), //LLM: was self.data (missing [i])
             );
 
             i += 1;
             if (!util.incrementCartesian(
-                u32,
+                i32,
                 3,
                 &cart,
                 .{ self.dims[0], self.dims[1], self.dims[2] }, //LLM: was dims[1],[2],[3]
             )) break;
         }
+        if (self.sparse) |tol| vdb.prune(tol);
     }
 
     pub fn save(
@@ -128,8 +127,9 @@ pub const ThreeDim = struct {
         defer arena.deinit();
 
         defer _ = arena.reset(.retain_capacity);
-        var vdb = try vdb543.VDB.build(arena.allocator());
-        var buffer = std.array_list.Managed(u8).init(arena.allocator());
+        var vdb: vdb543.VDB = .init(0);
+        var buffer: std.Io.Writer.Allocating = .init(arena.allocator());
+        defer buffer.deinit(); // good hygiene
         switch (v.source_format) {
             .ndarray => try v.extractVol(
                 arena.allocator(),
@@ -139,11 +139,13 @@ pub const ThreeDim = struct {
         }
 
         try vdb543.writeVDB(
-            &buffer,
+            &buffer.writer,
             &vdb,
             v.affine_transform,
         );
-        try v.writeVDB(&buffer); //LLM: was missing — buffer was never written to disk
+        var arrlist = buffer.toArrayList();
+        var managed = arrlist.toManaged(arena.allocator());
+        try v.writeVDB(&managed); //LLM: was missing — buffer was never written to disk
     }
 };
 
@@ -162,6 +164,7 @@ pub const FourDim = struct {
     frame_size: usize,
     save_config: SaveConfiguration,
     normalizer: util.Normalizer,
+    sparse: ?f32,
 
     //ensure ndarray compliance with prep_4D_ndarray
     pub fn init(
@@ -176,6 +179,7 @@ pub const FourDim = struct {
         speed: f32, //0.5 for half speed, 2.0 for double speed etc
         dims: [4]usize,
         save_config: SaveConfiguration,
+        sparse: ?f32,
     ) !FourDim {
         var normalizer: util.Normalizer = undefined;
 
@@ -206,6 +210,7 @@ pub const FourDim = struct {
             .frame_size = dims[1] * dims[2] * dims[3],
             .save_config = save_config,
             .normalizer = normalizer,
+            .sparse = sparse,
         };
     }
 
@@ -239,27 +244,23 @@ pub const FourDim = struct {
         const end = ((frame_num + 1) * self.frame_size);
 
         var i: usize = 0;
-        var cart = [_]u32{ 0, 0, 0 };
+        var cart = [_]i32{ 0, 0, 0 };
         while (true) {
-            try vdb543.setVoxel(
-                vdb,
-                .{
-                    cart[self.cartesian_order[0]],
-                    cart[self.cartesian_order[1]],
-                    cart[self.cartesian_order[2]],
-                },
-                self.normalizer.apply(self.data[start..end][i]),
+            try vdb.putVoxel(
                 allocator,
+                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
+                self.normalizer.apply(self.data[start..end][i]),
             );
 
             i += 1;
             if (!util.incrementCartesian(
-                u32,
+                i32,
                 3,
                 &cart,
                 .{ self.dims[1], self.dims[2], self.dims[3] },
             )) break;
         }
+        if (self.sparse) |tol| vdb.prune(tol);
     }
 
     //TODO: DRY maybe
@@ -282,7 +283,7 @@ pub const FourDim = struct {
         const b_end = ((b_frame_num + 1) * self.frame_size);
 
         var i: usize = 0;
-        var cart = [_]u32{ 0, 0, 0 };
+        var cart = [_]i32{ 0, 0, 0 };
         while (true) {
             //WARN: not sure if normalizer is needed here
             //or if it should be applied when calculating av and bv
@@ -290,25 +291,21 @@ pub const FourDim = struct {
             const av = self.data[a_start..a_end][i]; //value of a frame voxel at this cart coord
             const bv = self.data[b_start..b_end][i]; //value of b frame voxel at this cart coord
             const voxel_value = (av * a_scalar) + (bv * b_scalar);
-            try vdb543.setVoxel(
-                vdb,
-                .{
-                    cart[self.cartesian_order[0]],
-                    cart[self.cartesian_order[1]],
-                    cart[self.cartesian_order[2]],
-                },
-                voxel_value,
+            try vdb.putVoxel(
                 allocator,
+                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
+                voxel_value,
             );
 
             i += 1;
             if (!util.incrementCartesian(
-                u32,
+                i32,
                 3,
                 &cart,
                 .{ self.dims[1], self.dims[2], self.dims[3] },
             )) break;
         }
+        if (self.sparse) |tol| vdb.prune(tol);
     }
 
     pub fn save(
@@ -380,8 +377,9 @@ pub const Interpolator = struct {
     ) !void {
         for (0..self.vol.dims[0]) |n| {
             defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
-            var vdb = try vdb543.VDB.build(arena.allocator());
-            var buffer = std.array_list.Managed(u8).init(arena.allocator());
+            var vdb: vdb543.VDB = .init(0);
+            var buffer: std.Io.Writer.Allocating = .init(arena.allocator());
+            defer buffer.deinit(); // good hygiene!
             switch (self.vol.source_format) {
                 .ndarray => try self.vol.extractFrame(
                     arena.allocator(),
@@ -392,11 +390,13 @@ pub const Interpolator = struct {
             }
 
             try vdb543.writeVDB(
-                &buffer,
+                &buffer.writer,
                 &vdb,
                 self.vol.affine_transform,
             );
-            try self.vol.saveFrame(n, &buffer);
+            var arrlist = buffer.toArrayList();
+            var managed = arrlist.toManaged(arena.allocator());
+            try self.vol.saveFrame(n, &managed);
         }
     }
 
@@ -410,8 +410,9 @@ pub const Interpolator = struct {
             for (0..self.hold_durration) |i| {
                 //TODO: dry with other interpolation modes eventually
                 defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
-                var vdb = try vdb543.VDB.build(arena.allocator());
-                var buffer = std.array_list.Managed(u8).init(arena.allocator());
+                var vdb: vdb543.VDB = .init(0);
+                var buffer: std.Io.Writer.Allocating = .init(arena.allocator());
+                defer buffer.clearRetainingCapacity(); // good hygiene!
 
                 //NOTE: f32 because that is our current value for
                 //the VDB voxels
@@ -432,12 +433,14 @@ pub const Interpolator = struct {
                     else => return DataFormatError.NotSupportedYet,
                 }
                 try vdb543.writeVDB(
-                    &buffer,
+                    &buffer.writer,
                     &vdb,
                     self.vol.affine_transform,
                 );
                 const frame_num = o * self.hold_durration + i; //LLM: calculated
-                try self.vol.saveFrame(frame_num, &buffer);
+                var arrlist = buffer.toArrayList();
+                var managed = arrlist.toManaged(arena.allocator());
+                try self.vol.saveFrame(frame_num, &managed);
             }
         }
     }

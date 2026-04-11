@@ -13,351 +13,912 @@ const print = std.debug.print;
 const util = @import("util.zig");
 const uuidv4 = util.UUIDv4;
 const save = @import("save.zig");
-//SECTION: IO helper functions
-fn writePointer(buffer: *ArrayList(u8), pointer: *const u8, len: usize) !void {
-    try buffer.appendSlice(pointer[0..len]);
-}
-fn writeSlice(comptime T: type, buffer: *ArrayList(u8), slice: []const T) !void {
-    const byte_data = std.mem.sliceAsBytes(slice);
-    try buffer.appendSlice(byte_data);
-}
-fn writeU8(buffer: *ArrayList(u8), value: u8) !void {
-    try buffer.append(value);
-}
-fn writeScalar(comptime T: type, buffer: *ArrayList(u8), value: T) !void {
-    try buffer.appendSlice(std.mem.asBytes(&value));
-}
 
-fn castInt32ToU32(value: i32) u32 {
-    const result: u32 = @bitCast(value);
-    return result;
-}
-fn writeVec3i(buffer: *ArrayList(u8), value: [3]i32) !void {
-    try writeScalar(u32, buffer, castInt32ToU32(value[0]));
-    try writeScalar(u32, buffer, castInt32ToU32(value[1]));
-    try writeScalar(u32, buffer, castInt32ToU32(value[2]));
-}
+const Writer = std.Io.Writer;
 
-fn writeString(buffer: *ArrayList(u8), string: []const u8) !void {
-    for (string) |character| {
-        try buffer.append(character);
-    }
-}
-
-fn writeName(buffer: *ArrayList(u8), name: []const u8) !void {
-    try writeScalar(u32, buffer, @intCast(name.len));
-    try writeString(buffer, name);
-}
-fn writeMetaString(buffer: *ArrayList(u8), name: []const u8, string: []const u8) !void {
-    try writeName(buffer, name);
-    try writeName(buffer, "string");
-    try writeName(buffer, string);
-}
-fn writeMetaBool(buffer: *ArrayList(u8), name: []const u8, value: bool) !void {
-    try writeName(buffer, name);
-    try writeName(buffer, "bool");
-    try writeScalar(u32, buffer, 1); //bool is stored in one whole byte
-    try writeU8(buffer, if (value) 1 else 0);
-}
-fn writeMetaVector(buffer: *ArrayList(u8), name: []const u8, value: [3]i32) !void {
-    try writeName(buffer, name);
-    try writeName(buffer, "vec3i");
-    try writeScalar(u32, buffer, 3 * @sizeOf(i32));
-    try writeVec3i(buffer, value);
-}
 //SECTION: VDB nodes
-pub const VDB = struct {
-    five_node: *Node5,
-    //NOTE:  to make this arbitrarily large:
-    //You'll need an autohashmap to *Node5s and some mask that encompasses all the node5 (how many?)
-    pub fn build(allocator: std.mem.Allocator) !VDB { //WARN: should be arena
-        const five_node = try Node5.build(allocator);
-        return VDB{ .five_node = five_node };
+
+pub const Point = packed struct {
+    z: i32,
+    y: i32,
+    x: i32,
+
+    pub fn from(array: [3]i32) Point {
+        return .{ .x = array[0], .y = array[1], .z = array[2] };
+    }
+
+    pub fn offsetOf(p: Point, comptime n: u5, comptime m: u5) u32 {
+        const o = n - m;
+        const x: u32 = @bitCast((p.x & ((1 << n) - 1)) >> m);
+        const y: u32 = @bitCast((p.y & ((1 << n) - 1)) >> m);
+        const z: u32 = @bitCast((p.z & ((1 << n) - 1)) >> m);
+        return (x << (o + o)) + (y << o) + z;
+    }
+
+    test offsetOf {
+        const p: Point = .from(.{ 3, 7, 4 });
+        const expected: u32 = (1 << 2) + (1 << 1) + 0;
+        try std.testing.expectEqual(expected, p.offsetOf(2, 1));
+    }
+
+    pub fn compareUpper(p: Point, q: Point, comptime n: u5) bool {
+        return p.maskLower(n) == q.maskLower(n);
+    }
+
+    test compareUpper {
+        const p: Point = .{ .x = 69, .y = 67, .z = 137 };
+        const q: Point = .{ .x = 0, .y = 0, .z = 0 };
+        try std.testing.expect(p.compareUpper(q, 8));
+        try std.testing.expect(!p.compareUpper(q, 7));
+    }
+
+    pub fn maskLower(p: Point, comptime n: u5) Point {
+        const mask: i32 = mask: {
+            const mask: i32 = ((1 << n) - 1);
+            break :mask ~mask;
+        };
+        return .{
+            .x = p.x & mask,
+            .y = p.y & mask,
+            .z = p.z & mask,
+        };
+    }
+
+    pub fn format(p: Point, w: *Writer) Writer.Error!void {
+        try w.writeInt(i32, p.x, .little);
+        try w.writeInt(i32, p.y, .little);
+        try w.writeInt(i32, p.z, .little);
     }
 };
-const Node5 = struct {
-    mask: [512]u64, // maybe thees should be called "masks" plural?
-    four_nodes: std.AutoHashMap(u32, *Node4),
-    fn build(allocator: std.mem.Allocator) !*Node5 {
-        const four_nodes = std.AutoHashMap(u32, *Node4).init(allocator);
-        const node5 = try allocator.create(Node5);
-        node5.* = Node5{ .mask = @splat(0), .four_nodes = four_nodes };
-        return node5;
-    }
-};
-const Node4 = struct {
-    mask: [64]u64,
-    three_nodes: std.AutoHashMap(u32, *Node3),
-    fn build(allocator: std.mem.Allocator) !*Node4 {
-        const three_nodes = std.AutoHashMap(u32, *Node3).init(allocator);
 
-        const node4 = try allocator.create(Node4);
-        node4.* = Node4{ .mask = @splat(0), .three_nodes = three_nodes };
+pub const VDB = VDBType(f32, 5, 4, 3, false);
 
-        return node4;
-    }
-};
+test VDB {
+    _ = VDB;
+}
 
-const Node3 = struct {
-    mask: [8]u64,
-    data: [512]f32, //can technically be any value!
-    fn build(allocator: std.mem.Allocator) !*Node3 {
-        const node3 = try allocator.create(Node3);
-        node3.* = Node3{ .mask = @splat(0), .data = @splat(@as(f32, 0)) };
-        return node3;
-    }
-};
+fn equalTolerance(comptime V: type, a: V, b: V, tolerance: V) bool {
+    if (tolerance == 0) return a == b;
+    // if a is small, approxEqAbs works better
+    if (std.math.approxEqAbs(V, 0, a, tolerance))
+        return std.math.approxEqAbs(V, a, b, tolerance);
+    return std.math.approxEqRel(V, a, b, tolerance);
+}
 
-//SECTION: Bit index functions:
-// Generalized Function to pack the whole thing down into xxxyyyzzz:
-// From the original: bit_index = z + y * dim + x * dim^2
-// bit_index = z | (y << dim) | (x << (dim << 1))
-// Note the pedagogical code (4096-1, etc). This is a holdover
-// from the jengaFX repo. I'm keeping it around for clarity
-// as I don't believe there is a runtime performance hit.
-fn getBitIndex4(position: [3]u32) u32 {
-    const relative_position: [3]u32 = .{ position[0] & (4096 - 1), position[1] & (4096 - 1), position[2] & (4096 - 1) };
-    const index_3d: [3]u32 = .{
-        relative_position[0] >> 7,
-        relative_position[1] >> 7,
-        relative_position[2] >> 7,
+pub fn InternalNode(comptime V: type, comptime N: u5) type {
+    return struct {
+        pub const dim = N + N + N;
+        pub const size = 1 << dim;
+        pub const Data = union {
+            value: V,
+            child: usize,
+        };
+        data: [size]Data,
+        value_mask: Mask,
+        child_mask: Mask,
+        origin: Point,
+
+        const Node = @This();
+        const Mask = std.bit_set.ArrayBitSet(usize, size);
+
+        pub fn isConstant(self: *const Node, tolerance: V) bool {
+            if (self.child_mask.count() != 0) return false;
+            const count = self.value_mask.count();
+            if (count == 0) return true;
+            if (count != self.value_mask.capacity()) return false;
+            var it = self.iterateValues();
+            const first = it.next().?;
+            while (it.next()) |second|
+                if (!equalTolerance(V, first, second, tolerance)) return false;
+            return true;
+        }
+
+        pub const Iterator = struct {
+            n: *const Node,
+            it: Mask.Iterator(.{}),
+
+            pub fn next(self: *Iterator) ?V {
+                const idx = self.it.next() orelse return null;
+                return self.n.data[idx].value;
+            }
+        };
+
+        pub fn iterateValues(self: *const Node) Iterator {
+            std.debug.assert(self.child_mask.intersectWith(self.value_mask).count() == 0); // child and value masks must be disjoint
+            return .{
+                .n = self,
+                .it = self.value_mask.iterator(.{}),
+            };
+        }
+
+        test isConstant {
+            var node: Node = .init(.from(.{ 0, 0, 0 }));
+            try std.testing.expect(node.isConstant(0));
+            node.child_mask.set(0);
+            try std.testing.expect(!node.isConstant(0));
+            node.child_mask.unset(0);
+            node.value_mask.set(0);
+            try std.testing.expect(!node.isConstant(0));
+            node.value_mask.unset(0);
+            node.value_mask.toggleAll();
+            node.data = @splat(.{ .value = 1 });
+            try std.testing.expect(node.isConstant(0));
+        }
+
+        pub fn init(origin: Point) Node {
+            return .{
+                .data = undefined,
+                .value_mask = .initEmpty(),
+                .child_mask = .initEmpty(),
+                .origin = origin,
+            };
+        }
+
+        pub fn format(self: *const Node, w: *Writer) Writer.Error!void {
+            std.debug.assert(self.child_mask.intersectWith(self.value_mask).count() == 0); // child mask and value mask must be disjoint
+            try w.writeAll(@ptrCast(&self.child_mask.masks));
+            try w.writeAll(@ptrCast(&self.value_mask.masks));
+            // FIXME: compression?
+            try w.writeByte(6);
+            for (0..self.value_mask.capacity()) |i| {
+                if (self.value_mask.isSet(i))
+                    try w.writeAll(std.mem.asBytes(&self.data[i].value))
+                else
+                    try w.splatByteAll(0, @sizeOf(V));
+            }
+        }
+
+        test format {
+            const n: Node = .init(.from(.{ 0, 0, 0 }));
+            var w: std.Io.Writer.Discarding = .init(&.{});
+            try w.writer.print("{f}", .{&n});
+            try std.testing.expectEqual((size / 8) + (size / 8) + 1 + (size * @sizeOf(V)), w.fullCount());
+        }
     };
-    return index_3d[2] | (index_3d[1] << 5) | (index_3d[0] << 10);
 }
-fn getBitIndex3(position: [3]u32) u32 {
-    const relative_position: [3]u32 = .{ position[0] & (128 - 1), position[1] & (128 - 1), position[2] & (128 - 1) };
-    const index_3d: [3]u32 = .{
-        relative_position[0] >> 3,
-        relative_position[1] >> 3,
-        relative_position[2] >> 3,
+
+pub fn LeafNode(comptime N: u5, comptime include_inside: bool) type {
+    return struct {
+        const Self = @This();
+        pub const dim = N + N + N;
+        pub const size = 1 << dim;
+        pub const Flags = packed struct(u64) {
+            buf_count: u2 = 1,
+            compressed: bool = false,
+            quantized: bool = false,
+            origin: packed struct {
+                x: i20,
+                y: i20,
+                z: i20,
+
+                pub fn toPoint(self: @This()) Point {
+                    return .{
+                        .x = self.x << N,
+                        .y = self.y << N,
+                        .z = self.z << N,
+                    };
+                }
+            },
+
+            pub fn init(p: Point) Flags {
+                return .{ .origin = .{
+                    .x = @truncate(p.x >> N),
+                    .y = @truncate(p.y >> N),
+                    .z = @truncate(p.z >> N),
+                } };
+            }
+        };
+        data_offset: usize,
+        value_mask: std.bit_set.ArrayBitSet(usize, size) = .initEmpty(),
+        inside_mask: if (include_inside)
+            std.bit_set.ArrayBitSet(usize, size)
+        else
+            void = if (include_inside) .initEmpty() else {},
+        flags: Flags,
+
+        pub fn format(self: *const @This(), w: *Writer) Writer.Error!void {
+            try w.writeAll(@ptrCast(&self.value_mask.masks));
+        }
+
+        pub fn prune(self: *@This(), comptime V: type, data: []const V, background: V, tolerance: V) void {
+            var it = self.value_mask.iterator(.{});
+            while (it.next()) |i| {
+                if (equalTolerance(V, background, data[i], tolerance)) self.value_mask.unset(i);
+            }
+        }
+
+        pub fn isConstant(self: *const @This(), comptime V: type, data: []const V, tolerance: V) bool {
+            const count = self.value_mask.count();
+            if (count == 0) return true;
+            if (count != self.value_mask.capacity()) return false;
+            const first = data[0];
+            for (data) |second| if (!equalTolerance(V, first, second, tolerance)) return false;
+            return true;
+        }
     };
-    return index_3d[2] | (index_3d[1] << 4) | (index_3d[0] << 8);
-}
-fn getBitIndex0(position: [3]u32) u32 {
-    const relative_position: [3]u32 = .{ position[0] & (8 - 1), position[1] & (8 - 1), position[2] & (8 - 1) };
-    const index_3d: [3]u32 = .{ relative_position[0] >> 0, relative_position[1] >> 0, relative_position[2] >> 0 };
-    return index_3d[2] | (index_3d[1] << 3) | (index_3d[0] << 6);
 }
 
-pub fn setVoxel(
-    vdb: *VDB,
-    position: [3]u32,
-    value: f32,
-    allocator: std.mem.Allocator,
-) !void {
-    var node_5: *Node5 = vdb.five_node;
+pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5, comptime include_inside: bool) type {
+    std.debug.assert(@sizeOf(V) <= @sizeOf(usize));
+    return struct {
+        const Self = @This();
+        pub const Key = [3]i32;
+        pub const Data = struct {
+            child_off: ?usize,
+            tile_value: V,
+            active: bool,
+        };
+        pub const NodeA = InternalNode(V, A);
+        pub const NodeB = InternalNode(V, B);
+        pub const NodeC = LeafNode(C, include_inside);
 
-    const bit_index_4 = getBitIndex4(position);
-    const bit_index_3 = getBitIndex3(position);
-    const bit_index_0 = getBitIndex0(position);
+        map: std.AutoArrayHashMapUnmanaged(Key, Data),
+        nodes_A: std.ArrayListUnmanaged(NodeA),
+        nodes_B: std.ArrayListUnmanaged(NodeB),
+        nodes_C: std.ArrayListUnmanaged(NodeC),
+        // VDB assumes ownership of these pointers
+        values: std.ArrayListUnmanaged([]V),
+        background: V,
 
-    var node_4: *Node4 = undefined;
-    const node_4_or_null = node_5.four_nodes.get(bit_index_4);
-    if (node_4_or_null == null) {
-        node_4 = try Node4.build(allocator);
-        try node_5.four_nodes.put(bit_index_4, node_4);
-    } else {
-        node_4 = node_4_or_null.?;
-    }
+        pub fn init(background: V) Self {
+            return .{
+                .map = .empty,
+                .nodes_A = .empty,
+                .nodes_B = .empty,
+                .nodes_C = .empty,
+                .values = .empty,
+                .background = background,
+            };
+        }
 
-    var node_3: *Node3 = undefined;
-    const node_3_or_null = node_4.three_nodes.get(bit_index_3);
-    if (node_3_or_null == null) {
-        node_3 = try Node3.build(allocator);
-        try node_4.three_nodes.put(bit_index_3, node_3);
-    } else {
-        node_3 = node_3_or_null.?;
-    }
+        pub fn deinit(self: *Self, gpa: std.mem.Allocator) void {
+            self.map.deinit(gpa);
+            self.nodes_A.deinit(gpa);
+            self.nodes_B.deinit(gpa);
+            self.nodes_C.deinit(gpa);
+            for (self.values.items) |arr| gpa.free(arr);
+            self.values.deinit(gpa);
+            self.* = undefined;
+        }
 
-    const one: u64 = 1;
-    node_5.mask[bit_index_4 >> 6] |= one << @intCast(bit_index_4 & (64 - 1));
-    node_4.mask[bit_index_3 >> 6] |= one << @intCast(bit_index_3 & (64 - 1));
-    node_3.mask[bit_index_0 >> 6] |= one << @intCast(bit_index_0 & (64 - 1));
+        pub fn pointToKey(p: Point) Self.Key {
+            const masked = p.maskLower(A + B + C);
+            return .{ masked.x, masked.y, masked.z };
+        }
 
-    node_3.data[bit_index_0] = value;
-}
+        pub fn Iterator(comptime which: Level) type {
+            return struct {
+                vdb: *const Self,
+                parent: switch (which) {
+                    .a => []const Data,
+                    .b => *NodeA,
+                    .c => *NodeB,
+                },
+                it: switch (which) {
+                    .a => usize,
+                    .b => NodeA.Mask.Iterator(.{}),
+                    .c => NodeB.Mask.Iterator(.{}),
+                },
+                n: usize,
 
-fn writeNode5Header(buffer: *ArrayList(u8), node: *Node5) !void {
-    //origin of 5-node:
-    try writeVec3i(buffer, .{ 0, 0, 0 });
-    //child masks:
-    for (node.mask) |child_mask| {
-        try writeScalar(u64, buffer, child_mask);
-    }
-    //Presently we don't have any values masks, so just zeroing those out
-    for (node.mask) |_| {
-        try writeScalar(u64, buffer, 0);
-    }
-    //Write uncompressed (signified by 6) node values
-    try writeU8(buffer, 6);
-    var i: usize = 0;
-    while (i < 32768) : (i += 1) {
-        try writeScalar(f32, buffer, 0);
-    }
-}
-fn writeNode4Header(buffer: *ArrayList(u8), node: *Node4) !void {
-    //Child masks
-    for (node.mask) |child_mask| {
-        try writeScalar(u64, buffer, child_mask);
-    }
-    //No value masks atm
-    for (node.mask) |_| {
-        try writeScalar(u64, buffer, 0);
-    }
+                const Which = switch (which) {
+                    .a => *NodeA,
+                    .b => *NodeB,
+                    .c => *NodeC,
+                };
 
-    try writeU8(buffer, 6);
-    var i: usize = 0;
-    while (i < 4096) : (i += 1) {
-        try writeScalar(f32, buffer, 0);
-    }
-}
+                pub fn next(self: *@This()) ?Which {
+                    if (comptime which == .a) {
+                        while (self.it < self.parent.len) {
+                            const dat = self.parent[self.it];
+                            self.n = self.it;
+                            self.it += 1;
+                            const offset = dat.child_off orelse continue;
+                            if (!dat.active) continue;
+                            return &self.vdb.nodes_A.items[offset];
+                        }
+                        return null;
+                    }
+                    const idx = self.it.next() orelse return null;
+                    self.n = idx;
+                    return switch (which) {
+                        .a => comptime unreachable,
+                        .b => &self.vdb.nodes_B.items[self.parent.data[idx].child],
+                        .c => &self.vdb.nodes_C.items[self.parent.data[idx].child],
+                    };
+                }
+            };
+        }
 
-const TreeError = error{
-    FourNodeNotFound,
-    ThreeNodeNotFound,
-};
+        pub fn iterateChildren(self: *const Self, comptime which: Level, of: switch (which) {
+            .a => void,
+            .b => *NodeA,
+            .c => *NodeB,
+        }) Iterator(which) {
+            return .{
+                .vdb = self,
+                .parent = switch (which) {
+                    .a => self.map.values(),
+                    else => of,
+                },
+                .it = switch (which) {
+                    .a => 0,
+                    else => of.child_mask.iterator(.{}),
+                },
+                .n = 0,
+            };
+        }
 
-fn writeTree(buffer: *ArrayList(u8), vdb: *VDB) !void {
-    try writeScalar(u32, buffer, 1); //Number of value buffers per leaf node (only change for multi-core implementations)
-    try writeScalar(u32, buffer, 0); //Root node background value
-    try writeScalar(u32, buffer, 0); //number of tiles
-    try writeScalar(u32, buffer, 1); //number of 5 nodes
+        pub const Level = enum { a, b, c };
 
-    const node_5 = vdb.five_node;
+        pub const Accessor = struct {
+            point: Point,
+            a: ?usize,
+            b: ?usize,
+            c: ?usize,
 
-    try writeNode5Header(buffer, node_5);
+            pub const init: Accessor = .{ .point = undefined, .a = null, .b = null, .c = null };
 
-    //CREATE TOPOLOGY:
-    for (node_5.mask[0..], 0..) |five_mask_og_t, five_mask_idx_t| {
-        var five_mask_t = five_mask_og_t;
-        while (five_mask_t != 0) : (five_mask_t &= five_mask_t - 1) {
-            const bit_index_4n = @as(u32, @intCast(five_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(five_mask_t));
-            const node_4 = node_5.four_nodes.get(bit_index_4n).?;
+            // Pointers may become invalidated by modifications to the VDB
+            pub fn getNodeCached(
+                self: Accessor,
+                vdb: *const Self,
+                comptime which: Level,
+                at: Point,
+            ) switch (which) {
+                .a => ?*NodeA,
+                .b => ?*NodeB,
+                .c => ?*NodeC,
+            } {
+                switch (which) {
+                    .a => {
+                        const cached = self.a orelse return null;
+                        if (!self.point.compareUpper(at, A + B + C)) return null;
+                        return &vdb.nodes_A.items[cached];
+                    },
+                    .b => {
+                        const cached = self.b orelse return null;
+                        if (!self.point.compareUpper(at, B + C)) return null;
+                        return &vdb.nodes_B.items[cached];
+                    },
+                    .c => {
+                        const cached = self.c orelse return null;
+                        if (!self.point.compareUpper(at, C)) return null;
+                        return &vdb.nodes_C.items[cached];
+                    },
+                }
+            }
 
-            try writeNode4Header(buffer, node_4);
+            pub fn getNode(
+                self: *Accessor,
+                vdb: *const Self,
+                comptime which: Level,
+                at: Point,
+            ) error{ Tile, NoNode }!switch (which) {
+                .a => *NodeA,
+                .b => *NodeB,
+                .c => *NodeC,
+            } {
+                return self.getNodeCached(vdb, which, at) orelse {
+                    switch (which) {
+                        .a => {
+                            self.a = null;
+                            const key = pointToKey(at);
+                            const data = vdb.map.get(key) orelse return error.NoNode;
+                            const child = data.child_off orelse {
+                                if (!data.active) return error.NoNode;
+                                return error.Tile;
+                            };
+                            self.a = child;
+                            self.point = at;
+                            return &vdb.nodes_A.items[child];
+                        },
+                        .b => {
+                            self.b = null;
+                            const a_node = try self.getNode(vdb, .a, at);
+                            const a_off = at.offsetOf(A + B + C, B + C);
+                            if (a_node.value_mask.isSet(a_off)) return error.Tile;
+                            if (!a_node.child_mask.isSet(a_off)) return error.NoNode;
+                            const child = a_node.data[a_off].child;
+                            self.b = child;
+                            self.point = at;
+                            return &vdb.nodes_B.items[child];
+                        },
+                        .c => {
+                            self.c = null;
+                            const b_node = try self.getNode(vdb, .b, at);
+                            const b_off = at.offsetOf(B + C, C);
+                            if (b_node.value_mask.isSet(b_off)) return error.Tile;
+                            if (!b_node.child_mask.isSet(b_off)) return error.NoNode;
+                            const child = b_node.data[b_off].child;
+                            self.c = child;
+                            self.point = at;
+                            return &vdb.nodes_C.items[child];
+                        },
+                    }
+                };
+            }
 
-            //Iterate 3-nodes
-            for (node_4.mask[0..], 0..) |four_mask_og_t, four_mask_idx_t| {
-                var four_mask_t = four_mask_og_t;
-                while (four_mask_t != 0) : (four_mask_t &= four_mask_t - 1) {
-                    const bit_index_3n_t = @as(u32, @intCast(four_mask_idx_t)) * @as(u32, @intCast(64)) + @as(u32, @ctz(four_mask_t));
-                    const node_3_t = node_4.three_nodes.get(bit_index_3n_t).?;
-                    for (node_3_t.mask) |three_mask| {
-                        try writeScalar(u64, buffer, three_mask);
+            pub fn get(self: *Accessor, vdb: *const Self, at: Point) V {
+                const c_node = self.getNode(vdb, .c, at) catch |err| switch (err) {
+                    error.Tile => {
+                        const b_node = self.getNodeCached(vdb, .b, at) orelse return tile: {
+                            const a_node = self.getNodeCached(vdb, .a, at) orelse {
+                                const key = pointToKey(at);
+                                const data = vdb.map.get(key).?; // we would have gotten NoNode otherwise
+                                break :tile data.tile_value;
+                            };
+                            const a_off = at.offsetOf(A + B + C, B + C);
+                            break :tile a_node.data[a_off].value;
+                        };
+                        const b_off = at.offsetOf(B + C, C);
+                        return b_node.data[b_off].value;
+                    },
+                    error.NoNode => return vdb.background,
+                };
+                const c_off = at.offsetOf(C, 0);
+                if (!c_node.value_mask.isSet(c_off)) return vdb.background; // no voxel present at coordinates
+                if (c_node.flags.buf_count == 0 or c_node.flags.compressed) @panic("TODO"); // TODO: compression, multibuffering?
+                return vdb.values.items[c_node.data_offset][c_off];
+            }
+
+            /// Returns error.Tile when the larger node containing the new tile is already a tile
+            pub fn putTile(self: *Accessor, vdb: *Self, gpa: std.mem.Allocator, containing: Point, val: V, which: Level) (std.mem.Allocator.Error || error{Tile})!void {
+                switch (which) {
+                    .a => {
+                        const key = pointToKey(containing);
+                        const gop = try vdb.map.getOrPut(gpa, key);
+                        gop.value_ptr.* = .{
+                            .active = true,
+                            .tile_value = val,
+                            .child_off = null,
+                        };
+                    },
+                    .b => {
+                        const node = self.getNode(vdb, .a, containing) catch |err| switch (err) {
+                            error.Tile => return error.Tile,
+                            error.NoNode => a_node: {
+                                const key = pointToKey(containing);
+                                const gop = try vdb.map.getOrPut(gpa, key);
+                                gop.value_ptr.* = .{
+                                    .active = true,
+                                    .child_off = vdb.nodes_A.items.len,
+                                    .tile_value = undefined,
+                                };
+                                const a_node = try vdb.nodes_A.addOne(gpa);
+                                a_node.* = .init(containing.maskLower(A + B + C));
+                                self.a = vdb.nodes_A.items.len - 1;
+                                break :a_node a_node;
+                            },
+                        };
+                        const a_off = containing.offsetOf(A + B + C, B + C);
+                        node.child_mask.unset(a_off);
+                        node.value_mask.set(a_off);
+                        node.data[a_off] = .{ .value = val };
+                    },
+                    .c => {
+                        const node = self.getNode(vdb, .b, containing) catch |err| switch (err) {
+                            error.Tile => return error.Tile,
+                            error.NoNode => b_node: {
+                                const a_node = self.getNodeCached(vdb, .a, containing) orelse a_node: {
+                                    const key = pointToKey(containing);
+                                    const gop = try vdb.map.getOrPut(gpa, key);
+                                    gop.value_ptr.* = .{
+                                        .active = true,
+                                        .child_off = vdb.nodes_A.items.len,
+                                        .tile_value = undefined,
+                                    };
+                                    const a_node = try vdb.nodes_A.addOne(gpa);
+                                    a_node.* = .init(containing.maskLower(A + B + C));
+                                    self.a = vdb.nodes_A.items.len - 1;
+                                    break :a_node a_node;
+                                };
+                                const a_off = containing.offsetOf(A + B + C, B + C);
+                                a_node.child_mask.set(a_off);
+                                a_node.data[a_off] = .{ .child = vdb.nodes_B.items.len };
+                                const b_node = try vdb.nodes_B.addOne(gpa);
+                                b_node.* = .init(containing.maskLower(B + C));
+                                self.b = vdb.nodes_B.items.len - 1;
+                                break :b_node b_node;
+                            },
+                        };
+                        const b_off = containing.offsetOf(B + C, C);
+                        node.child_mask.unset(b_off);
+                        node.value_mask.set(b_off);
+                        node.data[b_off] = .{ .value = val };
+                    },
+                }
+            }
+
+            // FIXME: audit the sad paths
+            pub fn putVoxel(self: *Accessor, vdb: *Self, gpa: std.mem.Allocator, at: Point, val: V) (std.mem.Allocator.Error || error{Tile})!void {
+                // special case: don't create voxels for the background value
+                if (val == vdb.background) return;
+                const node = self.getNode(vdb, .c, at) catch |err| switch (err) {
+                    error.Tile => return error.Tile,
+                    error.NoNode => node: {
+                        const b_node = self.getNodeCached(vdb, .b, at) orelse b_node: {
+                            const a_node = self.getNodeCached(vdb, .a, at) orelse a_node: {
+                                const key = pointToKey(at);
+                                const a_node = try vdb.nodes_A.addOne(gpa);
+                                a_node.* = .init(at.maskLower(A + B + C));
+                                const gop = try vdb.map.getOrPut(gpa, key);
+                                gop.value_ptr.* = .{
+                                    .active = true,
+                                    .child_off = vdb.nodes_A.items.len - 1,
+                                    .tile_value = undefined,
+                                };
+                                self.a = vdb.nodes_A.items.len - 1;
+                                self.point = at;
+                                break :a_node a_node;
+                            };
+                            const a_off = at.offsetOf(A + B + C, B + C);
+                            const b_node = try vdb.nodes_B.addOne(gpa);
+                            b_node.* = .init(at.maskLower(B + C));
+                            a_node.child_mask.set(a_off);
+                            a_node.data[a_off] = .{ .child = vdb.nodes_B.items.len - 1 };
+                            self.b = vdb.nodes_B.items.len - 1;
+                            self.point = at;
+                            break :b_node b_node;
+                        };
+                        const b_off = at.offsetOf(B + C, C);
+                        const c_node = try vdb.nodes_C.addOne(gpa);
+                        const size = 1 << C + C + C;
+                        const ptr = try vdb.values.addOne(gpa);
+                        const slice = try gpa.alloc(V, size);
+                        ptr.* = slice;
+                        c_node.* = .{
+                            .data_offset = vdb.values.items.len - 1,
+                            .flags = .init(at.maskLower(C)),
+                        };
+                        b_node.child_mask.set(b_off);
+                        b_node.data[b_off] = .{ .child = vdb.nodes_C.items.len - 1 };
+                        self.c = vdb.nodes_C.items.len - 1;
+                        self.point = at;
+                        break :node c_node;
+                    },
+                };
+                const off = at.offsetOf(C, 0);
+                node.value_mask.set(off);
+                vdb.values.items[node.data_offset][off] = val;
+            }
+        };
+
+        /// returns self.background if no voxel is found
+        /// prefer using an Accessor if doing multiple operations.
+        pub fn get(self: *Self, at: Point) V {
+            var accessor: Self.Accessor = .init;
+            return accessor.get(self, at);
+        }
+
+        /// prefer using an Accessor if doing multiple operations.
+        /// returns error.Tile if the region is already contained in a larger tile
+        pub fn putTile(self: *Self, gpa: std.mem.Allocator, containing: Point, val: V, which: Level) (std.mem.Allocator.Error || error{Tile})!void {
+            var accessor: Self.Accessor = .init;
+            return accessor.putTile(self, gpa, containing, val, which);
+        }
+
+        /// prefer using an Accessor if doing multiple operations.
+        pub fn putVoxel(self: *Self, gpa: std.mem.Allocator, at: Point, val: V) (std.mem.Allocator.Error || error{Tile})!void {
+            var accessor: Self.Accessor = .init;
+            return accessor.putVoxel(self, gpa, at, val);
+        }
+
+        /// creates and returns a new VDB which has all of the data reachable from the current VDB
+        pub fn dupe(self: *const Self, gpa: std.mem.Allocator) std.mem.Allocator.Error!Self {
+            var vdb: Self = .init(self.background);
+            for (self.map.keys(), self.map.values()) |key, val| {
+                if (val.child_off == null and !val.active) continue;
+                const gop = try vdb.map.getOrPut(gpa, key);
+                gop.value_ptr.* = val;
+                const old_a_node = &self.nodes_A.items[val.child_off orelse continue];
+                gop.value_ptr.child_off = vdb.nodes_A.items.len;
+                const new_a_node = try vdb.nodes_A.addOne(gpa);
+                new_a_node.* = old_a_node.*;
+                std.debug.assert(old_a_node.child_mask.intersectWith(old_a_node.value_mask).count() == 0);
+                var b_it = self.iterateChildren(.b, old_a_node);
+                while (b_it.next()) |old_b_node| {
+                    new_a_node.data[b_it.n] = .{ .child = vdb.nodes_B.items.len };
+                    const new_b_node = try vdb.nodes_B.addOne(gpa);
+                    new_b_node.* = old_b_node.*;
+                    std.debug.assert(old_b_node.child_mask.intersectWith(old_b_node.value_mask).count() == 0);
+                    var c_it = self.iterateChildren(.c, old_b_node);
+                    while (c_it.next()) |old_c_node| {
+                        new_b_node.data[c_it.n] = .{ .child = vdb.nodes_C.items.len };
+                        const new_c_node = try vdb.nodes_C.addOne(gpa);
+                        new_c_node.* = old_c_node.*;
+                        new_c_node.data_offset = vdb.values.items.len;
+                        const new_data_ptr = try vdb.values.addOne(gpa);
+                        new_data_ptr.* = try gpa.dupe(V, self.values.items[old_c_node.data_offset]);
+                    }
+                }
+            }
+            return vdb;
+        }
+
+        /// replaces nodes whose values are all constant with tiles
+        /// leaves "dangling" nodes; call dupe afterward to produce a new tree without dangling nodes
+        pub fn prune(self: *Self, tolerance: V) void {
+            var a_it = self.iterateChildren(.a, {});
+            while (a_it.next()) |a_node| {
+                var b_it = self.iterateChildren(.b, a_node);
+                while (b_it.next()) |b_node| {
+                    var c_it = self.iterateChildren(.c, b_node);
+                    while (c_it.next()) |c_node| {
+                        const data = self.values.items[c_node.data_offset];
+                        c_node.prune(V, data, self.background, tolerance);
+                        if (c_node.isConstant(V, data, tolerance)) {
+                            b_node.child_mask.unset(c_it.n);
+                            if (c_node.value_mask.count() != 0) {
+                                b_node.value_mask.set(c_it.n);
+                                b_node.data[c_it.n] = .{ .value = data[0] };
+                            }
+                        }
+                    }
+                    if (b_node.isConstant(tolerance)) {
+                        a_node.child_mask.unset(b_it.n);
+                        if (b_node.value_mask.count() != 0) {
+                            a_node.value_mask.set(b_it.n);
+                            a_node.data[b_it.n] = .{ .value = b_node.data[0].value };
+                        }
+                    }
+                }
+                if (a_node.isConstant(tolerance)) {
+                    const count = a_node.value_mask.count();
+                    self.map.values()[a_it.n] = .{
+                        .active = count != 0,
+                        .child_off = null,
+                        .tile_value = if (count == 0) undefined else a_node.data[0].value,
+                    };
+                }
+            }
+        }
+
+        test prune {
+            var vdb: Self = .init(0);
+            const gpa = std.testing.allocator;
+            defer vdb.deinit(gpa);
+            const p: Point = .from(.{ 0, 0, 0 });
+            try vdb.putVoxel(gpa, p, 1);
+            vdb.prune(0);
+            var accessor: Accessor = .init;
+            try std.testing.expectEqual(1, accessor.get(&vdb, p));
+            {
+                const c_node = accessor.getNodeCached(&vdb, .c, p).?;
+                const b_node = accessor.getNodeCached(&vdb, .b, p).?;
+                const a_node = accessor.getNodeCached(&vdb, .a, p).?;
+                try std.testing.expectEqual(1, c_node.value_mask.count());
+                try std.testing.expectEqual(1, b_node.child_mask.count() + b_node.value_mask.count());
+                try std.testing.expectEqual(1, a_node.child_mask.count() + a_node.value_mask.count());
+                try std.testing.expectEqual(0, vdb.countTopTiles());
+                try std.testing.expectEqual(1, vdb.countTopNodes());
+                c_node.value_mask.unset(0);
+            }
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(0, accessor.get(&vdb, p));
+            try std.testing.expectEqual(0, vdb.countTopTiles());
+            try std.testing.expectEqual(0, vdb.countTopNodes());
+            vdb.deinit(gpa);
+            vdb = .init(0);
+            try vdb.putTile(gpa, p, 1, .c);
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(1, accessor.get(&vdb, p));
+            try std.testing.expectEqual(0, vdb.countTopTiles());
+            try std.testing.expectEqual(1, vdb.countTopNodes());
+            const b_node = accessor.getNodeCached(&vdb, .b, p).?;
+            try std.testing.expectEqual(1, b_node.value_mask.count());
+            try std.testing.expectEqual(0, b_node.child_mask.count());
+            b_node.child_mask.set(0);
+            b_node.value_mask.unset(0);
+            b_node.data[0] = .{ .child = vdb.nodes_C.items.len };
+            const c_node = try vdb.nodes_C.addOne(gpa);
+            c_node.* = .{ .flags = .init(p), .data_offset = vdb.values.items.len };
+            const data = try vdb.values.addOne(gpa);
+            data.* = try gpa.alloc(V, NodeC.size);
+            @memset(data.*, 2);
+            data.*[0] = 1;
+            c_node.value_mask.toggleAll();
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(1, accessor.get(&vdb, p));
+            _ = try accessor.getNode(&vdb, .c, p);
+            data.*[0] = 2;
+            vdb.prune(0);
+            accessor = .init;
+            try std.testing.expectEqual(2, accessor.get(&vdb, p));
+            try std.testing.expectError(error.Tile, accessor.getNode(&vdb, .c, p));
+        }
+
+        pub fn countTopTiles(self: *const Self) u32 {
+            var num: u32 = 0;
+            for (self.map.values()) |val| {
+                if (val.child_off == null and val.active) num += 1;
+            }
+            return num;
+        }
+
+        pub fn countTopNodes(self: *const Self) u32 {
+            var num: u32 = 0;
+            for (self.map.values()) |val| {
+                if (val.child_off != null) num += 1;
+            }
+            return num;
+        }
+
+        pub fn format(self: *const Self, w: *Writer) Writer.Error!void {
+            try w.writeInt(u32, 1, .little); // value buffers per leaf node
+            try w.writeAll(std.mem.asBytes(&self.background));
+            try w.writeInt(u32, self.countTopTiles(), .little);
+            try w.writeInt(u32, self.countTopNodes(), .little);
+            // write tiles
+            for (self.map.keys(), self.map.values()) |key, val| {
+                if (val.child_off != null) continue;
+                for (&key) |k| try w.writeInt(i32, k, .little); // origin
+                try w.writeAll(std.mem.asBytes(&val.tile_value));
+                try w.writeByte(@intFromBool(val.active));
+            }
+            // write children (topology)
+            for (self.map.keys(), self.map.values()) |key, val| {
+                const offset = val.child_off orelse continue;
+                if (!val.active) continue;
+                for (&key) |k| try w.writeInt(i32, k, .little); // origin
+                var c: std.Io.Writer.Discarding = .init(&.{});
+                const p = &c.writer;
+                for (&key) |k| try p.writeInt(i32, k, .little); // origin
+                const a_node = &self.nodes_A.items[offset];
+                try w.print("{f}", .{a_node});
+                try p.print("{f}", .{a_node});
+                var count = c.fullCount();
+                count = c.fullCount();
+                if (count != 12 + 4096 + 4096 + 1 + 131_072) std.debug.panic("diff: {d}", .{count});
+                // write children
+                var a_it = self.iterateChildren(.b, a_node);
+                while (a_it.next()) |b_node| {
+                    try w.print("{f}", .{b_node});
+                    try p.print("{f}", .{b_node});
+                    const b_diff = c.fullCount() - count;
+                    count = c.fullCount();
+                    std.debug.assert(512 + 512 + 1 + 16_384 == b_diff);
+                    var b_it = self.iterateChildren(.c, b_node);
+                    while (b_it.next()) |c_node| {
+                        try w.print("{f}", .{c_node});
+                        try p.print("{f}", .{c_node});
+                        const c_diff = c.fullCount() - count;
+                        count = c.fullCount();
+                        std.debug.assert(c_diff == 64);
+                    }
+                }
+            }
+            // write children (values)
+            for (self.map.values()) |val| {
+                const a_offset = val.child_off orelse continue;
+                if (!val.active) continue;
+                const a_node = &self.nodes_A.items[a_offset];
+                var a_it = self.iterateChildren(.b, a_node);
+                while (a_it.next()) |b_node| {
+                    var b_it = self.iterateChildren(.c, b_node);
+                    while (b_it.next()) |c_node| {
+                        try w.print("{f}", .{c_node});
+                        try w.writeByte(6); // TODO: this indicates no compression
+                        const data = self.values.items[c_node.data_offset];
+                        switch (@import("builtin").mode) {
+                            .Debug => {
+                                for (0..c_node.value_mask.capacity()) |i| {
+                                    if (c_node.value_mask.isSet(i))
+                                        try w.writeAll(std.mem.asBytes(&data[i]))
+                                    else
+                                        try w.splatByteAll(0, @sizeOf(V));
+                                }
+                            },
+                            else => { // in Release modes, we write the bytes directly
+                                try w.writeAll(@ptrCast(data));
+                            },
+                        }
                     }
                 }
             }
         }
-    }
-
-    //WRITE DATA
-    for (node_5.mask[0..], 0..) |five_mask_og_d, five_mask_idx_d| {
-        var five_mask_d = five_mask_og_d;
-        while (five_mask_d != 0) : (five_mask_d &= five_mask_d - 1) {
-            const bit_index_4_d = @as(u32, @intCast(five_mask_idx_d)) * @as(u32, @intCast(64)) + @as(u32, @intCast(@ctz(five_mask_d)));
-            const node_4_t = node_5.four_nodes.get(bit_index_4_d).?;
-
-            for (node_4_t.mask[0..], 0..) |four_mask_og_d, four_mask_idx_d| {
-                var four_mask_d = four_mask_og_d;
-                while (four_mask_d != 0) : (four_mask_d &= four_mask_d - 1) {
-                    const bit_index_3_d = @as(u32, @intCast(four_mask_idx_d)) * 64 + @as(u32, @intCast(@ctz(four_mask_d)));
-                    const node_3_d = node_4_t.three_nodes.get(bit_index_3_d).?;
-                    for (node_3_d.mask) |three_mask| {
-                        try writeScalar(u64, buffer, three_mask); //we must re-write the masks for some reason
-                    }
-                    try writeU8(buffer, 6); //6 means no compression
-                    try writeSlice(f32, buffer, &node_3_d.data);
-                }
-            }
-        }
-    }
+    };
 }
 
-fn writeMetadata(buffer: *ArrayList(u8)) !void {
+fn alt(slice: []const u8) std.fmt.Alt([]const u8, struct {
+    fn format(
+        self: []const u8,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.writeInt(u32, @intCast(self.len), .little);
+        try writer.writeAll(self);
+    }
+}.format) {
+    return .{ .data = slice };
+}
+
+fn writeMetadata(w: *Writer) Writer.Error!void {
     // lots of hard coded things that will by dynamic if we expand this!
-    try writeScalar(u32, buffer, 4); //write number of entries
-    try writeMetaString(buffer, "class", "unknown");
-    try writeMetaString(buffer, "file_compression", "none");
-    try writeMetaBool(buffer, "is_saved_as_half_float", false);
-    try writeMetaString(buffer, "name", "density");
+    try w.writeInt(u32, 4, .little); // number of entries
+    try w.print("{f}{f}{f}", .{ alt("class"), alt("string"), alt("unknown") });
+    try w.print("{f}{f}{f}", .{ alt("file_compression"), alt("string"), alt("none") });
+    try w.print("{f}{f}", .{ alt("is_saved_as_half_float"), alt("bool") });
+    try w.writeInt(u32, 1, .little); // size of bool is larger than the boolean lol
+    try w.writeByte(@intFromBool(false));
+    try w.print("{f}{f}{f}", .{ alt("name"), alt("string"), alt("density") });
 }
 
-fn writeTransform(buffer: *ArrayList(u8), affine: [4][4]f64) !void {
-    try writeName(buffer, "AffineMap");
-
-    try writeScalar(f64, buffer, affine[0][0]);
-    try writeScalar(f64, buffer, affine[1][0]);
-    try writeScalar(f64, buffer, affine[2][0]);
-    try writeScalar(f64, buffer, 0);
-
-    try writeScalar(f64, buffer, affine[0][1]);
-    try writeScalar(f64, buffer, affine[1][1]);
-    try writeScalar(f64, buffer, affine[2][1]);
-    try writeScalar(f64, buffer, 0);
-
-    try writeScalar(f64, buffer, affine[0][2]);
-    try writeScalar(f64, buffer, affine[1][2]);
-    try writeScalar(f64, buffer, affine[2][2]);
-    try writeScalar(f64, buffer, 0);
-
-    try writeScalar(f64, buffer, affine[0][3]);
-    try writeScalar(f64, buffer, affine[1][3]);
-    try writeScalar(f64, buffer, affine[2][3]);
-    try writeScalar(f64, buffer, 1);
+fn writeTransform(w: *Writer, affine: [4][4]f64) Writer.Error!void {
+    try w.print("{f}", .{alt("AffineMap")});
+    for (0..4) |i| {
+        for (0..4) |j| {
+            const f = affine[j][i];
+            try w.writeAll(std.mem.asBytes(&f));
+        }
+    }
 }
 
-fn writeGrid(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
+fn writeGrid(w: *Writer, vdb: *const VDB, affine: [4][4]f64, offset: u64) Writer.Error!void {
+    var counter: std.Io.Writer.Discarding = .init(&.{});
     //grid name (should be dynamic when doing multiple grids)
-    try writeName(buffer, "density");
+    try w.print("{f}", .{alt("density")});
+    try counter.writer.print("{f}", .{alt("density")});
 
-    //grid type
-    //  (thiswill probably always be 543 but who knows! precision should match source eventually
-    try writeName(buffer, "Tree_float_5_4_3");
+    // grid type
+    // (this will probably always be 543 but who knows! precision should match source eventually
+    try w.print("{f}", .{alt("Tree_float_5_4_3")});
+    try counter.writer.print("{f}", .{alt("Tree_float_5_4_3")});
 
-    //Indicate no instance parent
-    try writeScalar(u32, buffer, 0);
+    // Indicate no instance parent
+    try w.writeInt(u32, 0, .little);
+    try counter.writer.writeInt(u32, 0, .little);
 
     //Grid descriptor stream position
-    try writeScalar(u64, buffer, @as(u64, @intCast(buffer.items.len)) + @sizeOf(u64) * 3);
-    try writeScalar(u64, buffer, 0);
-    try writeScalar(u64, buffer, 0);
+    const position = offset + counter.fullCount() + (@sizeOf(u64) * 3);
+    try w.writeInt(u64, position, .little);
+    try w.writeInt(u64, 0, .little);
+    try w.writeInt(u64, 0, .little);
 
     //no compression
-    try writeScalar(u32, buffer, 0);
+    try w.writeInt(u32, 0, .little);
 
-    try writeMetadata(buffer);
-    try writeTransform(buffer, affine);
-    try writeTree(buffer, vdb);
+    try writeMetadata(w);
+    try writeTransform(w, affine);
+    try w.print("{f}", .{vdb});
 }
 
-pub fn writeVDB(buffer: *ArrayList(u8), vdb: *VDB, affine: [4][4]f64) !void {
-    //CRAZY: this seems to just infer the dimensions from
-    //the transform? Idk i wrote this a while ago...
-
+pub fn writeVDB(w: *Writer, vdb: *const VDB, affine: [4][4]f64) !void {
+    var counter: std.Io.Writer.Discarding = .init(&.{});
     //Magic Number (needed it spells out BDV)
-    try writeSlice(u8, buffer, &.{ 0x20, 0x42, 0x44, 0x56, 0x0, 0x0, 0x0, 0x0 });
+    try w.writeAll(&.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 });
+    try counter.writer.writeAll(&.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 });
 
     //File Version
-    try writeScalar(u32, buffer, 224);
+    try w.writeInt(u32, 224, .little);
+    try counter.writer.writeInt(u32, 224, .little);
 
     //Library version (pretend OpenVDB 8.1)
-    try writeScalar(u32, buffer, 8);
-    try writeScalar(u32, buffer, 1);
+    try w.writeInt(u32, 8, .little);
+    try counter.writer.writeInt(u32, 8, .little);
+    try w.writeInt(u32, 1, .little);
+    try counter.writer.writeInt(u32, 1, .little);
 
     //no grid offsets
-    try writeU8(buffer, 0);
+    try w.writeByte(0);
+    try counter.writer.writeByte(0);
 
-    //write UUID
-    const uuid = uuidv4(); //Feel free to replace with your own
-    try writeString(buffer, uuid[0..]);
+    // write UUID
+    const uuid = uuidv4(); // Feel free to replace with your own
+    try w.writeAll(&uuid);
+    try counter.writer.writeAll(&uuid);
 
     //No Metadata for now
-    try writeScalar(u32, buffer, 0);
+    try w.writeInt(u32, 0, .little);
+    try counter.writer.writeInt(u32, 0, .little);
 
     //One Grid
-    try writeScalar(u32, buffer, 1);
+    try w.writeInt(u32, 1, .little);
+    try counter.writer.writeInt(u32, 0, .little);
 
-    try writeGrid(buffer, vdb, affine);
+    try writeGrid(w, vdb, affine, counter.fullCount());
 }
 
 //SECTION: Utility functions
@@ -380,6 +941,26 @@ pub fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
 pub fn lengthSquared(v: [3]f32) f32 {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
+//SECTION: writing frames
+
+// Writes a static VDB frame to disk
+pub fn writeFrame(
+    vdb: *VDB,
+    filename: []const u8,
+    arena_alloc: std.mem.Allocator,
+    transform: [4][4]f64,
+) !std.array_list.Managed(u8) {
+    // FIXME: the semantics of this function are awful
+    const name = try save.versionName(filename, arena_alloc);
+    const file = try std.fs.cwd().createFile(name.items, .{});
+    defer file.close();
+
+    var buf: [2048]u8 = undefined;
+    var w: std.fs.File.Writer = .init(file, &buf);
+    try writeVDB(&w.interface, vdb, transform);
+    try w.end();
+    return name; // this seems wrong
+}
 
 //SECTION: Tests:
 const constants = @import("constants.zig");
@@ -396,10 +977,11 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
     defer arena.deinit();
     const arena_alloc = arena.allocator();
 
-    var buffer = std.array_list.Managed(u8).init(arena_alloc);
+    var buffer: std.Io.Writer.Allocating = .init(arena_alloc);
+    defer buffer.deinit();
     const R: u32 = 128;
     const D: u32 = R * 2;
-    var sphere_vdb = try VDB.build(arena_alloc);
+    var sphere_vdb = VDB.init(0);
     const Rf: f32 = @floatFromInt(R);
     const R2: f32 = Rf * Rf;
     for (0..D - 1) |z| {
@@ -408,26 +990,23 @@ pub fn sphereTest(comptime save_dir: []const u8) !void {
                 const p = toF32(.{ x, y, z });
                 const diff = subVec(p, .{ Rf, Rf, Rf });
                 if (lengthSquared(diff) < R2) {
-                    try setVoxel(
-                        &sphere_vdb,
-                        .{ @intCast(x), @intCast(y), @intCast(z) },
-                        1.0,
-                        arena_alloc,
-                    );
+                    try sphere_vdb.putVoxel(arena_alloc, .{ .x = @intCast(x), .y = @intCast(y), .z = @intCast(z) }, 1.0);
                 }
             }
         }
     }
     try writeVDB(
-        &buffer,
+        &buffer.writer,
         &sphere_vdb,
         id_4x4,
     );
+    var arrlist = buffer.toArrayList();
+    var managed = arrlist.toManaged(arena_alloc);
     try test_patterns.saveTestPattern(
         save_dir,
         "sphere_test_pattern",
         arena_alloc,
-        &buffer,
+        &managed,
     );
 }
 pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
@@ -438,27 +1017,25 @@ pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
     defer arena.deinit();
     const arena_alloc = arena.allocator();
 
-    var buffer = ArrayList(u8).init(arena_alloc);
+    var buffer: std.Io.Writer.Allocating = .init(arena_alloc);
+    defer buffer.deinit();
 
-    var single_voxel = try VDB.build(arena_alloc);
+    var single_voxel: VDB = .init(0);
 
     print("setting voxels\n", .{});
-    try setVoxel(
-        &single_voxel,
-        .{ @intCast(0), @intCast(0), @intCast(0) },
-        1.0,
-        arena_alloc,
-    );
+    try single_voxel.putVoxel(arena_alloc, .{ .x = 0, .y = 0, .z = 0 }, 1.0);
     try writeVDB(
-        &buffer,
+        &buffer.writer,
         &single_voxel,
         id_4x4,
     ); // assumes compatible signature
+    var arrlist = buffer.toArrayList();
+    var managed = arrlist.toManaged(arena_alloc);
     try test_patterns.saveTestPattern(
         save_dir,
         "one_pixel_test_pattern",
         arena_alloc,
-        &buffer,
+        &managed,
     );
 }
 const t = @import("timer.zig");

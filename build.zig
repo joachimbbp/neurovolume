@@ -1,9 +1,9 @@
 const std = @import("std");
-const cwd = std.fs.cwd();
+
 //builds C library for Python hooks
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = std.builtin.OptimizeMode.ReleaseFast });
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
     const nvol_mod = b.createModule(.{
         .root_source_file = b.path("./src/zig/c_root.zig"),
         .target = target,
@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    exe.linkLibrary(libneurovolume);
+    exe.root_module.linkLibrary(libneurovolume);
     b.installArtifact(libneurovolume);
     b.installArtifact(exe);
     //_: Zig TESTS:

@@ -44,7 +44,6 @@ VDBs are a highly performant, art-directable, volumetric data structure that sup
 
 # 🛠️ Missing Features
 While a comprehensive road-map will be published soon, there are a few important considerations to take into account now.
-- Presently the VDB writer isn't sparse nor does it support multiple grids. Tiles and multiple grids are in development.
 - Documentation has not been written yet.
 - pypi package presently only supports arm64. Coverage for linux and windows is in the works.
 
