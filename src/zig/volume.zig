@@ -32,7 +32,7 @@ pub const ThreeDim = struct {
     frame_size: usize,
     save_config: SaveConfiguration,
     normalizer: util.Normalizer,
-    sparse: ?f32,
+    sparse: ?f32, //null: don't sparsify,
 
     //ensure ndarray compliance with prep_ndarray
     pub fn init(
@@ -114,6 +114,10 @@ pub const ThreeDim = struct {
                 .{ self.dims[0], self.dims[1], self.dims[2] }, //LLM: was dims[1],[2],[3]
             )) break;
         }
+        //when it is pruning, see if all the values are approx the same
+        // the tol is the tolerance amount
+        // higher means more things are pruned
+        //default is quite strict
         if (self.sparse) |tol| vdb.prune(tol);
     }
 

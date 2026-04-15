@@ -65,7 +65,7 @@ pub export fn initFourDim(
         speed,
         dims.*,
         save_config,
-        4 * std.math.floatEps(f32),
+        4 * std.math.floatEps(f32), //THIS IS THE DEFAULT PRUNE SET!
     ) catch {
         allocator.free(basename_owned);
         allocator.free(folder_owned);

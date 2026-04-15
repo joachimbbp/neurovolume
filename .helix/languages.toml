@@ -1,0 +1,30 @@
+[[language]]
+name = "python"
+auto-format = true
+formatter = { command = "ruff", args = ["format", "-"] }
+language-servers = [
+    {name = "pyright"},
+    {name = "ruff-lsp"},
+]
+
+[language-server.pyright]
+command = "pyright-langserver"
+args = ["--stdio"]
+config = {}
+
+[language-server.ruff-lsp]
+command = "ruff"
+args = ["server"]
+config = {}
+
+# from https://github.com/bernardassan/awesome-helix/blob/main/languages.toml
+[[language]]
+name = "zig"
+auto-format = true
+
+[language-server.zls.config]
+enable_build_on_save = true
+build_on_save_args = ["check", "-fincremental", "--watch"]
+force_autofix = true
+warn_style = true
+highlight_global_var_declarations = true# full up claude copyslop
