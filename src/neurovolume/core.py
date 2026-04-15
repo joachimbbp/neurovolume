@@ -10,6 +10,7 @@ from neurovolume._internal import (
 import os
 import sys
 import numpy as np  # DEPENDENCY: really the only one we should have!
+from pathlib import Path
 
 
 def hello():
@@ -125,36 +126,34 @@ def ndarray_to_vdb(
     # very specfici but it works quite well
     # translated from zig to Python with Claude
     prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
-):
-
-    # LLM: claude fixed some bugs in this func
+) -> Path | None:
+    """
+    returns path to VDB
+    if VDB sequence, returns path to folder
+    """
+    dims = arr.shape
     if arr.ndim == 3:
-        print("3D array")
-
-        dims = arr.shape
-
         vol = _init_three_dim(
-            base_name=basename,
+            basename=basename,
             save_folder=output_dir,
             overwrite=True,
             data=arr,
             transform=transform,  # 4x4 affine float64
             dims=dims,  # (x, y, z)
             prune = prune,
-            # TODO prune amount! was: 4 * std.math.floatEps(f32),
         )
         _save_three_dim(vol)
         _deinit_three_dim(vol)
+        # kinda hacky tbh
+        # this happens way down on the zig level and it would be
+        # cooler to have the path percolate back up
+        return Path(f"{output_dir}/{basename}.vdb")
 
     elif arr.ndim == 4:
-        print("4D array")
-
-        dims = arr.shape  # (x, z, y, t) after transpose
-
         seq_out = os.path.join(output_dir, basename)
         os.makedirs(seq_out, exist_ok=True)
         vol = _init_four_dim(
-            base_name=basename,
+            basename=basename,
             save_folder=seq_out,
             overwrite=True,
             data=arr,
@@ -165,10 +164,12 @@ def ndarray_to_vdb(
             dims=dims,
             prune=prune,
             
-            # TODO prune amount! was: 4 * std.math.floatEps(f32),
         )
         _save_four_dim(vol, interpolation_flag)
         _deinit_four_dim(vol)
+        # should return the folder containing the seq
+        # see above comment at end of .ndim == 3
+        return Path(f"{output_dir}/{basename}")
     else:
         print(f"{arr.ndim}D not supported")
-        return
+        return None
