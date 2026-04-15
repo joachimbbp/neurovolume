@@ -4,11 +4,16 @@ Neurovolume is a Python library for manipulating and visualizing volumetric data
 
 While this project focuses on neuroscience, it includes `ndarray` to `VDB` to support virtually any volumetric data pipeline.
 
-This project is under active development and might not have everything you need (particularly if you are working with very large datasets). Please reference the "Missing Features" section.
+This project is under active development and might not have everything you need. Please reference the "Missing Features" section.
 
 This project is available as a pre-release alpha on [pypi](https://pypi.org/project/neurovolume/). Presently it is only available for arm64. More operating systems coming soon!
 
-# 🏗️ Usage
+# 🏗️ Building
+If you are building locally, we use uv to build and test the project:
+```bash
+uv run python -m ziglang build && uv run pytest tests -s
+```
+# 
 This is how you could save a BOLD sequence from a .nii file
 
 ````python
@@ -26,13 +31,17 @@ nv.ndarray_to_vdb(
     transform=nv.scale(img.affine, 0.01), # scaled for blender viewport
 )
 ````
-
-If you are building locally, we use uv to build and test the project:
-```bash
-uv run python -m ziglang build && uv run pytest tests -s
+To use sparsity, add a `prune` value to your `ndarray_to_vdb` function call. This example gives good results for our T1 Anatomy scan:
+```python
+nv.ndarray_to_vdb(
+    nv.prep_ndarray(data, (0, 2, 1)),
+    "anat_offset_0p05_prune",
+    output_dir=vdb_out,
+    transform=_test_pattern_pos(img.affine),
+    prune=np.float32(0.05),
+)
 ```
-
-
+Higher sparsity amounts will result in better performance and lower disk space usage. However, after a certain point, they begin to degrade the VDB quality.
 
 # 📀 Projects
 - [BoldViz](https://github.com/joachimbbp/boldviz): a Blender plugin for fMRI and MRI visualizations. It was used to create the renders in this README. A great place to start if you don't want to deal with writing any Python.
@@ -40,12 +49,14 @@ uv run python -m ziglang build && uv run pytest tests -s
 - The [nibabel example](https://github.com/joachimbbp/neurovolume_examples/blob/master/nibabel_example.py) shows how to use an external NIfTI parser, which could be of use for not-yet-supported filetypes. We're moving away from native file parsing as everyone seems to use numpy, but please reach out if this is something that you'd want!
 
 # ☁️ Why VDB?
-VDBs are a highly performant, art-directable, volumetric data structure that supports animations. Our volume-based approach aims to provide easy access to the original density data throughout the visualization and analysis pipeline. Unlike the [openVDB repo](https://www.openvdb.org/), our smaller version is much more readable and does not need to be run in a docker container.
+VDBs are a highly performant, art-directable, sparse volumetric data structure. Our volume-based approach aims to provide easy access to the original density data throughout the visualization and analysis pipeline. Unlike the [openVDB repo](https://www.openvdb.org/), our smaller version is much more readable and does not need to be run in a docker container.
 
 # 🛠️ Missing Features
 While a comprehensive road-map will be published soon, there are a few important considerations to take into account now.
-- Documentation has not been written yet.
 - pypi package presently only supports arm64. Coverage for linux and windows is in the works.
+- Documentation has not been written yet. Specifically:
+    - Documentation for sparsity: we should establish how/when sparsity might result in a lossy compression.
+- Multiple grids has yet to be implemented
 
 
 # 🧠 Dataset Citation
