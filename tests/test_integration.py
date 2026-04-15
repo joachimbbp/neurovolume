@@ -133,40 +133,40 @@ def test_pyramid(size=64000):
     print("pyramids saved")
 
 
-def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
-    brain_scale = 0.01
-    brain_y_move = -2.38251
-    scaled = nv.scale(affine, brain_scale)
-    moved = nv.translate(scaled, 0, brain_y_move, 0)
-    return moved
+# def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
+#     brain_scale = 0.01
+#     brain_y_move = -2.38251
+#     scaled = nv.scale(affine, brain_scale)
+#     moved = nv.translate(scaled, 0, brain_y_move, 0)
+#     return moved
 
 
-def test_anat_static():
-    os.makedirs(vdb_out, exist_ok=True)
-    img = nib.load(anat)
-    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+# def test_anat_static():
+#     os.makedirs(vdb_out, exist_ok=True)
+#     img = nib.load(anat)
+#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
 
-    nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (0, 2, 1)),
-        "anat_offset",
-        output_dir=vdb_out,
-        transform=_test_pattern_pos(img.affine),
-    )
+#     nv.ndarray_to_vdb(
+#         nv.prep_ndarray(data, (0, 2, 1)),
+#         "anat_offset",
+#         output_dir=vdb_out,
+#         transform=_test_pattern_pos(img.affine),
+#     )
 
 
-def test_bold_seq_direct():
-    img = nib.load(bold)
-    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+# def test_bold_seq_direct():
+#     img = nib.load(bold)
+#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
 
-    (
-        nv.ndarray_to_vdb(
-            nv.prep_ndarray(data, (3, 0, 2, 1)),
-            "bold_direct_offset",
-            source_fps=_get_fps(img),
-            output_dir=vdb_out,
-            transform=_test_pattern_pos(img.affine),
-        ),
-    )
+#     (
+#         nv.ndarray_to_vdb(
+#             nv.prep_ndarray(data, (3, 0, 2, 1)),
+#             "bold_direct_offset",
+#             source_fps=_get_fps(img),
+#             output_dir=vdb_out,
+#             transform=_test_pattern_pos(img.affine),
+#         ),
+#     )
 
 
 #
