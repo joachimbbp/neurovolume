@@ -34,7 +34,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "nibabel", specifier = ">=5.4.0" },
-    { name = "numpy", specifier = ">=1.26,<2.0" },
+    { name = "numpy", specifier = ">=1.26.4" },
     { name = "pytest", specifier = ">=9.0.1" },
     { name = "ziglang", specifier = ">=0.15.2" },
 ]
