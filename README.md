@@ -9,7 +9,7 @@ This project is under active development and might not have everything you need 
 This project is available as a pre-release alpha on [pypi](https://pypi.org/project/neurovolume/). Presently it is only available for arm64. More operating systems coming soon!
 
 # 🏗️ Usage
-This is how you could save a BOLD sequence from a .niii file
+This is how you could save a BOLD sequence from a .nii file
 
 ````python
 import numpy as np
