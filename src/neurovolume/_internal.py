@@ -23,7 +23,7 @@ lib_path = Path(__file__).parent / "_native" / _get_library_name()
 lib = ctypes.CDLL(str(lib_path))
 
 
-nv = c.cdll.LoadLibrary(lib_path)  # Neurovolume library
+nv = c.cdll.LoadLibrary(str(lib_path))  # Neurovolume library
 
 
 # LLMEND:
@@ -33,14 +33,6 @@ def _hello():
 
 
 # _: Main code:
-def _b(string):
-    """
-    Returns the utf-u8 encoded bytes literal of the string
-    Equivalent to 'b"inputstring"'
-    """
-    return string.encode("utf-8")
-
-
 def _get_basename(path):
     hierarchy = path.split("/")
     return hierarchy[-1].split(".")[0]
@@ -60,7 +52,7 @@ def _b(string):
     return string.encode("utf-8")
 
 
-# LLM: claude wrote this function
+# LLM: claude wrote this function (more or less)
 def _init_four_dim(
     base_name: str,
     save_folder: str,
@@ -71,6 +63,7 @@ def _init_four_dim(
     playback_fps: float,
     speed: float,
     dims: tuple,
+    prune: np.float32 | None,
     source_format: int = 0,  # 0=ndarray, 1=nifti1 (mirrors volume.zig SourceFormat)
     cartesian_order: tuple = (0, 1, 2),  # almost always 0 1 2
 ) -> c.c_void_p:
@@ -87,7 +80,8 @@ def _init_four_dim(
         4x4 affine as float64, shape (4,4) or (16,).
     dims: tuple
         (x, y, z, t) voxel dimensions.
-
+    prune:
+        amount to sparsify
     Returns:
     ------------
     Opaque ctypes pointer to the FourDim on the Zig heap.
@@ -99,6 +93,9 @@ def _init_four_dim(
     )
     dims_arr = (c.c_size_t * 4)(*dims)
     cartesian_arr = (c.c_size_t * 3)(*cartesian_order)  # LLM: fix on this line
+
+    # full up claude line:
+    prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
 
     nv.initFourDim.argtypes = [
         c.c_char_p,  # base_name
@@ -112,6 +109,7 @@ def _init_four_dim(
         c.c_float,  # playback_fps
         c.c_float,  # speed
         c.POINTER(c.c_size_t),  # dims [4]usize
+        c.POINTER(c.c_float), # prune ?f32, null = no pruning
     ]
     nv.initFourDim.restype = c.c_void_p
 
@@ -127,6 +125,7 @@ def _init_four_dim(
         c.c_float(playback_fps),
         c.c_float(speed),
         dims_arr,
+        prune_ptr,
     )
     if ptr is None:
         raise RuntimeError("initFourDim returned null — allocation or init failed")
@@ -168,6 +167,7 @@ def _init_three_dim(
     data: np.ndarray,
     transform: np.ndarray,
     dims: tuple,
+    prune: np.float32 | None,
     source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
     cartesian_order: tuple = (0, 1, 2),
 ) -> c.c_void_p:
@@ -184,7 +184,8 @@ def _init_three_dim(
         4x4 affine as float64.
     dims: tuple
         (x, y, z) voxel dimensions.
-
+    prune:
+        amount to sparsify
     Returns:
     ------------
     Opaque ctypes pointer to the ThreeDim on the Zig heap.
@@ -197,6 +198,9 @@ def _init_three_dim(
     dims_arr = (c.c_size_t * 3)(*dims)
     cartesian_arr = (c.c_size_t * 3)(*cartesian_order)
 
+    # full up claude line:
+    prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
+
     nv.initThreeDim.argtypes = [
         c.c_char_p,  # base_name
         c.c_char_p,  # save_folder
@@ -206,6 +210,7 @@ def _init_three_dim(
         c.POINTER(c.c_size_t),  # cartesian_order [3]usize
         c.POINTER(c.c_double),  # transform_flat [16]f64
         c.POINTER(c.c_size_t),  # dims [3]usize
+        c.POINTER(c.c_float), # prune ?f32, null = no pruning
     ]
     nv.initThreeDim.restype = c.c_void_p
 
@@ -218,6 +223,7 @@ def _init_three_dim(
         cartesian_arr,
         transform_arr,
         dims_arr,
+        prune_ptr,
     )
     if ptr is None:
         raise RuntimeError("initThreeDim returned null — allocation or init failed")

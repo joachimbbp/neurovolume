@@ -121,6 +121,10 @@ def ndarray_to_vdb(
     playback_fps=24.0,
     speed=1.0,
     interpolation_flag=0,  # default to direct, chose 1 for cross
+    # Robbie's reccomended default prune amount
+    # very specfici but it works quite well
+    # translated from zig to Python with Claude
+    prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
 ):
 
     # LLM: claude fixed some bugs in this func
@@ -136,6 +140,8 @@ def ndarray_to_vdb(
             data=arr,
             transform=transform,  # 4x4 affine float64
             dims=dims,  # (x, y, z)
+            prune = prune,
+            # TODO prune amount! was: 4 * std.math.floatEps(f32),
         )
         _save_three_dim(vol)
         _deinit_three_dim(vol)
@@ -157,6 +163,9 @@ def ndarray_to_vdb(
             playback_fps=playback_fps,
             speed=speed,
             dims=dims,
+            prune=prune,
+            
+            # TODO prune amount! was: 4 * std.math.floatEps(f32),
         )
         _save_four_dim(vol, interpolation_flag)
         _deinit_four_dim(vol)

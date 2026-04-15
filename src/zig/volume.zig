@@ -32,7 +32,7 @@ pub const ThreeDim = struct {
     frame_size: usize,
     save_config: SaveConfiguration,
     normalizer: util.Normalizer,
-    sparse: ?f32,
+    prune: ?f32, //null: don't sparsify,
 
     //ensure ndarray compliance with prep_ndarray
     pub fn init(
@@ -44,7 +44,7 @@ pub const ThreeDim = struct {
         normalize: bool,
         dims: [3]usize,
         save_config: SaveConfiguration,
-        sparse: ?f32,
+        prune: ?f32,
     ) !ThreeDim { //LLM: was !FourDim
         var normalizer: util.Normalizer = undefined;
 
@@ -72,7 +72,7 @@ pub const ThreeDim = struct {
             .frame_size = dims[0] * dims[1] * dims[2], //LLM: was dims[1]*dims[2]*dims[3]
             .save_config = save_config,
             .normalizer = normalizer,
-            .sparse = sparse,
+            .prune = prune,
         };
     }
 
@@ -114,7 +114,11 @@ pub const ThreeDim = struct {
                 .{ self.dims[0], self.dims[1], self.dims[2] }, //LLM: was dims[1],[2],[3]
             )) break;
         }
-        if (self.sparse) |tol| vdb.prune(tol);
+        //when it is pruning, see if all the values are approx the same
+        // the tol is the tolerance amount
+        // higher means more things are pruned
+        //default is quite strict
+        if (self.prune) |tol| vdb.prune(tol);
     }
 
     pub fn save(
@@ -164,7 +168,7 @@ pub const FourDim = struct {
     frame_size: usize,
     save_config: SaveConfiguration,
     normalizer: util.Normalizer,
-    sparse: ?f32,
+    prune: ?f32,
 
     //ensure ndarray compliance with prep_4D_ndarray
     pub fn init(
@@ -179,7 +183,7 @@ pub const FourDim = struct {
         speed: f32, //0.5 for half speed, 2.0 for double speed etc
         dims: [4]usize,
         save_config: SaveConfiguration,
-        sparse: ?f32,
+        prune: ?f32, //contorls sparsity
     ) !FourDim {
         var normalizer: util.Normalizer = undefined;
 
@@ -210,7 +214,7 @@ pub const FourDim = struct {
             .frame_size = dims[1] * dims[2] * dims[3],
             .save_config = save_config,
             .normalizer = normalizer,
-            .sparse = sparse,
+            .prune = prune,
         };
     }
 
@@ -260,7 +264,7 @@ pub const FourDim = struct {
                 .{ self.dims[1], self.dims[2], self.dims[3] },
             )) break;
         }
-        if (self.sparse) |tol| vdb.prune(tol);
+        if (self.prune) |tol| vdb.prune(tol);
     }
 
     //TODO: DRY maybe
@@ -305,7 +309,7 @@ pub const FourDim = struct {
                 .{ self.dims[1], self.dims[2], self.dims[3] },
             )) break;
         }
-        if (self.sparse) |tol| vdb.prune(tol);
+        if (self.prune) |tol| vdb.prune(tol);
     }
 
     pub fn save(

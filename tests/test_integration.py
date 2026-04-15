@@ -126,11 +126,19 @@ def test_pyramid(size=64000):
     os.makedirs(vdb_out, exist_ok=True)
     nv.ndarray_to_vdb(
         prepped_pyramid,
-        "pyramid_offset",
+        "pyramid_offset_default_prune",
         output_dir=vdb_out,
         transform=rotated,
     )
+    nv.ndarray_to_vdb(
+        prepped_pyramid,
+        "pyramid_offset_no_prune",
+        output_dir=vdb_out,
+        transform=rotated,
+        prune=None,
+    )
     print("pyramids saved")
+
 
 
 def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
@@ -141,16 +149,25 @@ def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
     return moved
 
 
-def test_anat_static():
+def test_anat_static_no_prune():
     os.makedirs(vdb_out, exist_ok=True)
     img = nib.load(anat)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
 
     nv.ndarray_to_vdb(
         nv.prep_ndarray(data, (0, 2, 1)),
-        "anat_offset",
+        "anat_offset_no_prune",
         output_dir=vdb_out,
         transform=_test_pattern_pos(img.affine),
+        prune=None,
+    )
+
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(data, (0, 2, 1)),
+        "anat_offset_0p05_prune",
+        output_dir=vdb_out,
+        transform=_test_pattern_pos(img.affine),
+        prune=np.float32(0.05),
     )
 
 
@@ -158,16 +175,21 @@ def test_bold_seq_direct():
     img = nib.load(bold)
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
 
-    (
-        nv.ndarray_to_vdb(
-            nv.prep_ndarray(data, (3, 0, 2, 1)),
-            "bold_direct_offset",
-            source_fps=_get_fps(img),
-            output_dir=vdb_out,
-            transform=_test_pattern_pos(img.affine),
-        ),
-    )
-
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(data, (3, 0, 2, 1)),
+        "bold_direct_offset",
+        source_fps=_get_fps(img),
+        output_dir=vdb_out,
+        transform=_test_pattern_pos(img.affine),
+        )
+    nv.ndarray_to_vdb(
+        nv.prep_ndarray(data, (3, 0, 2, 1)),
+        "bold_direct_offset_0p05_prune",
+        source_fps=_get_fps(img),
+        output_dir=vdb_out,
+        transform=_test_pattern_pos(img.affine),
+        prune=np.float32(0.05)
+        )
 
 #
 #

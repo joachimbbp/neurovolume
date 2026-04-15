@@ -22,7 +22,10 @@ pub export fn initFourDim(
     playback_fps: f32,
     speed: f32,
     dims: *const [4]usize,
+    prune: ?*const f32,
 ) ?*anyopaque {
+    const prune_val: ?f32 = if (prune) |p| p.* else null;
+
     const allocator = std.heap.c_allocator;
     // Reshape flat transform into [4][4]f64 LLM:
     var transform: [4][4]f64 = undefined;
@@ -65,7 +68,8 @@ pub export fn initFourDim(
         speed,
         dims.*,
         save_config,
-        4 * std.math.floatEps(f32),
+        prune_val,
+        // 4 * std.math.floatEps(f32), //THIS IS THE DEFAULT PRUNE SET!
     ) catch {
         allocator.free(basename_owned);
         allocator.free(folder_owned);
@@ -108,7 +112,9 @@ pub export fn initThreeDim(
     cartesian_order: *const [3]usize,
     transform_flat: *const [16]f64,
     dims: *const [3]usize,
+    prune: ?*const f32,
 ) ?*anyopaque {
+    const prune_val: ?f32 = if (prune) |p| p.* else null;
     const allocator = std.heap.c_allocator;
     var transform: [4][4]f64 = undefined;
     for (0..4) |i| {
@@ -146,7 +152,8 @@ pub export fn initThreeDim(
         false,
         dims.*,
         save_config,
-        4 * std.math.floatEps(f32),
+        prune_val,
+        // 4 * std.math.floatEps(f32),
     ) catch {
         allocator.free(basename_owned);
         allocator.free(folder_owned);
