@@ -126,12 +126,38 @@ def test_pyramid(size=64000):
     os.makedirs(vdb_out, exist_ok=True)
     nv.ndarray_to_vdb(
         prepped_pyramid,
-        "pyramid_offset",
+        "pyramid_offset_default_prune",
         output_dir=vdb_out,
         transform=rotated,
     )
     print("pyramids saved")
 
+
+def test_pyramid_no_prune(size=64000):
+    pyramid, built = _build_pyramid()
+    assert built, "Pyramid should build successfully"
+
+    identity = np.eye(4)
+    # perhaps this pattern isn't the best?
+    print(f"identity matrix: \n{identity}")
+    scaled = nv.scale(identity, 0.030)
+    print(f"scaled affine: \n{scaled}")
+    translated = nv.translate(scaled, 1.6, 0.7, 0.2)
+    print(f"translated affine:\n{translated}")
+    rotated = nv.rotate(translated, 0, 0, np.deg2rad(44))
+    print(f"rotated matrix: \n{rotated}")
+
+    prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
+
+    os.makedirs(vdb_out, exist_ok=True)
+    nv.ndarray_to_vdb(
+        prepped_pyramid,
+        "pyramid_offset_default_prune",
+        output_dir=vdb_out,
+        transform=rotated,
+        prune=None,
+    )
+    print("pyramids saved")
 
 # def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
 #     brain_scale = 0.01
