@@ -116,7 +116,7 @@ def ndarray_to_vdb(
     arr: np.ndarray,  # dont for get to prep this!
     basename: str,
     source_fps=1,  # static default
-    output_dir="../../output/",
+    output_dir:Path=Path("../../output/"),
     overwrite=True,  # presently the only option
     transform=np.eye(4),
     playback_fps=24.0,
@@ -126,7 +126,7 @@ def ndarray_to_vdb(
     # very specfici but it works quite well
     # translated from zig to Python with Claude
     prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
-) -> Path | None:
+) -> Path:
     """
     returns path to VDB
     if VDB sequence, returns path to folder
@@ -147,10 +147,10 @@ def ndarray_to_vdb(
         # kinda hacky tbh
         # this happens way down on the zig level and it would be
         # cooler to have the path percolate back up
-        return Path(f"{output_dir}/{basename}.vdb")
+        return output_dir / f"{basename}.vdb"
 
     elif arr.ndim == 4:
-        seq_out = os.path.join(output_dir, basename)
+        seq_out = output_dir / basename 
         os.makedirs(seq_out, exist_ok=True)
         vol = _init_four_dim(
             basename=basename,
@@ -171,5 +171,4 @@ def ndarray_to_vdb(
         # see above comment at end of .ndim == 3
         return Path(f"{output_dir}/{basename}")
     else:
-        print(f"{arr.ndim}D not supported")
-        return None
+        raise ValueError(f"{arr.ndim}D not supported")

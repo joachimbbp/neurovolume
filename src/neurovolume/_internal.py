@@ -55,7 +55,7 @@ def _b(string):
 # LLM: claude wrote this function (more or less)
 def _init_four_dim(
     basename: str,
-    save_folder: str,
+    save_folder: Path,
     overwrite: bool,
     data: np.ndarray,
     transform: np.ndarray,
@@ -115,7 +115,7 @@ def _init_four_dim(
 
     ptr = nv.initFourDim(
         _b(basename),
-        _b(save_folder),
+        _b(str(save_folder)),
         overwrite,
         source_format,
         data.ctypes.data_as(c.POINTER(c.c_float)),
@@ -162,7 +162,7 @@ def _save_four_dim(ptr: c.c_void_p, interpolation_mode: int) -> None:
 # LLM: claude wrote this function
 def _init_three_dim(
     basename: str,
-    save_folder: str,
+    save_folder: Path,
     overwrite: bool,
     data: np.ndarray,
     transform: np.ndarray,
@@ -216,7 +216,7 @@ def _init_three_dim(
 
     ptr = nv.initThreeDim(
         _b(basename),
-        _b(save_folder),
+        _b(str(save_folder)),
         overwrite,
         source_format,
         data.ctypes.data_as(c.POINTER(c.c_float)),

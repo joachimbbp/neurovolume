@@ -4,6 +4,7 @@ import neurovolume as nv
 from urllib.request import urlretrieve
 import gzip
 import shutil
+from pathlib import Path
 import os
 
 # TODO:
@@ -35,7 +36,7 @@ with gzip.open(bold_gz, "rb") as f_in:
     with open(bold, "wb") as f_out:
         shutil.copyfileobj(f_in, f_out)
 
-vdb_out = "./tests/data/vdb_out"
+vdb_out = Path("tests/data/vdb_out")
 
 
 def _get_fps(img, loud=False):

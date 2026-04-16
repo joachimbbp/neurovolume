@@ -27,7 +27,7 @@ data = np.array(img.get_fdata(), order="C", dtype=np.float32)
 nv.ndarray_to_vdb(
     nv.prep_ndarray(data, (0, 2, 1)),
     "anat_offset",
-    output_dir=vdb_out,
+    output_dir=save_dir_path,
     transform=nv.scale(img.affine, 0.01), # scaled for blender viewport
 )
 ````
@@ -36,7 +36,7 @@ To use sparsity, add a `prune` value to your `ndarray_to_vdb` function call. Thi
 nv.ndarray_to_vdb(
     nv.prep_ndarray(data, (0, 2, 1)),
     "anat_offset_0p05_prune",
-    output_dir=vdb_out,
+    output_dir=save_dir_path,
     transform=_test_pattern_pos(img.affine),
     prune=np.float32(0.05),
 )
