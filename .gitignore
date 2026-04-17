@@ -5,6 +5,7 @@ __pycache__
 *.vdb
 .zig-cache
 zig-out
+zig-pkg
 .vscode
 dist
 DS_Store
