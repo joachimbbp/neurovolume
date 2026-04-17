@@ -251,6 +251,8 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
         pub const NodeA = InternalNode(V, A);
         pub const NodeB = InternalNode(V, B);
         pub const NodeC = LeafNode(C, include_inside);
+        // TODO: if V is allowed to be non-float, this needs changing
+        pub const kind: []const u8 = std.fmt.comptimePrint("Tree_float_{d}_{d}_{d}", .{ A, B, C });
 
         map: std.AutoArrayHashMapUnmanaged(Key, Data),
         nodes_A: std.ArrayListUnmanaged(NodeA),
@@ -747,6 +749,7 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
             return num;
         }
 
+        /// writes the topology for this tree
         pub fn format(self: *const Self, w: *Writer) Writer.Error!void {
             try w.writeInt(u32, 1, .little); // value buffers per leaf node
             try w.writeAll(std.mem.asBytes(&self.background));
@@ -791,34 +794,42 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
                     }
                 }
             }
-            // write children (values)
-            for (self.map.values()) |val| {
-                const a_offset = val.child_off orelse continue;
-                if (!val.active) continue;
-                const a_node = &self.nodes_A.items[a_offset];
-                var a_it = self.iterateChildren(.b, a_node);
-                while (a_it.next()) |b_node| {
-                    var b_it = self.iterateChildren(.c, b_node);
-                    while (b_it.next()) |c_node| {
-                        try w.print("{f}", .{c_node});
-                        try w.writeByte(6); // TODO: this indicates no compression
-                        const data = self.values.items[c_node.data_offset];
-                        switch (@import("builtin").mode) {
-                            .Debug => {
-                                for (0..c_node.value_mask.capacity()) |i| {
-                                    if (c_node.value_mask.isSet(i))
-                                        try w.writeAll(std.mem.asBytes(&data[i]))
-                                    else
-                                        try w.splatByteAll(0, @sizeOf(V));
-                                }
-                            },
-                            else => { // in Release modes, we write the bytes directly
-                                try w.writeAll(@ptrCast(data));
-                            },
+        }
+
+        /// writes the data values for this tree
+        pub fn blockData(vdb: *const Self) std.fmt.Alt(*const Self, struct {
+            pub fn format(self: *const Self, w: *Writer) Writer.Error!void {
+                // write children (values)
+                for (self.map.values()) |val| {
+                    const a_offset = val.child_off orelse continue;
+                    if (!val.active) continue;
+                    const a_node = &self.nodes_A.items[a_offset];
+                    var a_it = self.iterateChildren(.b, a_node);
+                    while (a_it.next()) |b_node| {
+                        var b_it = self.iterateChildren(.c, b_node);
+                        while (b_it.next()) |c_node| {
+                            try w.print("{f}", .{c_node});
+                            try w.writeByte(6); // TODO: this indicates no compression
+                            const dat = self.values.items[c_node.data_offset];
+                            switch (@import("builtin").mode) {
+                                .Debug => {
+                                    for (0..c_node.value_mask.capacity()) |i| {
+                                        if (c_node.value_mask.isSet(i))
+                                            try w.writeAll(std.mem.asBytes(&dat[i]))
+                                        else
+                                            try w.splatByteAll(0, @sizeOf(V));
+                                    }
+                                },
+                                else => { // in Release modes, we write the bytes directly
+                                    try w.writeAll(@ptrCast(dat));
+                                },
+                            }
                         }
                     }
                 }
             }
+        }.format) {
+            return .{ .data = vdb };
         }
     };
 }
@@ -835,90 +846,217 @@ fn alt(slice: []const u8) std.fmt.Alt([]const u8, struct {
     return .{ .data = slice };
 }
 
-fn writeMetadata(w: *Writer) Writer.Error!void {
-    // lots of hard coded things that will by dynamic if we expand this!
-    try w.writeInt(u32, 4, .little); // number of entries
-    try w.print("{f}{f}{f}", .{ alt("class"), alt("string"), alt("unknown") });
-    try w.print("{f}{f}{f}", .{ alt("file_compression"), alt("string"), alt("none") });
-    try w.print("{f}{f}", .{ alt("is_saved_as_half_float"), alt("bool") });
-    try w.writeInt(u32, 1, .little); // size of bool is larger than the boolean lol
-    try w.writeByte(@intFromBool(false));
-    try w.print("{f}{f}{f}", .{ alt("name"), alt("string"), alt("density") });
+const vdb_magic: []const u8 = &.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 };
+const Metadatum = union(enum) {
+    // TODO: allow more metadata types
+    string: []const u8,
+    boolean: bool,
+
+    pub fn format(data: Metadatum, w: *std.Io.Writer) std.Io.Writer.Error!void {
+        try w.print("{f}", .{alt(switch (data) {
+            .string => "string",
+            .boolean => "bool",
+        })});
+        switch (data) {
+            .string => |str| try w.print("{f}", .{alt(str)}),
+            .boolean => |b| {
+                try w.writeInt(u32, 1, .little);
+                try w.writeByte(@intFromBool(b));
+            },
+        }
+    }
+
+    pub fn deinit(d: *Metadatum, allocator: std.mem.Allocator) void {
+        switch (d.*) {
+            .boolean => return,
+            .string => |str| allocator.free(str),
+        }
+    }
+};
+pub fn GridType(comptime vdb_type: type) type {
+    return struct {
+        tree: *vdb_type,
+        name: []const u8,
+        grid_position: i64,
+        block_position: i64,
+        end_position: i64,
+        transform: [4][4]f64,
+        metadata: MetaMap,
+
+        pub const kind = vdb_type.kind;
+        const Self = @This();
+
+        pub fn init(tree: *vdb_type, name: []const u8, transform: [4][4]f64, metadata: MetaMap) Self {
+            return .{
+                .tree = tree,
+                .name = name,
+                .transform = transform,
+                .metadata = metadata,
+                .block_position = 0,
+                .end_position = 0,
+                .grid_position = 0,
+            };
+        }
+
+        pub fn addDefaultMetadata(grid: *Self, gpa: std.mem.Allocator) !void {
+            try grid.metadata.put(gpa, "class", .{ .string = try gpa.dupe(u8, "unknown") });
+            try grid.metadata.put(gpa, "file_compression", .{ .string = try gpa.dupe(u8, "none") });
+            try grid.metadata.put(gpa, "is_saved_as_half_float", .{ .boolean = false });
+        }
+
+        /// Grids do not own their tree or name,
+        /// so you must call grid.tree.deinit() separately to prevent leaks.
+        pub fn deinit(g: *Self, allocator: std.mem.Allocator) void {
+            for (g.metadata.values()) |*val| val.deinit(allocator);
+            g.metadata.deinit(allocator);
+            g.* = undefined;
+        }
+
+        pub fn writeTopology(g: Self, w: *std.Io.Writer) Writer.Error!void {
+            try w.print("{f}", .{g.tree});
+        }
+        pub fn writeData(g: Self, w: *std.Io.Writer) Writer.Error!void {
+            try w.print("{f}", .{g.tree.blockData()});
+        }
+
+        pub fn writeTransform(g: Self, w: *Writer) Writer.Error!void {
+            try w.print("{f}", .{alt("AffineMap")});
+            for (0..4) |i| {
+                for (0..4) |j| {
+                    const f = g.transform[j][i];
+                    try w.writeAll(std.mem.asBytes(&f));
+                }
+            }
+        }
+
+        pub fn writeHeader(_: Self, writer: *std.Io.Writer, name: []const u8, other_name: []const u8) Writer.Error!void {
+            try writer.print("{f}", .{alt(name)});
+            try writer.print("{f}", .{alt(Self.kind)});
+            try writer.print("{f}", .{alt(other_name)});
+        }
+
+        fn writePositions(grid: Self, writer: *std.Io.Writer) Writer.Error!void {
+            try writer.writeInt(i64, grid.grid_position, .little);
+            try writer.writeInt(i64, grid.block_position, .little);
+            try writer.writeInt(i64, grid.end_position, .little);
+        }
+
+        pub fn writeInstance(
+            grid: *Self,
+            file: *std.fs.File.Writer,
+            name: []const u8,
+            other_name: []const u8,
+        ) !void {
+            try grid.writeHeader(&file.interface, name, other_name);
+            const offset = logicalPos(file);
+            try grid.writePositions(&file.interface);
+            grid.grid_position = @intCast(logicalPos(file));
+            try writeMetadata(&file.interface, grid.metadata);
+            try grid.writeTransform(&file.interface);
+            grid.end_position = @intCast(logicalPos(file));
+            const end = logicalPos(file);
+            try file.end(); // needed in order to seek
+            try file.seekTo(offset);
+            try grid.writePositions(&file.interface);
+            try file.end(); // needed in order to seek
+            try file.seekTo(end);
+        }
+
+        fn write(grid: *Self, file: *std.fs.File.Writer, name: []const u8) !void {
+            try grid.writeHeader(&file.interface, name, "");
+            const offset = logicalPos(file);
+            try grid.writePositions(&file.interface);
+            grid.grid_position = @intCast(logicalPos(file));
+            try writeMetadata(&file.interface, grid.metadata);
+            try grid.writeTransform(&file.interface);
+            try grid.writeTopology(&file.interface);
+            grid.block_position = @intCast(logicalPos(file));
+            try grid.writeData(&file.interface);
+            grid.end_position = @intCast(logicalPos(file));
+            const end = logicalPos(file);
+            try file.end(); // needed in order to seek
+            try file.seekTo(offset);
+            try grid.writePositions(&file.interface);
+            try file.end(); // needed in order to seek
+            try file.seekTo(end);
+        }
+    };
+}
+pub const Grid = GridType(VDB);
+pub const MetaMap = std.StringArrayHashMapUnmanaged(Metadatum);
+
+// FIXME: remove this function in favor of file.logicalPos() after updating to Zig 0.16
+fn logicalPos(file: *const std.fs.File.Writer) u64 {
+    return file.pos + file.interface.end;
 }
 
-fn writeTransform(w: *Writer, affine: [4][4]f64) Writer.Error!void {
-    try w.print("{f}", .{alt("AffineMap")});
-    for (0..4) |i| {
-        for (0..4) |j| {
-            const f = affine[j][i];
-            try w.writeAll(std.mem.asBytes(&f));
-        }
+fn writeMetadata(w: *Writer, map: MetaMap) !void {
+    // metadata count
+    try w.writeInt(u32, @intCast(map.count()), .little);
+    var it = map.iterator();
+    while (it.next()) |entry| {
+        std.debug.assert(entry.key_ptr.len > 0);
+        try w.print("{f}", .{alt(entry.key_ptr.*)});
+        try w.print("{f}", .{entry.value_ptr.*});
     }
 }
 
-fn writeGrid(w: *Writer, vdb: *const VDB, affine: [4][4]f64, offset: u64) Writer.Error!void {
-    var counter: std.Io.Writer.Discarding = .init(&.{});
-    //grid name (should be dynamic when doing multiple grids)
-    try w.print("{f}", .{alt("density")});
-    try counter.writer.print("{f}", .{alt("density")});
+pub fn writeVDBFile(
+    file: *std.fs.File.Writer,
+    scratch: std.mem.Allocator,
+    grids: []Grid,
+    file_metadata: MetaMap,
+) !void {
+    // magic number
+    try file.interface.writeAll(vdb_magic);
+    // file version
+    try file.interface.writeInt(u32, 224, .little);
+    // library version (matching OpenVDB 8.1)
+    try file.interface.writeInt(u32, 8, .little);
+    try file.interface.writeInt(u32, 1, .little);
+    // grid offsets
+    try file.interface.writeByte(1);
+    // UUID
+    const uuid = uuidv4();
+    try file.interface.writeAll(&uuid);
 
-    // grid type
-    // (this will probably always be 543 but who knows! precision should match source eventually
-    try w.print("{f}", .{alt("Tree_float_5_4_3")});
-    try counter.writer.print("{f}", .{alt("Tree_float_5_4_3")});
+    // metadata
+    try writeMetadata(&file.interface, file_metadata);
 
-    // Indicate no instance parent
-    try w.writeInt(u32, 0, .little);
-    try counter.writer.writeInt(u32, 0, .little);
+    // grid count
+    try file.interface.writeInt(u32, @intCast(grids.len), .little);
 
-    //Grid descriptor stream position
-    const position = offset + counter.fullCount() + (@sizeOf(u64) * 3);
-    try w.writeInt(u64, position, .little);
-    try w.writeInt(u64, 0, .little);
-    try w.writeInt(u64, 0, .little);
+    // collect and disambiguate names
+    const names: [][]const u8 = try scratch.alloc([]const u8, grids.len);
+    defer scratch.free(names);
+    var w: std.Io.Writer.Allocating = .init(scratch);
+    var histogram: std.StringHashMapUnmanaged(struct { count: u32, current: u32 }) = .empty;
+    defer histogram.deinit(scratch);
+    for (grids) |grid| {
+        const gop = try histogram.getOrPut(scratch, grid.name);
+        if (gop.found_existing) gop.value_ptr.count += 1 else gop.value_ptr.* = .{ .count = 1, .current = 0 };
+    }
+    for (grids, names) |grid, *name| {
+        const hist = histogram.getPtr(grid.name).?;
+        if (grid.name.len == 0 or hist.count > 1) {
+            try w.writer.print("{s}\x1e{d}", .{ grid.name, hist.current });
+            hist.current += 1;
+            name.* = try w.toOwnedSlice();
+        } else name.* = try scratch.dupe(u8, grid.name);
+    }
+    w.deinit();
+    defer for (names) |name| scratch.free(name);
 
-    //no compression
-    try w.writeInt(u32, 0, .little);
-
-    try writeMetadata(w);
-    try writeTransform(w, affine);
-    try w.print("{f}", .{vdb});
-}
-
-pub fn writeVDB(w: *Writer, vdb: *const VDB, affine: [4][4]f64) !void {
-    var counter: std.Io.Writer.Discarding = .init(&.{});
-    //Magic Number (needed it spells out BDV)
-    try w.writeAll(&.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 });
-    try counter.writer.writeAll(&.{ ' ', 'B', 'D', 'V', 0, 0, 0, 0 });
-
-    //File Version
-    try w.writeInt(u32, 224, .little);
-    try counter.writer.writeInt(u32, 224, .little);
-
-    //Library version (pretend OpenVDB 8.1)
-    try w.writeInt(u32, 8, .little);
-    try counter.writer.writeInt(u32, 8, .little);
-    try w.writeInt(u32, 1, .little);
-    try counter.writer.writeInt(u32, 1, .little);
-
-    //no grid offsets
-    try w.writeByte(0);
-    try counter.writer.writeByte(0);
-
-    // write UUID
-    const uuid = uuidv4(); // Feel free to replace with your own
-    try w.writeAll(&uuid);
-    try counter.writer.writeAll(&uuid);
-
-    //No Metadata for now
-    try w.writeInt(u32, 0, .little);
-    try counter.writer.writeInt(u32, 0, .little);
-
-    //One Grid
-    try w.writeInt(u32, 1, .little);
-    try counter.writer.writeInt(u32, 0, .little);
-
-    try writeGrid(w, vdb, affine, counter.fullCount());
+    // write out the grids
+    for (grids, names, 0..) |*grid, unique_name, i| {
+        for (grids[0..i], names[0..i]) |other, other_name| {
+            if (other.tree == grid.tree) {
+                try grid.writeInstance(file, unique_name, other_name);
+            }
+            break;
+        } else try grid.write(file, unique_name);
+    }
+    try file.end();
 }
 
 //SECTION: Utility functions
@@ -957,94 +1095,8 @@ pub fn writeFrame(
 
     var buf: [2048]u8 = undefined;
     var w: std.fs.File.Writer = .init(file, &buf);
-    try writeVDB(&w.interface, vdb, transform);
-    try w.end();
+    var g: Grid = .init(vdb, "density", transform, .empty);
+    try g.addDefaultMetadata(arena_alloc);
+    try writeVDBFile(&w, arena_alloc, &.{g}, .empty);
     return name; // this seems wrong
-}
-
-//SECTION: Tests:
-const constants = @import("constants.zig");
-const id_4x4 = constants.IdentityMatrix4x4;
-const test_patterns = @import("test_patterns.zig");
-//Use "tmp" to use the tmp folder in zig cache
-pub fn sphereTest(comptime save_dir: []const u8) !void {
-    //NICE: I think this is a good convention for allocators and arena allocators
-    //FIX: upon using this, it's a little clunky. See nifti1.toVolume for a better option
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
-
-    var buffer: std.Io.Writer.Allocating = .init(arena_alloc);
-    defer buffer.deinit();
-    const R: u32 = 128;
-    const D: u32 = R * 2;
-    var sphere_vdb = VDB.init(0);
-    const Rf: f32 = @floatFromInt(R);
-    const R2: f32 = Rf * Rf;
-    for (0..D - 1) |z| {
-        for (0..D - 1) |y| {
-            for (0..D - 1) |x| {
-                const p = toF32(.{ x, y, z });
-                const diff = subVec(p, .{ Rf, Rf, Rf });
-                if (lengthSquared(diff) < R2) {
-                    try sphere_vdb.putVoxel(arena_alloc, .{ .x = @intCast(x), .y = @intCast(y), .z = @intCast(z) }, 1.0);
-                }
-            }
-        }
-    }
-    try writeVDB(
-        &buffer.writer,
-        &sphere_vdb,
-        id_4x4,
-    );
-    var arrlist = buffer.toArrayList();
-    var managed = arrlist.toManaged(arena_alloc);
-    try test_patterns.saveTestPattern(
-        save_dir,
-        "sphere_test_pattern",
-        arena_alloc,
-        &managed,
-    );
-}
-pub fn oneVoxelTest(comptime save_dir: []const u8) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa_alloc = gpa.allocator();
-    defer _ = gpa.deinit();
-    var arena = std.heap.ArenaAllocator.init(gpa_alloc);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
-
-    var buffer: std.Io.Writer.Allocating = .init(arena_alloc);
-    defer buffer.deinit();
-
-    var single_voxel: VDB = .init(0);
-
-    print("setting voxels\n", .{});
-    try single_voxel.putVoxel(arena_alloc, .{ .x = 0, .y = 0, .z = 0 }, 1.0);
-    try writeVDB(
-        &buffer.writer,
-        &single_voxel,
-        id_4x4,
-    ); // assumes compatible signature
-    var arrlist = buffer.toArrayList();
-    var managed = arrlist.toManaged(arena_alloc);
-    try test_patterns.saveTestPattern(
-        save_dir,
-        "one_pixel_test_pattern",
-        arena_alloc,
-        &managed,
-    );
-}
-const t = @import("timer.zig");
-test "test patterns" {
-    const s = t.Click();
-    print("☁️ ⚪️ Sphere Test Pattern\n", .{});
-    _ = t.Lap(s, "Sphere Test Pattern Timer");
-
-    try sphereTest("tmp");
-    print("☁️ ▫️ One Voxel Test Pattern\n", .{});
-    try oneVoxelTest("tmp");
 }

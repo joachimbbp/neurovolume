@@ -76,21 +76,6 @@ pub const ThreeDim = struct {
         };
     }
 
-    fn writeVDB(
-        v: *ThreeDim,
-        buffer: *std.array_list.Managed(u8),
-    ) !void {
-        var buf: [512]u8 = undefined;
-        const output_filepath = try std.fmt.bufPrint(
-            &buf,
-            "{s}/{s}.vdb",
-            .{ v.save_config.folder, v.save_config.basename }, //LLM: was hardcoded path
-        );
-        const file = try std.fs.cwd().createFile(output_filepath, .{});
-        defer file.close();
-        try file.writeAll(buffer.items);
-    }
-
     //extracts the 3D ndarray volume into a VDB
     fn extractVol(
         self: *ThreeDim, //LLM: was *FourDim
@@ -127,13 +112,21 @@ pub const ThreeDim = struct {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const gpa_alloc = gpa.allocator();
         defer _ = gpa.deinit();
+
+        var w: std.Io.Writer.Allocating = .init(gpa_alloc);
+        try w.writer.print("{s}/{s}.vdb", .{ v.save_config.folder, v.save_config.basename });
+
         var arena = std.heap.ArenaAllocator.init(gpa_alloc);
         defer arena.deinit();
 
-        defer _ = arena.reset(.retain_capacity);
+        var buffer: [2048]u8 = undefined;
+        const file = try std.fs.cwd().createFile(w.written(), .{});
+        defer file.close();
+        w.deinit();
+        var writer = file.writer(&buffer);
+
         var vdb: vdb543.VDB = .init(0);
-        var buffer: std.Io.Writer.Allocating = .init(arena.allocator());
-        defer buffer.deinit(); // good hygiene
+        defer vdb.deinit(arena.allocator());
         switch (v.source_format) {
             .ndarray => try v.extractVol(
                 arena.allocator(),
@@ -142,14 +135,17 @@ pub const ThreeDim = struct {
             else => return DataFormatError.NotSupportedYet,
         }
 
-        try vdb543.writeVDB(
-            &buffer.writer,
-            &vdb,
-            v.affine_transform,
+        var grids: [1]vdb543.Grid = .{.init(&vdb, v.name, v.affine_transform, .empty)};
+        try grids[0].addDefaultMetadata(arena.allocator());
+        defer grids[0].deinit(arena.allocator());
+
+        try vdb543.writeVDBFile(
+            &writer,
+            arena.allocator(),
+            &grids,
+            .empty,
         );
-        var arrlist = buffer.toArrayList();
-        var managed = arrlist.toManaged(arena.allocator());
-        try v.writeVDB(&managed); //LLM: was missing — buffer was never written to disk
+        try writer.end();
     }
 };
 
@@ -218,20 +214,15 @@ pub const FourDim = struct {
         };
     }
 
-    fn saveFrame(
+    fn frameFile(
         v: *FourDim,
         frame_num: usize,
-        buffer: *std.array_list.Managed(u8),
-    ) !void {
-        var buf: [512]u8 = undefined;
-        const output_filepath = try std.fmt.bufPrint(
-            &buf,
-            "{s}/{s}_{d:0>4}.vdb",
-            .{ v.save_config.folder, v.save_config.basename, frame_num },
-        );
-        const file = try std.fs.cwd().createFile(output_filepath, .{});
-        defer file.close();
-        try file.writeAll(buffer.items);
+        scratch: std.mem.Allocator,
+    ) !std.fs.File {
+        var w: std.Io.Writer.Allocating = .init(scratch);
+        defer w.deinit();
+        try w.writer.print("{s}/{s}_{d:0>4}.vdb", .{ v.save_config.folder, v.save_config.basename, frame_num });
+        return try std.fs.cwd().createFile(w.written(), .{});
     }
 
     //extracts a 3D slice of a 4D ndarray to a VDB
@@ -382,8 +373,8 @@ pub const Interpolator = struct {
         for (0..self.vol.dims[0]) |n| {
             defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
             var vdb: vdb543.VDB = .init(0);
-            var buffer: std.Io.Writer.Allocating = .init(arena.allocator());
-            defer buffer.deinit(); // good hygiene!
+            defer vdb.deinit(arena.allocator());
+
             switch (self.vol.source_format) {
                 .ndarray => try self.vol.extractFrame(
                     arena.allocator(),
@@ -393,14 +384,16 @@ pub const Interpolator = struct {
                 else => return DataFormatError.NotSupportedYet,
             }
 
-            try vdb543.writeVDB(
-                &buffer.writer,
-                &vdb,
-                self.vol.affine_transform,
-            );
-            var arrlist = buffer.toArrayList();
-            var managed = arrlist.toManaged(arena.allocator());
-            try self.vol.saveFrame(n, &managed);
+            var g: [1]vdb543.Grid = .{.init(&vdb, self.vol.name, self.vol.affine_transform, .empty)};
+            defer g[0].deinit(arena.allocator());
+            try g[0].addDefaultMetadata(arena.allocator());
+
+            const file = try self.vol.frameFile(n, arena.allocator());
+            defer file.close();
+            var buf: [2048]u8 = undefined;
+            var w = file.writer(&buf);
+            try vdb543.writeVDBFile(&w, arena.allocator(), &g, .empty);
+            try w.end();
         }
     }
 
@@ -415,8 +408,7 @@ pub const Interpolator = struct {
                 //TODO: dry with other interpolation modes eventually
                 defer _ = arena.reset(.retain_capacity); //LLM: free per-frame, keep buffer capacity
                 var vdb: vdb543.VDB = .init(0);
-                var buffer: std.Io.Writer.Allocating = .init(arena.allocator());
-                defer buffer.clearRetainingCapacity(); // good hygiene!
+                defer vdb.deinit(arena.allocator());
 
                 //NOTE: f32 because that is our current value for
                 //the VDB voxels
@@ -436,15 +428,17 @@ pub const Interpolator = struct {
                     ),
                     else => return DataFormatError.NotSupportedYet,
                 }
-                try vdb543.writeVDB(
-                    &buffer.writer,
-                    &vdb,
-                    self.vol.affine_transform,
-                );
+                var g: [1]vdb543.Grid = .{.init(&vdb, self.vol.name, self.vol.affine_transform, .empty)};
+                defer g[0].deinit(arena.allocator());
+                try g[0].addDefaultMetadata(arena.allocator());
+
                 const frame_num = o * self.hold_durration + i; //LLM: calculated
-                var arrlist = buffer.toArrayList();
-                var managed = arrlist.toManaged(arena.allocator());
-                try self.vol.saveFrame(frame_num, &managed);
+                const file = try self.vol.frameFile(frame_num, arena.allocator());
+                defer file.close();
+                var buf: [2048]u8 = undefined;
+                var w = file.writer(&buf);
+                try vdb543.writeVDBFile(&w, arena.allocator(), &g, .empty);
+                try w.end();
             }
         }
     }
