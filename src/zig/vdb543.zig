@@ -902,6 +902,7 @@ pub fn GridType(comptime vdb_type: type) type {
             try grid.metadata.put(gpa, "class", .{ .string = try gpa.dupe(u8, "unknown") });
             try grid.metadata.put(gpa, "file_compression", .{ .string = try gpa.dupe(u8, "none") });
             try grid.metadata.put(gpa, "is_saved_as_half_float", .{ .boolean = false });
+            try grid.metadata.put(gpa, "name", .{ .string = try gpa.dupe(u8, "density") });
         }
 
         /// Grids do not own their tree or name,
@@ -951,14 +952,16 @@ pub fn GridType(comptime vdb_type: type) type {
             const offset = logicalPos(file);
             try grid.writePositions(&file.interface);
             grid.grid_position = @intCast(logicalPos(file));
+            // no compression
+            try file.interface.writeInt(u32, 0, .little);
             try writeMetadata(&file.interface, grid.metadata);
             try grid.writeTransform(&file.interface);
             grid.end_position = @intCast(logicalPos(file));
             const end = logicalPos(file);
-            try file.end(); // needed in order to seek
+            try file.interface.flush(); // needed in order to seek
             try file.seekTo(offset);
             try grid.writePositions(&file.interface);
-            try file.end(); // needed in order to seek
+            try file.interface.flush(); // needed in order to seek
             try file.seekTo(end);
         }
 
@@ -967,6 +970,8 @@ pub fn GridType(comptime vdb_type: type) type {
             const offset = logicalPos(file);
             try grid.writePositions(&file.interface);
             grid.grid_position = @intCast(logicalPos(file));
+            // no compression
+            try file.interface.writeInt(u32, 0, .little);
             try writeMetadata(&file.interface, grid.metadata);
             try grid.writeTransform(&file.interface);
             try grid.writeTopology(&file.interface);
@@ -974,10 +979,10 @@ pub fn GridType(comptime vdb_type: type) type {
             try grid.writeData(&file.interface);
             grid.end_position = @intCast(logicalPos(file));
             const end = logicalPos(file);
-            try file.end(); // needed in order to seek
+            try file.interface.flush(); // needed in order to seek
             try file.seekTo(offset);
             try grid.writePositions(&file.interface);
-            try file.end(); // needed in order to seek
+            try file.interface.flush(); // needed in order to seek
             try file.seekTo(end);
         }
     };
@@ -1056,7 +1061,7 @@ pub fn writeVDBFile(
             break;
         } else try grid.write(file, unique_name);
     }
-    try file.end();
+    try file.interface.flush();
 }
 
 //SECTION: Utility functions

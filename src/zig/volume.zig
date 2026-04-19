@@ -135,7 +135,7 @@ pub const ThreeDim = struct {
             else => return DataFormatError.NotSupportedYet,
         }
 
-        var grids: [1]vdb543.Grid = .{.init(&vdb, v.name, v.affine_transform, .empty)};
+        var grids: [1]vdb543.Grid = .{.init(&vdb, "density", v.affine_transform, .empty)};
         try grids[0].addDefaultMetadata(arena.allocator());
         defer grids[0].deinit(arena.allocator());
 
@@ -384,7 +384,7 @@ pub const Interpolator = struct {
                 else => return DataFormatError.NotSupportedYet,
             }
 
-            var g: [1]vdb543.Grid = .{.init(&vdb, self.vol.name, self.vol.affine_transform, .empty)};
+            var g: [1]vdb543.Grid = .{.init(&vdb, "density", self.vol.affine_transform, .empty)};
             defer g[0].deinit(arena.allocator());
             try g[0].addDefaultMetadata(arena.allocator());
 
@@ -428,7 +428,7 @@ pub const Interpolator = struct {
                     ),
                     else => return DataFormatError.NotSupportedYet,
                 }
-                var g: [1]vdb543.Grid = .{.init(&vdb, self.vol.name, self.vol.affine_transform, .empty)};
+                var g: [1]vdb543.Grid = .{.init(&vdb, "density", self.vol.affine_transform, .empty)};
                 defer g[0].deinit(arena.allocator());
                 try g[0].addDefaultMetadata(arena.allocator());
 
