@@ -12,3 +12,6 @@ DS_Store
 ./src/neurovolume/_native/*
 
 .pytest_cache
+
+
+.helix/config.toml

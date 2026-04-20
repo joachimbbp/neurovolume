@@ -1,3 +1,7 @@
+# Leaving this in the repo because it's a nice "just works" config 
+# Eventually we might build out some python format requirements
+# that will be reflected here
+
 [[language]]
 name = "python"
 auto-format = true
