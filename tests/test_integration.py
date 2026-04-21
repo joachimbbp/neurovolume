@@ -99,6 +99,26 @@ def _build_pyramid(size=64):
     print("Pyramid build")
     return arr, True
 
+# LLM: 
+def _build_sphere(size=64):
+    """
+    Build a 3D sphere in a numpy array.
+    Args:
+        size: Size of the cubic array (default 64x64x64)
+    Returns:
+        3D numpy array with sphere structure (1.0 inside, 0.0 outside)
+    """
+    arr = np.zeros((size, size, size), dtype=np.float32)
+    center = size // 2
+    radius = center
+
+    # Use numpy broadcasting for efficiency instead of triple nested loop
+    z, y, x = np.ogrid[:size, :size, :size]
+    dist_sq = (x - center)**2 + (y - center)**2 + (z - center)**2
+    arr[dist_sq <= radius**2] = 1.0
+
+    print("Sphere built")
+    return arr, True
 
 def test_hello():
     nv.hello()

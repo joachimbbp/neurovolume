@@ -102,91 +102,97 @@ pub export fn saveFourDim(
     return 0;
 }
 
-//LLM: claude wrote this function
-pub export fn initThreeDim(
-    base_name: [*:0]const u8,
-    save_folder: [*:0]const u8,
-    overwrite: bool,
-    source_format: volume.SourceFormat,
-    data: [*]const f32,
-    cartesian_order: *const [3]usize,
-    transform_flat: *const [16]f64,
-    dims: *const [3]usize,
-    prune: ?*const f32,
-) ?*anyopaque {
-    const prune_val: ?f32 = if (prune) |p| p.* else null;
-    const allocator = std.heap.c_allocator;
-    var transform: [4][4]f64 = undefined;
-    for (0..4) |i| {
-        for (0..4) |j| {
-            transform[i][j] = transform_flat[i * 4 + j];
-        }
-    }
+// WIP: moving threeDim to use grids
 
-    const len = dims[0] * dims[1] * dims[2];
-
-    // Dupe strings so the struct owns them past the Python call lifetime
-    const basename_owned = allocator.dupe(u8, std.mem.span(base_name)) catch return null;
-    const folder_owned = allocator.dupe(u8, std.mem.span(save_folder)) catch {
-        allocator.free(basename_owned);
-        return null;
-    };
-
-    const save_config = volume.SaveConfiguration{
-        .basename = basename_owned,
-        .folder = folder_owned,
-        .overwrite = overwrite,
-    };
-
-    const vol_ptr = allocator.create(volume.ThreeDim) catch {
-        allocator.free(basename_owned);
-        allocator.free(folder_owned);
-        return null;
-    };
-    vol_ptr.* = volume.ThreeDim.init(
-        basename_owned,
-        data[0..len],
-        cartesian_order.*,
-        source_format,
-        transform,
-        false,
-        dims.*,
-        save_config,
-        prune_val,
-        // 4 * std.math.floatEps(f32),
-    ) catch {
-        allocator.free(basename_owned);
-        allocator.free(folder_owned);
-        allocator.destroy(vol_ptr);
-        return null;
-    };
-    return vol_ptr;
-}
+//HEy CLAUDE:
+// write the c interop for the following functions from volume here:
+// - extract
+// - ThreeDim.save (also, do I need an init?)
+// - buildGrid
+// Feel free to let me know of any logical errors etc!
 
 //LLM: claude wrote this function
-pub export fn deinitThreeDim(ptr: ?*anyopaque) void {
-    const allocator = std.heap.c_allocator;
-    if (ptr) |p| {
-        const vol_ptr: *volume.ThreeDim = @ptrCast(@alignCast(p));
-        allocator.free(vol_ptr.save_config.basename);
-        allocator.free(vol_ptr.save_config.folder);
-        allocator.destroy(vol_ptr);
-    }
-}
+// pub export fn initThreeDim(
+//     base_name: [*:0]const u8,
+//     save_folder: [*:0]const u8,
+//     overwrite: bool,
+//     source_format: volume.SourceFormat,
+//     data: [*]const f32,
+//     cartesian_order: *const [3]usize,
+//     transform_flat: *const [16]f64,
+//     dims: *const [3]usize,
+//     prune: ?*const f32,
+// ) ?*anyopaque {
+//     const prune_val: ?f32 = if (prune) |p| p.* else null;
+//     const allocator = std.heap.c_allocator;
+//     var transform: [4][4]f64 = undefined;
+//     for (0..4) |i| {
+//         for (0..4) |j| {
+//             transform[i][j] = transform_flat[i * 4 + j];
+//         }
+//     }
 
-//LLM: claude wrote this function
-pub export fn saveThreeDim(ptr: ?*anyopaque) usize {
-    if (ptr) |p| {
-        const vol_ptr: *volume.ThreeDim = @ptrCast(@alignCast(p));
-        vol_ptr.save() catch |e| {
-            return cErr(e).code;
-        };
-    }
-    return 0;
-}
+//     const len = dims[0] * dims[1] * dims[2];
 
-//BOOKMARK: up next: a save function with that takes in the above pointer!
-//Use the new volume.save() that you are writing rn
+//     // Dupe strings so the struct owns them past the Python call lifetime
+//     const basename_owned = allocator.dupe(u8, std.mem.span(base_name)) catch return null;
+//     const folder_owned = allocator.dupe(u8, std.mem.span(save_folder)) catch {
+//         allocator.free(basename_owned);
+//         return null;
+//     };
+
+//     const save_config = volume.SaveConfiguration{
+//         .basename = basename_owned,
+//         .folder = folder_owned,
+//         .overwrite = overwrite,
+//     };
+
+//     const vol_ptr = allocator.create(volume.ThreeDim) catch {
+//         allocator.free(basename_owned);
+//         allocator.free(folder_owned);
+//         return null;
+//     };
+//     vol_ptr.* = volume.ThreeDim.init(
+//         basename_owned,
+//         data[0..len],
+//         cartesian_order.*,
+//         source_format,
+//         transform,
+//         false,
+//         dims.*,
+//         save_config,
+//         prune_val,
+//         // 4 * std.math.floatEps(f32),
+//     ) catch {
+//         allocator.free(basename_owned);
+//         allocator.free(folder_owned);
+//         allocator.destroy(vol_ptr);
+//         return null;
+//     };
+//     return vol_ptr;
+// }
+
+// //LLM: claude wrote this function
+// pub export fn deinitThreeDim(ptr: ?*anyopaque) void {
+//     const allocator = std.heap.c_allocator;
+//     if (ptr) |p| {
+//         const vol_ptr: *volume.ThreeDim = @ptrCast(@alignCast(p));
+//         allocator.free(vol_ptr.save_config.basename);
+//         allocator.free(vol_ptr.save_config.folder);
+//         allocator.destroy(vol_ptr);
+//     }
+// }
+
+// //LLM: claude wrote this function
+// pub export fn saveThreeDim(ptr: ?*anyopaque) usize {
+//     if (ptr) |p| {
+//         const vol_ptr: *volume.ThreeDim = @ptrCast(@alignCast(p));
+//         vol_ptr.save() catch |e| {
+//             return cErr(e).code;
+//         };
+//     }
+//     return 0;
+// }
 
 //TODO: Volume apply effects and interpolation
 

@@ -22,89 +22,105 @@ pub const SaveConfiguration = struct {
     folder: []const u8,
     overwrite: bool, // if false, saves version number
 };
-pub const ThreeDim = struct {
+
+//extracts data into a VDB
+fn extract(
+    allocator: std.mem.Allocator,
+    data: []const f32,
+    cartesian_order: [3]usize,
+    vdb: *vdb543.VDB,
+    normalizer: util.Normalizer,
+    dims: [3]usize,
+) !void {
+    var i: usize = 0;
+    var cart = [_]i32{ 0, 0, 0 };
+    while (true) {
+        try vdb.putVoxel(
+            allocator,
+            .from(.{ cart[cartesian_order[0]], cart[cartesian_order[1]], cart[cartesian_order[2]] }),
+            normalizer.apply(data[i]), //LLM: was self.data (missing [i])
+        );
+
+        i += 1;
+        if (!util.incrementCartesian(
+            i32,
+            3,
+            &cart,
+            .{ dims[0], .dims[1], dims[2] },
+        )) break;
+    }
+}
+
+pub fn buildGrid(
+    arena: std.heap.ArenaAllocator,
     name: []const u8,
     data: []const f32,
     cartesian_order: [3]usize,
     source_format: SourceFormat,
     affine_transform: [4][4]f64,
-    dims: [3]usize, // spatial layout only (x, y, z) — no time dimension
-    frame_size: usize,
+    normalize: bool,
+    dims: [3]usize,
+    prune: ?f32,
+) !*vdb543.Grid {
+    //setup based on data source type (just numpy for now)
+    var normalizer: util.Normalizer = undefined;
+    switch (source_format) {
+        .ndarray => {
+            if (normalize) {
+                std.debug.print(
+                    ndarray_fyi,
+                    .{},
+                );
+                return DataFormatError.UnsupportedUsage;
+            }
+            normalizer = util.Normalizer.init(false, 0.0, 1.0);
+        },
+        else => return DataFormatError.NotSupportedYet,
+    }
+    var vdb: vdb543.VDB = .init(0);
+    defer vdb.deinit(arena.allocator());
+    switch (source_format) {
+        .ndarray => try extract(
+            arena.allocator(),
+            &vdb,
+        ),
+        else => return DataFormatError.NotSupportedYet,
+    }
+
+    //populate the data
+    var i: usize = 0;
+    var cart = [_]i32{ 0, 0, 0 };
+    while (true) {
+        try vdb.putVoxel(
+            arena.allocator,
+            .from(.{ cart[cartesian_order[0]], cart[cartesian_order[1]], cart[cartesian_order[2]] }),
+            normalizer.apply(data[i]),
+        );
+        i += 1;
+        if (!util.incrementCartesian(
+            i32,
+            3,
+            &cart,
+            .{ dims[0], dims[1], dims[2] },
+        )) break;
+    }
+    //when it is pruning, see if all the values are approx the same
+    // the tol is the tolerance amount
+    // higher means more things are pruned
+    //default is quite strict
+    if (prune) |tol| vdb.prune(tol);
+
+    var grid: vdb543.Grid = .{.init(&vdb, name, affine_transform, .empty)};
+    //TODO: see if you can add prune level to metadata
+    try grid.addMetadata(arena.allocator(), name);
+    // defer grid.deinit(arena.allocator());
+    return grid;
+}
+
+pub const ThreeDim = struct {
+    name: []const u8,
+    grids: []const *vdb543.Grid,
     save_config: SaveConfiguration,
-    normalizer: util.Normalizer,
-    prune: ?f32, //null: don't sparsify,
-
-    //ensure ndarray compliance with prep_ndarray
-    pub fn init(
-        name: []const u8,
-        data: []const f32,
-        cartesian_order: [3]usize,
-        source_format: SourceFormat,
-        transform: [4][4]f64,
-        normalize: bool,
-        dims: [3]usize,
-        save_config: SaveConfiguration,
-        prune: ?f32,
-    ) !ThreeDim { //LLM: was !FourDim
-        var normalizer: util.Normalizer = undefined;
-
-        switch (source_format) {
-            .ndarray => {
-                if (normalize) {
-                    std.debug.print(
-                        ndarray_fyi,
-                        .{},
-                    );
-                    return DataFormatError.UnsupportedUsage;
-                }
-                normalizer = util.Normalizer.init(false, 0.0, 1.0);
-            },
-            else => return DataFormatError.NotSupportedYet,
-        }
-
-        return .{
-            .name = name,
-            .data = data,
-            .cartesian_order = cartesian_order,
-            .source_format = source_format,
-            .affine_transform = transform,
-            .dims = dims,
-            .frame_size = dims[0] * dims[1] * dims[2], //LLM: was dims[1]*dims[2]*dims[3]
-            .save_config = save_config,
-            .normalizer = normalizer,
-            .prune = prune,
-        };
-    }
-
-    //extracts the 3D ndarray volume into a VDB
-    fn extractVol(
-        self: *ThreeDim, //LLM: was *FourDim
-        allocator: std.mem.Allocator,
-        vdb: *vdb543.VDB,
-    ) !void {
-        var i: usize = 0;
-        var cart = [_]i32{ 0, 0, 0 };
-        while (true) {
-            try vdb.putVoxel(
-                allocator,
-                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
-                self.normalizer.apply(self.data[i]), //LLM: was self.data (missing [i])
-            );
-
-            i += 1;
-            if (!util.incrementCartesian(
-                i32,
-                3,
-                &cart,
-                .{ self.dims[0], self.dims[1], self.dims[2] }, //LLM: was dims[1],[2],[3]
-            )) break;
-        }
-        //when it is pruning, see if all the values are approx the same
-        // the tol is the tolerance amount
-        // higher means more things are pruned
-        //default is quite strict
-        if (self.prune) |tol| vdb.prune(tol);
-    }
 
     pub fn save(
         v: *ThreeDim,
@@ -135,20 +151,17 @@ pub const ThreeDim = struct {
             else => return DataFormatError.NotSupportedYet,
         }
 
-        var grids: [1]vdb543.Grid = .{.init(&vdb, "density", v.affine_transform, .empty)};
-        try grids[0].addDefaultMetadata(arena.allocator());
-        defer grids[0].deinit(arena.allocator());
-
         try vdb543.writeVDBFile(
             &writer,
             arena.allocator(),
-            &grids,
+            v.grids,
             .empty,
         );
         try writer.end();
     }
 };
 
+// FOUR_DIM:
 //Four dimensional volume structure
 //nothing is allocated in this struct so no deinit
 pub const FourDim = struct {
@@ -430,6 +443,7 @@ pub const Interpolator = struct {
                 }
                 var g: [1]vdb543.Grid = .{.init(&vdb, "density", self.vol.affine_transform, .empty)};
                 defer g[0].deinit(arena.allocator());
+                //TODO: see if you can add prune level to metadata
                 try g[0].addDefaultMetadata(arena.allocator());
 
                 const frame_num = o * self.hold_durration + i; //LLM: calculated
@@ -443,12 +457,3 @@ pub const Interpolator = struct {
         }
     }
 };
-
-//WIP:
-fn buildPath(static: bool, frame: usize, save_config: SaveConfiguration) []const u8 {
-    _ = static;
-    _ = frame;
-    _ = save_config;
-    //WARNING: probably shouldn't be a []u8????
-    return "HAM/SPAM";
-}
