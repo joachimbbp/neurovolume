@@ -1055,12 +1055,15 @@ pub fn writeVDBFile(
 
     // write out the grids
     for (grids, names, 0..) |*grid, unique_name, i| {
+        var is_instance = false;
         for (grids[0..i], names[0..i]) |other, other_name| {
             if (other.tree == grid.tree) {
                 try grid.writeInstance(file, unique_name, other_name);
+                is_instance = true;
+                break;
             }
-            break;
-        } else try grid.write(file, unique_name);
+        }
+        if (!is_instance) try grid.write(file, unique_name);
     }
     try file.interface.flush();
 }

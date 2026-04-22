@@ -220,8 +220,7 @@ test "volume grid tests" {
 
     //SPHERE:
     const sphere_arr = try numpy.loadNpy(arena.allocator(), "sphere.npy");
-    // const sphere_raw = numpy.loadAsF32Slice(arena.allocator(), "sphere.npy").?;
-    std.debug.print("SHAPE: {any}\n", .{sphere_arr.shape});
+    std.debug.print("SPHERE SHAPE: {any}\n", .{sphere_arr.shape});
     const sphere_prepped = try numpy.prepNdarray(
         arena.allocator(),
         sphere_arr,
@@ -239,15 +238,33 @@ test "volume grid tests" {
     );
     try sphere_grid.populate(sphere_prepped);
 
-    //TODO: cube!
-    // const cube = numpy.loadAsF32Slice(arena.allocator(), "cube.npy").?;
-    //TODO: combine grids
-    var grids = [_]vdb543.Grid{sphere_grid.grid.?};
+    //CUBE:
+    const cube_arr = try numpy.loadNpy(arena.allocator(), "cube.npy");
+    std.debug.print("CUBE SHAPE: {any}\n", .{cube_arr.shape});
+    const cube_prepped = try numpy.prepNdarray(
+        arena.allocator(),
+        cube_arr,
+        &[_]usize{ 0, 2, 1 },
+    );
+    var cube_grid = Grid.init(
+        arena.allocator(),
+        "cube",
+        [3]usize{ 0, 1, 2 },
+        .ndarray,
+        identity,
+        false,
+        cube_arr.shape[0..3].*,
+        prune,
+    );
+    try cube_grid.populate(cube_prepped);
+
+    //GATHER GRIDS:
+    var grids = [_]vdb543.Grid{ sphere_grid.grid.?, cube_grid.grid.? };
 
     var multi_grid_vol: Vol = .{
         .grids = &grids,
         .save_config = .{
-            .basename = "multi_grid",
+            .basename = "multi_grid_v2",
             .folder = "./tests/data/vdb_out",
             .overwrite = true,
         },
