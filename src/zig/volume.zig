@@ -60,12 +60,41 @@ pub const Grid = struct {
             .grid = null,
         };
     }
+    //DEPRECATED: ? maybe?
+    fn extractVol(
+        self: *Grid,
+        allocator: std.mem.Allocator,
+        vdb: *vdb543.VDB,
+    ) !void {
+        var i: usize = 0;
+        var cart = [_]i32{ 0, 0, 0 };
+        while (true) {
+            try vdb.putVoxel(
+                allocator,
+                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
+                self.normalizer.apply(self.data[i]), //LLM: was self.data (missing [i])
+            );
+
+            i += 1;
+            if (!util.incrementCartesian(
+                i32,
+                3,
+                &cart,
+                .{ self.dims[0], self.dims[1], self.dims[2] }, //LLM: was dims[1],[2],[3]
+            )) break;
+        }
+        //when it is pruning, see if all the values are approx the same
+        // the tol is the tolerance amount
+        // higher means more things are pruned
+        //default is quite strict
+        if (self.prune) |tol| vdb.prune(tol);
+    }
 
     //populates the vdb543.Grid with VDB data
     pub fn populate(
         g: *Grid,
         data: []const f32,
-    ) !Grid {
+    ) !void {
         //setup based on data source type (just numpy for now)
         var normalizer: util.Normalizer = undefined;
         //switch prongs just open for possible future native fileparsing
@@ -87,6 +116,7 @@ pub const Grid = struct {
 
         //populate the data
         //formerly in fn extract()
+        //TODO: re-dry this again!
         var i: usize = 0;
         var cart = [_]i32{ 0, 0, 0 };
         while (true) {
@@ -110,26 +140,33 @@ pub const Grid = struct {
         //default is quite strict
         if (g.prune) |tol| g.vdb.prune(tol);
 
-        //LLM suggestion to heap allocate
-        //(probably a more memory efficient way to do this tbh!)
-        const grid = try g.alloc.create(vdb543.Grid);
-        grid.* = .{.init{ &g.vdb, g.name, g.affine_transform, .empty }};
-
-        //TODO: see if you can add prune level to metadata
+        //LLM suggesting a fix to its own code lol:
+        var grid = vdb543.Grid.init(&g.vdb, g.name, g.affine_transform, .empty);
         try grid.addMetadata(g.alloc, g.name);
-        g.vdb = grid;
+        g.grid = grid; // store into the optional field that's already on Grid
+
+        // //LLM suggestion to heap allocate
+        // //(probably a more memory efficient way to do this tbh!)
+        // const grid = try g.alloc.create(vdb543.Grid);
+        // grid.* = vdb543.Grid.init(&g.vdb, g.name, g.affine_transform, .empty);
+
+        // //TODO: see if you can add prune level to metadata
+        // try grid.addMetadata(g.alloc, g.name);
+        // //ugh... deep copy might not be the best but idk?
+        // g.vdb = grid.*;
     }
+
     pub fn deinit(g: *Grid) void {
         g.vdb.deinit(g.alloc);
     }
 };
-pub const ThreeDim = struct {
-    name: []const u8,
-    grids: []const *vdb543.Grid,
+pub const Vol = struct {
+    grids: []vdb543.Grid,
     save_config: SaveConfiguration,
+    source_format: SourceFormat,
 
     pub fn save(
-        v: *ThreeDim,
+        v: *Vol,
     ) !void {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const gpa_alloc = gpa.allocator();
@@ -149,13 +186,6 @@ pub const ThreeDim = struct {
 
         var vdb: vdb543.VDB = .init(0);
         defer vdb.deinit(arena.allocator());
-        switch (v.source_format) {
-            .ndarray => try v.extractVol(
-                arena.allocator(),
-                &vdb,
-            ),
-            else => return DataFormatError.NotSupportedYet,
-        }
 
         try vdb543.writeVDBFile(
             &writer,
@@ -168,6 +198,17 @@ pub const ThreeDim = struct {
 };
 
 test "volume grid tests" {
+    std.debug.print("🏁Grid tests\n", .{});
+    const identity = [4][4]f64{
+        .{ 1, 0, 0, 0 },
+        .{ 0, 1, 0, 0 },
+        .{ 0, 0, 1, 0 },
+        .{ 0, 0, 0, 1 },
+    };
+    // const prune: f32 = 0.5;
+    //TODO: test with a sane prune level!
+    const prune: f32 = 0.0;
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
     defer _ = gpa.deinit();
@@ -176,18 +217,41 @@ test "volume grid tests" {
     defer arena.deinit();
 
     //WARN: run from root!
-    const sphere =
-    Grid.init(arena.allocator, "sphere", )
-    //BOOKMARK: WAIT! the ndarray needs to be prepped! as in prep_ndarray
-    // probably just get an llm to quickly write the zig version?
 
-    numpy.loadAsF32Slice(arena.allocator(), "sphere.npy").?;
-    _ = sphere; // autofix
-    
-    
-    // const sphere_grid = buildGrid(, name: []const u8, data: []const f32, cartesian_order: [3]usize, source_format: SourceFormat, affine_transform: [4][4]f64, normalize: bool, dims: [3]usize, prune: ?f32)
-    const cube = numpy.loadAsF32Slice(arena.allocator(), "cube.npy").?;
-    _ = cube; // autofix
+    //SPHERE:
+    const sphere_arr = try numpy.loadNpy(arena.allocator(), "sphere.npy");
+    // const sphere_raw = numpy.loadAsF32Slice(arena.allocator(), "sphere.npy").?;
+    std.debug.print("SHAPE: {any}\n", .{sphere_arr.shape});
+    const sphere_prepped = try numpy.prepNdarray(
+        arena.allocator(),
+        sphere_arr,
+        &[_]usize{ 0, 2, 1 },
+    );
+    var sphere_grid = Grid.init(
+        arena.allocator(),
+        "sphere",
+        [3]usize{ 0, 1, 2 },
+        .ndarray,
+        identity,
+        false,
+        sphere_arr.shape[0..3].*,
+        prune,
+    );
+    try sphere_grid.populate(sphere_prepped);
 
+    //TODO: cube!
+    // const cube = numpy.loadAsF32Slice(arena.allocator(), "cube.npy").?;
+    //TODO: combine grids
+    var grids = [_]vdb543.Grid{sphere_grid.grid.?};
 
+    var multi_grid_vol: Vol = .{
+        .grids = &grids,
+        .save_config = .{
+            .basename = "multi_grid",
+            .folder = "./tests/data/vdb_out",
+            .overwrite = true,
+        },
+        .source_format = .ndarray,
+    };
+    try multi_grid_vol.save();
 }

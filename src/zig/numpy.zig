@@ -94,16 +94,16 @@ fn parseShape(allocator: std.mem.Allocator, header: []const u8) ![]usize {
     const end = std.mem.indexOf(u8, header[start..], ")") orelse return error.NoShape;
     const shape_str = header[start .. start + end];
 
-    var dims = std.ArrayList(usize).init(allocator);
+    var dims: std.ArrayListUnmanaged(usize) = .{};
+    defer dims.deinit(allocator);
     var iter = std.mem.splitScalar(u8, shape_str, ',');
     while (iter.next()) |part| {
         const trimmed = std.mem.trim(u8, part, " ");
         if (trimmed.len == 0) continue;
-        try dims.append(try std.fmt.parseInt(usize, trimmed, 10));
+        try dims.append(allocator, try std.fmt.parseInt(usize, trimmed, 10));
     }
-    return dims.toOwnedSlice();
+    return dims.toOwnedSlice(allocator);
 }
-
 fn dtypeSize(dtype: []const u8) usize {
     // Last char(s) are the byte count: '<f4' -> 4, '<i8' -> 8
     if (dtype.len == 0) return 0;
@@ -116,4 +116,83 @@ pub fn loadAsF32Slice(allocator: std.mem.Allocator, path: []const u8) ![]f32 {
 
     const floats = std.mem.bytesAsSlice(f32, @alignCast(arr.data));
     return allocator.dupe(f32, floats);
+}
+
+/// Transpose, convert to f32, and normalize to [0,1].
+/// `transpose` is a slice of axis indices, e.g. &[_]usize{2, 0, 1}
+/// Caller owns the returned slice.
+pub fn prepNdarray(
+    allocator: std.mem.Allocator,
+    array: NpyArray,
+    transpose: []const usize,
+) ![]f32 {
+    const ndim = array.shape.len;
+    std.debug.assert(transpose.len == ndim);
+
+    // Build transposed shape
+    const t_shape = try allocator.alloc(usize, ndim);
+    defer allocator.free(t_shape);
+    for (transpose, 0..) |ax, i| t_shape[i] = array.shape[ax];
+
+    // Total element count
+    var total: usize = 1;
+    for (t_shape) |d| total *= d;
+
+    const out = try allocator.alloc(f32, total);
+    errdefer allocator.free(out);
+
+    // Source must be f32 (dtype "<f4" or ">f4")
+
+    const src = std.mem.bytesAsSlice(
+        f32,
+        @as([]align(@alignOf(f32)) u8, @alignCast(array.data)),
+    );
+
+    // Compute strides for the ORIGINAL shape (C-order, row-major)
+    const src_strides = try allocator.alloc(usize, ndim);
+    defer allocator.free(src_strides);
+    {
+        var s: usize = 1;
+        var i: usize = ndim;
+        while (i > 0) {
+            i -= 1;
+            src_strides[i] = s;
+            s *= array.shape[i];
+        }
+    }
+
+    // Walk every output index in C-order and copy from transposed source index
+    var out_idx: usize = 0;
+    var coords = try allocator.alloc(usize, ndim);
+    defer allocator.free(coords);
+    @memset(coords, 0);
+
+    while (out_idx < total) : (out_idx += 1) {
+        // Compute flat source index via transposed axis mapping
+        var src_idx: usize = 0;
+        for (0..ndim) |i| src_idx += coords[i] * src_strides[transpose[i]];
+
+        out[out_idx] = src[src_idx];
+
+        // Increment coords (C-order carry)
+        var dim: usize = ndim;
+        while (dim > 0) {
+            dim -= 1;
+            coords[dim] += 1;
+            if (coords[dim] < t_shape[dim]) break;
+            coords[dim] = 0;
+        }
+    }
+
+    // Normalize to [0, 1]
+    var max_val: f32 = 0.0;
+    for (out) |v| if (v > max_val) {
+        max_val = v;
+    };
+    if (max_val > 0.0) {
+        const inv = 1.0 / max_val;
+        for (out) |*v| v.* *= inv;
+    }
+
+    return out;
 }
