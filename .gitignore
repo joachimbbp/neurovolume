@@ -2,16 +2,15 @@
 __pycache__
 .venv
 .DS_Store
-*.vdb
 .zig-cache
 zig-out
 zig-pkg
-.vscode
 dist
-DS_Store
 ./src/neurovolume/_native/*
-
 .pytest_cache
 
-
+.vscode
 .helix/config.toml
+
+*.npy
+*.vdb
