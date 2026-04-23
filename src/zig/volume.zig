@@ -173,8 +173,8 @@ test "volume grid tests" {
         .{ 0, 0, 0, 1 },
     };
     // const prune: f32 = 0.5;
-    //TODO: test with a sane prune level!
-    const prune: f32 = 0.0;
+    // 1.0 removes the entire thing!
+    const prune: f32 = 0.999999;
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa_alloc = gpa.allocator();
@@ -231,7 +231,11 @@ test "volume grid tests" {
     var multi_grid_vol: Vol = .{
         .grids = &grids,
         .save_config = .{
-            .basename = "multi_grid_v2",
+            .basename = try std.fmt.allocPrint(
+                arena.allocator(),
+                "multi_grid_v2_pruned_{d}",
+                .{prune},
+            ),
             .folder = "./tests/data/vdb_out",
             .overwrite = true,
         },
