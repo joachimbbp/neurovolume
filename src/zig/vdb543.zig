@@ -260,6 +260,7 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
         values: std.ArrayListUnmanaged([]V),
         background: V,
 
+        //background value is almost always 0
         pub fn init(background: V) Self {
             return .{
                 .map = .empty,

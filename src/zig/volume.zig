@@ -30,7 +30,7 @@ pub const Grid = struct {
     normalize: bool,
     dims: [3]usize,
     prune: ?f32,
-    vdb: vdb543.VDB,
+    vdb: *vdb543.VDB,
     grid: ?vdb543.Grid,
 
     pub fn init(
@@ -42,7 +42,10 @@ pub const Grid = struct {
         normalize: bool,
         dims: [3]usize,
         prune: ?f32,
-    ) Grid {
+    ) !Grid {
+        const vdb_ptr = try alloc.create(vdb543.VDB);
+        vdb_ptr.* = .init(0);
+
         return .{
             .alloc = alloc,
             .name = name,
@@ -52,7 +55,7 @@ pub const Grid = struct {
             .normalize = normalize,
             .dims = dims,
             .prune = prune,
-            .vdb = .init(0),
+            .vdb = vdb_ptr,
             .grid = null,
         };
     }
@@ -108,7 +111,12 @@ pub const Grid = struct {
         if (g.prune) |tol| g.vdb.prune(tol);
 
         //LLM suggesting a fix to its own code lol:
-        var grid = vdb543.Grid.init(&g.vdb, g.name, g.affine_transform, .empty);
+        var grid = vdb543.Grid.init(
+            g.vdb,
+            g.name,
+            g.affine_transform,
+            .empty,
+        );
         try grid.addMetadata(g.alloc, g.name);
         g.grid = grid; // store into the optional field that's already on Grid
 
@@ -125,6 +133,7 @@ pub const Grid = struct {
 
     pub fn deinit(g: *Grid) void {
         g.vdb.deinit(g.alloc);
+        g.alloc.destroy(g.vdb);
     }
 };
 pub const Vol = struct {
@@ -193,7 +202,7 @@ test "volume grid tests" {
         sphere_arr,
         &[_]usize{ 0, 2, 1 },
     );
-    var sphere_grid = Grid.init(
+    var sphere_grid = try Grid.init(
         arena.allocator(),
         "sphere",
         [3]usize{ 0, 1, 2 },
@@ -213,7 +222,7 @@ test "volume grid tests" {
         cube_arr,
         &[_]usize{ 0, 2, 1 },
     );
-    var cube_grid = Grid.init(
+    var cube_grid = try Grid.init(
         arena.allocator(),
         "cube",
         [3]usize{ 0, 1, 2 },
