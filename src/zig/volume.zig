@@ -1,7 +1,3 @@
-//TODO:
-// - [ ] DRY 3D and 4D volumes as much as possible wihtout getting over zealous
-// - [ ] crossfade interpolation
-// - [ ] move VDB saving functionality to the vdb module (and alert Robbie)
 const std = @import("std");
 const ndarray = @import("ndarray.zig");
 const util = @import("util.zig");
@@ -9,15 +5,15 @@ const vdb543 = @import("vdb543.zig");
 
 const numpy = @import("numpy.zig");
 
-const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
-const AccessError = error{IndexOutOBounds};
+pub const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
+pub const AccessError = error{IndexOutOBounds};
 
 pub const SourceFormat = enum(c_int) {
     ndarray = 0,
     nifti1 = 1,
 };
 
-const ndarray_fyi = "FYI: To ensure compliance, use the prep_ndarray function in the python library. Ndarrays are assumed to be normalized f32s in C order";
+pub const ndarray_fyi = "FYI: To ensure compliance, use the prep_ndarray function in the python library. Ndarrays are assumed to be normalized f32s in C order";
 
 pub const SaveConfiguration = struct {
     basename: []const u8,
@@ -59,35 +55,6 @@ pub const Grid = struct {
             .vdb = .init(0),
             .grid = null,
         };
-    }
-    //DEPRECATED: ? maybe?
-    fn extractVol(
-        self: *Grid,
-        allocator: std.mem.Allocator,
-        vdb: *vdb543.VDB,
-    ) !void {
-        var i: usize = 0;
-        var cart = [_]i32{ 0, 0, 0 };
-        while (true) {
-            try vdb.putVoxel(
-                allocator,
-                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
-                self.normalizer.apply(self.data[i]), //LLM: was self.data (missing [i])
-            );
-
-            i += 1;
-            if (!util.incrementCartesian(
-                i32,
-                3,
-                &cart,
-                .{ self.dims[0], self.dims[1], self.dims[2] }, //LLM: was dims[1],[2],[3]
-            )) break;
-        }
-        //when it is pruning, see if all the values are approx the same
-        // the tol is the tolerance amount
-        // higher means more things are pruned
-        //default is quite strict
-        if (self.prune) |tol| vdb.prune(tol);
     }
 
     //populates the vdb543.Grid with VDB data

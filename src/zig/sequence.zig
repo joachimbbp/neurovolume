@@ -1,95 +1,58 @@
+const std = @import("std");
+const volume = @import("volume.zig");
+const util = @import("util.zig");
+const vdb543 = @import("vdb543.zig");
+
+const ndarray_fyi = volume.ndarray_fyi;
+const DataFormatError = volume.DataFormatError;
+const AccessError = volume.AccessError;
+const SourceFormat = volume.SourceFormat;
+const SaveConfiguration = volume.SaveConfiguration;
+
 //TODO: integrate
 // this was originally in volume
-// no work has been done yet!
-// eventually this should be a SEQUENCE of VOLUMES
 
 // FOUR_DIM:
 //Four dimensional volume structure
 //nothing is allocated in this struct so no deinit
-pub const FourDim = struct {
+pub const Sequence = struct {
     name: []const u8,
     data: []const f32,
-    cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
-    source_format: SourceFormat,
-    affine_transform: [4][4]f64, //spatial transform only!
+    // cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
+    // source_format: SourceFormat,
+    // affine_transform: [4][4]f64, //spatial transform only!
     source_fps: f32,
     playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
-    dims: [4]usize, // time first, then domain specific spatial layout
-    frame_size: usize,
+    // dims: [4]usize, // time first, then domain specific spatial layout
+    // frame_size: usize,
     save_config: SaveConfiguration,
-    normalizer: util.Normalizer,
-    prune: ?f32,
-
-    //ensure ndarray compliance with prep_4D_ndarray
-    pub fn init(
-        name: []const u8,
-        data: []const f32,
-        cartesian_order: [3]usize,
-        source_format: SourceFormat,
-        transform: [4][4]f64,
-        normalize: bool,
-        source_fps: f32,
-        playback_fps: f32,
-        speed: f32, //0.5 for half speed, 2.0 for double speed etc
-        dims: [4]usize,
-        save_config: SaveConfiguration,
-        prune: ?f32, //contorls sparsity
-    ) !FourDim {
-        var normalizer: util.Normalizer = undefined;
-
-        switch (source_format) {
-            .ndarray => {
-                if (normalize) {
-                    std.debug.print(
-                        ndarray_fyi,
-                        .{},
-                    );
-                    return DataFormatError.UnsupportedUsage;
-                }
-                normalizer = util.Normalizer.init(false, 0.0, 1.0);
-            },
-            else => return DataFormatError.NotSupportedYet,
-        }
-
-        return .{
-            .name = name,
-            .data = data,
-            .cartesian_order = cartesian_order,
-            .source_format = source_format,
-            .affine_transform = transform,
-            .source_fps = source_fps,
-            .playback_fps = playback_fps,
-            .speed = speed,
-            .dims = dims,
-            .frame_size = dims[1] * dims[2] * dims[3],
-            .save_config = save_config,
-            .normalizer = normalizer,
-            .prune = prune,
-        };
-    }
+    // normalizer: util.Normalizer,
+    // prune: ?f32,
 
     fn frameFile(
-        v: *FourDim,
+        v: *Sequence,
         frame_num: usize,
         scratch: std.mem.Allocator,
     ) !std.fs.File {
         var w: std.Io.Writer.Allocating = .init(scratch);
         defer w.deinit();
-        try w.writer.print("{s}/{s}_{d:0>4}.vdb", .{ v.save_config.folder, v.save_config.basename, frame_num });
+        try w.writer.print("{s}/{s}_{d:0>4}.vdb", .{
+            v.save_config.folder,
+            v.save_config.basename,
+            frame_num,
+        });
         return try std.fs.cwd().createFile(w.written(), .{});
     }
 
-    //extracts a 3D slice of a 4D ndarray to a VDB
+    //extracts a 3D slice of a 4D ndarray to a grid
     pub fn extractFrame(
-        self: *FourDim,
+        self: *Sequence,
         allocator: std.mem.Allocator,
         frame_num: usize,
         vdb: *vdb543.VDB,
     ) !void {
         if (frame_num >= self.dims[0]) return AccessError.IndexOutOBounds;
-        //Assuming that there aren't headers or things in ndarrays
-        //  (I should read the docs I guess)
         const start = frame_num * self.frame_size;
         const end = ((frame_num + 1) * self.frame_size);
 
@@ -98,7 +61,11 @@ pub const FourDim = struct {
         while (true) {
             try vdb.putVoxel(
                 allocator,
-                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
+                .from(.{
+                    cart[self.cartesian_order[0]],
+                    cart[self.cartesian_order[1]],
+                    cart[self.cartesian_order[2]],
+                }),
                 self.normalizer.apply(self.data[start..end][i]),
             );
 
@@ -115,7 +82,7 @@ pub const FourDim = struct {
 
     //TODO: DRY maybe
     pub fn extractInterpolatedFrame(
-        self: *FourDim,
+        self: *Sequence,
         allocator: std.mem.Allocator,
         //HACK: there are better ways to do this I am sure
         // very naive but should work
@@ -159,7 +126,7 @@ pub const FourDim = struct {
     }
 
     pub fn save(
-        self: *FourDim,
+        self: *Sequence,
         interpolation: InterpolationMode,
     ) !void {
         var interpolator = try Interpolator.init(self, interpolation);
@@ -178,12 +145,12 @@ pub const InterpolationMode = enum(c_int) {
 };
 
 pub const Interpolator = struct {
-    vol: *FourDim,
+    vol: *Sequence,
     mode: InterpolationMode,
     total_frames: usize, //number of frames after interpolation
     hold_durration: usize,
 
-    pub fn init(vol: *FourDim, mode: InterpolationMode) !Interpolator {
+    pub fn init(vol: *Sequence, mode: InterpolationMode) !Interpolator {
         if (mode == .direct) {
             return .{
                 .vol = vol,
