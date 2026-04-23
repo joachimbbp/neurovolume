@@ -1,6 +1,7 @@
 # this is mostly the zig/c/python translation layer
 # all pretty unruley and should be automatically
 # generated in the future!
+# For now, most of this is LLM generated
 
 import ctypes as c
 import numpy as np  # DEPENDENCY:, the only one we should have!
@@ -51,207 +52,203 @@ def _b(string):
     """
     return string.encode("utf-8")
 
-
-# LLM: claude wrote this function (more or less)
-def _init_four_dim(
-    basename: str,
-    save_folder: Path,
-    overwrite: bool,
-    data: np.ndarray,
-    transform: np.ndarray,
-    source_fps: float,
-    playback_fps: float,
-    speed: float,
-    dims: tuple,
-    prune: np.float32 | None,
-    source_format: int = 0,  # 0=ndarray, 1=nifti1 (mirrors volume.zig SourceFormat)
-    cartesian_order: tuple = (0, 1, 2),  # almost always 0 1 2
-) -> c.c_void_p:
-    """
-    Initializes a FourDim volume on the Zig heap and returns an opaque pointer.
-
-    Parameters:
-    ------------
-    source_format: int
-        0 = ndarray, 1 = nifti1 (mirrors volume.zig SourceFormat enum)
-    data: np.ndarray
-        All frames flattened, C-contiguous float32.
-    transform: np.ndarray
-        4x4 affine as float64, shape (4,4) or (16,).
-    dims: tuple
-        (x, y, z, t) voxel dimensions.
-    prune:
-        amount to sparsify
-    Returns:
-    ------------
-    Opaque ctypes pointer to the FourDim on the Zig heap.
-    Must be freed by calling deinit_four_dim() or save_four_dim().
-    """
-    data = np.ascontiguousarray(data, dtype=np.float32)
-    transform_arr = (c.c_double * 16)(
-        *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
-    )
-    dims_arr = (c.c_size_t * 4)(*dims)
-    cartesian_arr = (c.c_size_t * 3)(*cartesian_order)  # LLM: fix on this line
-
-    # full up claude line:
-    prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
-
-    nv.initFourDim.argtypes = [
-        c.c_char_p,  # base_name
-        c.c_char_p,  # save_folder
-        c.c_bool,  # overwrite
-        c.c_int,  # source_format
-        c.POINTER(c.c_float),  # data
-        c.POINTER(c.c_size_t),  # cartesian_order [3]usize
-        c.POINTER(c.c_double),  # transform_flat [16]f64
-        c.c_float,  # source_fps
-        c.c_float,  # playback_fps
-        c.c_float,  # speed
-        c.POINTER(c.c_size_t),  # dims [4]usize
-        c.POINTER(c.c_float), # prune ?f32, null = no pruning
-    ]
-    nv.initFourDim.restype = c.c_void_p
-
-    ptr = nv.initFourDim(
-        _b(basename),
-        _b(str(save_folder)),
-        overwrite,
-        source_format,
-        data.ctypes.data_as(c.POINTER(c.c_float)),
-        cartesian_arr,
-        transform_arr,
-        c.c_float(source_fps),
-        c.c_float(playback_fps),
-        c.c_float(speed),
-        dims_arr,
-        prune_ptr,
-    )
-    if ptr is None:
-        raise RuntimeError("initFourDim returned null — allocation or init failed")
-    return ptr
-
-
 # LLM: claude wrote this function
-def _deinit_four_dim(ptr: c.c_void_p) -> None:
-    """
-    Frees a FourDim volume allocated by init_four_dim() without saving.
-    """
-    nv.deinitFourDim.argtypes = [c.c_void_p]
-    nv.deinitFourDim.restype = None
-    nv.deinitFourDim(ptr)
-
-
-# LLM: claude wrote this function
-def _save_four_dim(ptr: c.c_void_p, interpolation_mode: int) -> None:
-    """
-    Saves the FourDim volume to VDB files and frees it.
-    The pointer is invalid after this call.
-
-    Parameters:
-    ------------
-    ptr: opaque pointer returned by init_four_dim().
-    interpolation_mode: int
-        0 = direct (mirrors volume.zig InterpolationMode enum)
-    """
-    nv.saveFourDim.argtypes = [c.c_void_p, c.c_int]
-    nv.saveFourDim.restype = None
-    nv.saveFourDim(ptr, interpolation_mode)
-
-
-# LLM: claude wrote this function
-def _init_three_dim(
-    basename: str,
-    save_folder: Path,
-    overwrite: bool,
+def _init_grid(
+    name: str,
     data: np.ndarray,
     transform: np.ndarray,
     dims: tuple,
     prune: np.float32 | None,
+    normalize: bool = False,
     source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
     cartesian_order: tuple = (0, 1, 2),
 ) -> c.c_void_p:
     """
-    Initializes a ThreeDim volume on the Zig heap and returns an opaque pointer.
+    Initializes a volume.Grid on the Zig heap and returns an opaque pointer.
+
+    Note: this does NOT populate the grid. Call _populate_grid() next.
 
     Parameters:
     ------------
-    source_format: int
-        0 = ndarray (mirrors volume.zig SourceFormat enum)
+    name: str
+        Identifier for this grid (becomes the VDB grid name).
     data: np.ndarray
         3D volume, C-contiguous float32, normalized to [0, 1].
+        Used here only to validate shape; the buffer is sent via _populate_grid.
     transform: np.ndarray
         4x4 affine as float64.
     dims: tuple
         (x, y, z) voxel dimensions.
     prune:
-        amount to sparsify
+        Tolerance for sparsification. None disables pruning.
+    normalize: bool
+        Whether to normalize on the Zig side. For ndarray source_format this
+        must be False — use prep_ndarray in Python instead.
+    source_format: int
+        0 = ndarray (mirrors volume.zig SourceFormat enum)
+    cartesian_order: tuple
+        Axis remap, usually (0, 1, 2).
+
     Returns:
     ------------
-    Opaque ctypes pointer to the ThreeDim on the Zig heap.
-    Must be freed by calling deinit_three_dim().
+    Opaque ctypes pointer to the Grid on the Zig heap.
+    Must be freed by calling _deinit_grid().
     """
-    data = np.ascontiguousarray(data, dtype=np.float32)
     transform_arr = (c.c_double * 16)(
         *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
     )
     dims_arr = (c.c_size_t * 3)(*dims)
     cartesian_arr = (c.c_size_t * 3)(*cartesian_order)
-
-    # full up claude line:
     prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
 
-    nv.initThreeDim.argtypes = [
-        c.c_char_p,  # base_name
-        c.c_char_p,  # save_folder
-        c.c_bool,  # overwrite
-        c.c_int,  # source_format
-        c.POINTER(c.c_float),  # data
+    nv.initGrid.argtypes = [
+        c.c_char_p,             # name
+        c.c_int,                # source_format
         c.POINTER(c.c_size_t),  # cartesian_order [3]usize
         c.POINTER(c.c_double),  # transform_flat [16]f64
+        c.c_bool,               # normalize
         c.POINTER(c.c_size_t),  # dims [3]usize
-        c.POINTER(c.c_float), # prune ?f32, null = no pruning
+        c.POINTER(c.c_float),   # prune ?f32, null = no pruning
     ]
-    nv.initThreeDim.restype = c.c_void_p
+    nv.initGrid.restype = c.c_void_p
 
-    ptr = nv.initThreeDim(
-        _b(basename),
-        _b(str(save_folder)),
-        overwrite,
+    ptr = nv.initGrid(
+        _b(name),
         source_format,
-        data.ctypes.data_as(c.POINTER(c.c_float)),
         cartesian_arr,
         transform_arr,
+        normalize,
         dims_arr,
         prune_ptr,
     )
     if ptr is None:
-        raise RuntimeError("initThreeDim returned null — allocation or init failed")
+        raise RuntimeError("initGrid returned null — allocation or init failed")
     return ptr
 
 
 # LLM: claude wrote this function
-def _deinit_three_dim(ptr: c.c_void_p) -> None:
+def _populate_grid(
+    grid_ptr: c.c_void_p,
+    data: np.ndarray,
+) -> None:
     """
-    Frees a ThreeDim volume allocated by init_three_dim() without saving.
-    """
-    nv.deinitThreeDim.argtypes = [c.c_void_p]
-    nv.deinitThreeDim.restype = None
-    nv.deinitThreeDim(ptr)
-
-
-# LLM: claude wrote this function
-def _save_three_dim(ptr: c.c_void_p) -> None:
-    """
-    Saves the ThreeDim volume to a single VDB file.
-    The pointer remains valid after this call; free with deinit_three_dim().
+    Populates a Grid's VDB with voxel data.
 
     Parameters:
     ------------
-    ptr: opaque pointer returned by init_three_dim().
+    grid_ptr: c.c_void_p
+        Pointer from _init_grid().
+    data: np.ndarray
+        Flattened voxel data, length must equal dims[0]*dims[1]*dims[2].
+        C-contiguous float32.
     """
-    nv.saveThreeDim.argtypes = [c.c_void_p]
-    nv.saveThreeDim.restype = c.c_size_t
-    result = nv.saveThreeDim(ptr)
-    if result != 0:
-        raise RuntimeError(f"saveThreeDim returned error code {result}")
+    data = np.ascontiguousarray(data, dtype=np.float32)
+
+    nv.populateGrid.argtypes = [
+        c.c_void_p,             # grid ptr
+        c.POINTER(c.c_float),   # data
+    ]
+    nv.populateGrid.restype = c.c_size_t
+
+    code = nv.populateGrid(
+        grid_ptr,
+        data.ctypes.data_as(c.POINTER(c.c_float)),
+    )
+    if code != 0:
+        raise RuntimeError(f"populateGrid failed with error code {code}")
+
+
+# LLM: claude wrote this function
+def _deinit_grid(grid_ptr: c.c_void_p) -> None:
+    """
+    Frees a Grid previously returned by _init_grid().
+
+    IMPORTANT: any Vol that references this grid must be saved and deinitialized
+    first — the Vol holds pointers back into the Grid's heap-allocated VDB.
+    """
+    nv.deinitGrid.argtypes = [c.c_void_p]
+    nv.deinitGrid.restype = None
+    nv.deinitGrid(grid_ptr)
+
+
+# LLM: claude wrote this function
+def _init_vol(
+    basename: str,
+    save_folder: Path,
+    overwrite: bool,
+    grid_ptrs: list[c.c_void_p],
+    source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
+) -> c.c_void_p:
+    """
+    Initializes a volume.Vol on the Zig heap from a list of already-populated Grid
+    pointers and returns an opaque pointer.
+
+    Parameters:
+    ------------
+    basename: str
+        Output filename (without extension).
+    save_folder: Path
+        Folder to write the .vdb file into.
+    overwrite: bool
+        If False, saves with a version suffix instead of clobbering.
+    grid_ptrs: list[c.c_void_p]
+        Pointers from _init_grid() + _populate_grid(). Must outlive the Vol.
+    source_format: int
+        0 = ndarray (mirrors volume.zig SourceFormat enum)
+
+    Returns:
+    ------------
+    Opaque ctypes pointer to the Vol on the Zig heap.
+    Must be freed by calling _deinit_vol().
+    """
+    grid_count = len(grid_ptrs)
+    grids_arr = (c.c_void_p * grid_count)(*grid_ptrs)
+
+    nv.initVol.argtypes = [
+        c.c_char_p,             # basename
+        c.c_char_p,             # save_folder
+        c.c_bool,               # overwrite
+        c.c_int,                # source_format
+        c.POINTER(c.c_void_p),  # grid_ptrs
+        c.c_size_t,             # grid_count
+    ]
+    nv.initVol.restype = c.c_void_p
+
+    ptr = nv.initVol(
+        _b(basename),
+        _b(str(save_folder)),
+        overwrite,
+        source_format,
+        grids_arr,
+        grid_count,
+    )
+    if ptr is None:
+        raise RuntimeError("initVol returned null — allocation or init failed")
+    return ptr
+
+
+# LLM: claude wrote this function
+def _save_vol(vol_ptr: c.c_void_p) -> None:
+    """
+    Writes the Vol's grids to disk as a .vdb file, using the basename/folder
+    supplied at _init_vol() time.
+    """
+    nv.saveVol.argtypes = [c.c_void_p]
+    nv.saveVol.restype = c.c_size_t
+
+    code = nv.saveVol(vol_ptr)
+    if code != 0:
+        raise RuntimeError(f"saveVol failed with error code {code}")
+
+
+# LLM: claude wrote this function
+def _deinit_vol(vol_ptr: c.c_void_p) -> None:
+    """
+    Frees a Vol previously returned by _init_vol().
+
+    Does NOT free the underlying Grid pointers — those must be freed
+    separately with _deinit_grid() after this call returns.
+    """
+    nv.deinitVol.argtypes = [c.c_void_p]
+    nv.deinitVol.restype = None
+    nv.deinitVol(vol_ptr)

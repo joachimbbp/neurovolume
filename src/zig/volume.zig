@@ -139,7 +139,6 @@ pub const Grid = struct {
 pub const Vol = struct {
     grids: []vdb543.Grid,
     save_config: SaveConfiguration,
-    source_format: SourceFormat,
 
     pub fn save(
         v: *Vol,
@@ -248,7 +247,6 @@ test "volume grid tests" {
             .folder = "./tests/data/vdb_out",
             .overwrite = true,
         },
-        .source_format = .ndarray,
     };
     try multi_grid_vol.save();
 }
