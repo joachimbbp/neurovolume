@@ -52,7 +52,9 @@ def _b(string):
     """
     return string.encode("utf-8")
 
+
 # C_INTEROP:
+
 
 # LLM: claude wrote this function
 def _init_grid(
@@ -100,13 +102,13 @@ def _init_grid(
     prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
 
     nv.initGrid.argtypes = [
-        c.c_char_p,             # name
-        c.c_int,                # source_format
+        c.c_char_p,  # name
+        c.c_int,  # source_format
         c.POINTER(c.c_size_t),  # cartesian_order [3]usize
         c.POINTER(c.c_double),  # transform_flat [16]f64
-        c.c_bool,               # normalize
+        c.c_bool,  # normalize
         c.POINTER(c.c_size_t),  # dims [3]usize
-        c.POINTER(c.c_float),   # prune ?f32, null = no pruning
+        c.POINTER(c.c_float),  # prune ?f32, null = no pruning
     ]
     nv.initGrid.restype = c.c_void_p
 
@@ -143,8 +145,8 @@ def _populate_grid(
     data = np.ascontiguousarray(data, dtype=np.float32)
 
     nv.populateGrid.argtypes = [
-        c.c_void_p,             # grid ptr
-        c.POINTER(c.c_float),   # data
+        c.c_void_p,  # grid ptr
+        c.POINTER(c.c_float),  # data
     ]
     nv.populateGrid.restype = c.c_size_t
 
@@ -200,11 +202,11 @@ def _init_vol(
     grids_arr = (c.c_void_p * grid_count)(*grid_ptrs)
 
     nv.initVol.argtypes = [
-        c.c_char_p,             # basename
-        c.c_char_p,             # save_folder
-        c.c_bool,               # overwrite
+        c.c_char_p,  # basename
+        c.c_char_p,  # save_folder
+        c.c_bool,  # overwrite
         c.POINTER(c.c_void_p),  # grid_ptrs
-        c.c_size_t,             # grid_count
+        c.c_size_t,  # grid_count
     ]
     nv.initVol.restype = c.c_void_p
 

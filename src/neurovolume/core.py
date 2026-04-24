@@ -1,5 +1,5 @@
 from . import _internal
-
+import ctypes as c
 import os
 import numpy as np  # DEPENDENCY: really the only one we should have!
 from pathlib import Path
@@ -29,143 +29,166 @@ def prep_ndarray(
     return arr
 
 
-def grid(
-    name: str,
-    data: np.ndarray,
-    transform: np.ndarray = np.eye(4),
-    prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
-    normalize: bool = False,
-    source_format: str = "ndarray",
-    cartesian_order: tuple = (0, 1, 2),
-):
-    """
-    Parameters:
-    ------------
-    name:
-        The name of the grid
-    data: np.ndarray
-        The data to put in the grid!
-        Don't forget to prepare it using prep_ndarray!
-        right now this should probably be f32!
-    transform: np.ndarray
-        The affine transform matrix to apply to this grid to move it around. .nii files often include these
-        for alignment. Otherwise, check out the `transform` module for some sane abstractions (rotation,
-        translation, etc)
-    prune: np.float32
-        The higher this is, the more sparse the volume becomes. At some point it begins to degrade the volume
-        Balance between disk space usage and fidelity as per your use case.
-        Robbie has set this to a very specific, small default for some math reasons that, frankly, elude
-        me at this time (perhaps he will write a blog post!)
-    normalize: bool
-        WARNING:
-        Not used at the moment! Keeping it around as it might be needed in VDB sequences, normally you should
-        normalize before yeeting your arrays into the grids (prep_ndarray does normalize for you)
-    source_format: str (although it should be an enum or something later)
-        ndarray is the only option here! Similar story as normalize.
-    cartesian_order:
-        The order in which the dimensions are laid out. prep_ndarray makes it so (0,1,2) works just fine,
-        but if you want to do something weird, this is here for you.
-        Note to self and those curious, iirc 4D time series sequences are (3,0,1,2)
+class SaveConfig:
+    def __init__(
+        self,
+        basename: str,
+        # default assumes running from root:
+        folder=Path("output"),
+        # version numbering not implemented yet:
+        overwrite=True,
+    ):
+        """
+        Holds all the information needed to write out a VDB to disk
 
-    """
-    dims = data.shape
-    if data.ndim != 3:
-        # for vdbs with arbitrarily high (or low) dimensions... submit a PR you maniac!
-        # (it is possible according to the paper fyi)
-        # just think of the posibilities: n-dimensional physarum simulations!
-        # higher dimensional slime!
-        raise ValueError(f"Grids must be 3D! {data.ndim}D grids not supported")
-    if source_format == "ndarray":
-        source_format_int = 0
-    else:
-        raise ValueError(
-            f"{source_format} not supported yet. Presently only numpy arrays are supported!"
+        Parameters:
+        ----------
+
+        basename: str
+            the name of the VDB, or VDB sequence.
+        folder: Path
+            The locaiton where you want to save the VDB to.
+            Defaults to an "output" folder on root (so update your gitignores to include *.vdb!)
+        overwrite: bool
+            Right now the only available option is True
+            if False, you should get numbered versions of your VDB (but I haven't implemented that yet)
+        """
+        folder.mkdir(parents=True, exist_ok=True)
+        if not overwrite:
+            raise ValueError(
+                "Non overwrite functions (like numbering) not implemented yet!"
+            )
+        self.basename = basename
+        self.folder = folder
+        self.overwrite = overwrite
+
+
+class Grid:
+    # I must admit the naming repititions throughout this entire
+    # stack are mildly cursed!
+    def __init__(
+        self,
+        name: str,
+        data: np.ndarray,
+        transform: np.ndarray = np.eye(4),
+        prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
+        normalize: bool = False,
+        source_format: str = "ndarray",
+        cartesian_order: tuple = (0, 1, 2),
+    ):
+        """
+        Gathers all the information you need to build a grid
+
+        Parameters:
+        ------------
+        name:
+            The name of the grid
+        data: np.ndarray
+            The data to put in the grid!
+            Don't forget to prepare it using prep_ndarray!
+            right now this should probably be f32!
+        transform: np.ndarray
+            The affine transform matrix to apply to this grid to move it around. .nii files often include these
+            for alignment. Otherwise, check out the `transform` module for some sane abstractions (rotation,
+            translation, etc)
+        prune: np.float32
+            The higher this is, the more sparse the volume becomes. At some point it begins to degrade the volume
+            Balance between disk space usage and fidelity as per your use case.
+            Robbie has set this to a very specific, small default for some math reasons that, frankly, elude
+            me at this time (perhaps he will write a blog post!)
+        normalize: bool
+            WARNING:
+            Not used at the moment! Keeping it around as it might be needed in VDB sequences, normally you should
+            normalize before yeeting your arrays into the grids (prep_ndarray does normalize for you)
+        source_format: str (although it should be an enum or something later)
+            ndarray is the only option here! Similar story as normalize.
+        cartesian_order:
+            The order in which the dimensions are laid out. prep_ndarray makes it so (0,1,2) works just fine,
+            but if you want to do something weird, this is here for you.
+            Note to self and those curious, iirc 4D time series sequences are (3,0,1,2)
+
+        """
+        self.name = name
+        self.data = data
+        self.transform = transform
+        self.prune = prune
+        self.normalize = normalize
+        self.cartesian_order = cartesian_order
+        self.dims = data.shape
+        if data.ndim != 3:
+            # for vdbs with arbitrarily high (or low) dimensions... submit a PR you maniac!
+            # (it is possible according to the paper fyi)
+            # just think of the posibilities: n-dimensional physarum simulations!
+            # higher dimensional slime!
+            raise ValueError(f"Grids must be 3D! {data.ndim}D grids not supported")
+        if source_format == "ndarray":
+            self.source_format_int = 0
+        else:
+            raise ValueError(
+                f"{source_format} not supported yet. Presently only numpy arrays are supported!"
+            )
+
+    def c_ptr(self) -> c.c_void_p:
+        """
+        Returns the C pointer to the initialized grid
+        """
+        return _internal._init_grid(
+            self.name,
+            self.transform,
+            self.dims,
+            self.prune,
+            self.normalize,
+            self.source_format_int,
+            self.cartesian_order,
         )
 
-    g = _internal._init_grid(
-        name,
-        transform,
-        dims,
-        prune,
-        normalize,
-        source_format_int,
-        cartesian_order,
-    )
-    _internal._populate_grid(g, data)
 
-    # BUG:
-    # so this is problematic because the user has to call
-    # deinit grid which... I mean this is a Python library
-    # we can't have manual memory management here!
-    # IDEA:
-    # perhaps this just creates an object with all the data needed to make a grid
-    # and then you feed that into the "volume creator" which:
-    # generates the grids,
-    # adds them to a volume
-    # saves them out
-    #  and then deinits everything
-    # I think that's a good idea!
+class Volume:
+    def __init__(
+        self,
+        grids: list[Grid],
+        save_config: SaveConfig,
+    ):
+        """
+        Gathers all the information you need to build a VDB volume!
+        (i.e, a static VDB, not a squence)
 
-    # BOOKMARK:
+        Parameters:
+        -----------
+        name:
+            The name of your VDB.
+            Will be saved out as <name>.vdb
+        grids:
+            The individual grids that make up your VDB
+        save_config: SaveConfig
+           All the info you need to write a VDB to disk!
+        """
+        self.grids = grids
+        self.save_config = save_config
 
+    def write(self):
+        """
+        Writes the VDB to disk
 
-# def ndarray_to_vdb(
-#     arr: np.ndarray,  # dont for get to prep this!
-#     basename: str,
-#     source_fps=1,  # static default
-#     output_dir:Path=Path("../../output/"),
-#     overwrite=True,  # presently the only option
-#     transform=np.eye(4),
-#     playback_fps=24.0,
-#     speed=1.0,
-#     interpolation_flag=0,  # default to direct, chose 1 for cross
-#     # Robbie's reccomended default prune amount
-#     # very specfici but it works quite well
-#     # translated from zig to Python with Claude
-#     prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
-# ) -> Path:
-#     """
-#     returns path to VDB
-#     if VDB sequence, returns path to folder
-#     """
-#     dims = arr.shape
-#     if arr.ndim == 3:
-#         vol = _init_three_dim(
-#             basename=basename,
-#             save_folder=output_dir,
-#             overwrite=True,
-#             data=arr,
-#             transform=transform,  # 4x4 affine float64
-#             dims=dims,  # (x, y, z)
-#             prune = prune,
-#         )
-#         _save_three_dim(vol)
-#         _deinit_three_dim(vol)
-#         # kinda hacky tbh
-#         # this happens way down on the zig level and it would be
-#         # cooler to have the path percolate back up
-#         return output_dir / f"{basename}.vdb"
+        WARN: this assumes the grids are the same dimensions
+            definately write some functionality to make them
+            take different dimensions!
+        """
+        grid_ptrs = []
+        for g in self.grids:
+            grid_ptr = g.c_ptr()
+            grid_ptrs.append(grid_ptr)
+            _internal._populate_grid(grid_ptr, g.data)
 
-#     elif arr.ndim == 4:
-#         seq_out = output_dir / basename
-#         os.makedirs(seq_out, exist_ok=True)
-#         vol = _init_four_dim(
-#             basename=basename,
-#             save_folder=seq_out,
-#             overwrite=True,
-#             data=arr,
-#             transform=transform,
-#             source_fps=source_fps,
-#             playback_fps=playback_fps,
-#             speed=speed,
-#             dims=dims,
-#             prune=prune,
+        vol = _internal._init_vol(
+            self.save_config.basename,
+            self.save_config.folder,
+            self.save_config.overwrite,
+            grid_ptrs,
+        )
+        _internal._save_vol(vol)
 
-#         )
-#         _save_four_dim(vol, interpolation_flag)
-#         _deinit_four_dim(vol)
-#         # should return the folder containing the seq
-#         # see above comment at end of .ndim == 3
-#         return Path(f"{output_dir}/{basename}")
-#     else:
-#         raise ValueError(f"{arr.ndim}D not supported")
+        _internal._deinit_vol(vol)
+
+        for gp in grid_ptrs:
+            _internal._deinit_grid(gp)
