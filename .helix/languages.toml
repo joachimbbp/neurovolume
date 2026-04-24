@@ -7,8 +7,8 @@ name = "python"
 auto-format = true
 formatter = { command = "ruff", args = ["format", "-"] }
 language-servers = [
-    {name = "pyright"},
-    {name = "ruff-lsp"},
+    {name = "pyright"}, # type chekcer
+    {name = "ruff"}, # linter and formatter
 ]
 
 [language-server.pyright]
@@ -16,7 +16,7 @@ command = "pyright-langserver"
 args = ["--stdio"]
 config = {}
 
-[language-server.ruff-lsp]
+[language-server.ruff]
 command = "ruff"
 args = ["server"]
 config = {}

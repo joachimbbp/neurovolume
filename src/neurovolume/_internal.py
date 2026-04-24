@@ -52,10 +52,11 @@ def _b(string):
     """
     return string.encode("utf-8")
 
+# C_INTEROP:
+
 # LLM: claude wrote this function
 def _init_grid(
     name: str,
-    data: np.ndarray,
     transform: np.ndarray,
     dims: tuple,
     prune: np.float32 | None,
@@ -72,9 +73,6 @@ def _init_grid(
     ------------
     name: str
         Identifier for this grid (becomes the VDB grid name).
-    data: np.ndarray
-        3D volume, C-contiguous float32, normalized to [0, 1].
-        Used here only to validate shape; the buffer is sent via _populate_grid.
     transform: np.ndarray
         4x4 affine as float64.
     dims: tuple
@@ -177,7 +175,6 @@ def _init_vol(
     save_folder: Path,
     overwrite: bool,
     grid_ptrs: list[c.c_void_p],
-    source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
 ) -> c.c_void_p:
     """
     Initializes a volume.Vol on the Zig heap from a list of already-populated Grid
@@ -193,8 +190,6 @@ def _init_vol(
         If False, saves with a version suffix instead of clobbering.
     grid_ptrs: list[c.c_void_p]
         Pointers from _init_grid() + _populate_grid(). Must outlive the Vol.
-    source_format: int
-        0 = ndarray (mirrors volume.zig SourceFormat enum)
 
     Returns:
     ------------
@@ -208,7 +203,6 @@ def _init_vol(
         c.c_char_p,             # basename
         c.c_char_p,             # save_folder
         c.c_bool,               # overwrite
-        c.c_int,                # source_format
         c.POINTER(c.c_void_p),  # grid_ptrs
         c.c_size_t,             # grid_count
     ]
@@ -218,7 +212,6 @@ def _init_vol(
         _b(basename),
         _b(str(save_folder)),
         overwrite,
-        source_format,
         grids_arr,
         grid_count,
     )
