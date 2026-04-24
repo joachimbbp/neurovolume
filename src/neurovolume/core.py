@@ -174,6 +174,16 @@ class Volume:
             definately write some functionality to make them
             take different dimensions!
         """
+        # BOOKMARK:
+        # todo:
+        # so this is tough...
+        # transform happens on the VDB level
+        # SO: calculate the final size of the two grids ontop of each other
+        # AFTER they have the transformation applied
+        # then TRANSFORM them (via modifiying their affine) so that they
+        # appear properly within the origin
+        # its certainly some linear algebra to consider but very doable!
+
         grid_ptrs = []
         for g in self.grids:
             grid_ptr = g.c_ptr()

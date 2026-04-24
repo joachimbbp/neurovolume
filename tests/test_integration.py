@@ -15,25 +15,34 @@ import os
 import nibabel as nib  # DEPENDENCY: it's only for testing, see above todo
 
 
-anat_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
+t1_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
+t2_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T2w.nii.gz?versionId=03RdL5vjveFH52_H3viGPwhXCrbRcGau"
 bold_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q"
 # # HACK: this whole thing is a little hacky/messy
-anat_gz = "./tests/data/sub-01_T1w.nii.gz"
-anat = "./tests/data/sub-01_t1w.nii"
+t1_gz = "./tests/data/sub-01_T1w.nii.gz"
+t2_gz = "./tests/data/sub-01_T2w.nii.gz"
+t1_nii = "./tests/data/sub-01_T1w.nii"
+t2_nii = "./tests/data/sub-01_T2w.nii"
 bold_gz = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii.gz"
-bold = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
+bold_nii = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
+
 # print("Downloading test data...")
-# TODO: check if not present?
-# urlretrieve(anat_url, anat_gz)
+# # TODO: check if not present?
+# urlretrieve(t1_url, t1_gz)
+# urlretrieve(t2_url, t2_gz)
 # urlretrieve(bold_url, bold_gz)
+
 # print("Test data downloaded")
-# print("Unzipping...")
-# TODO: DRY:
-# with gzip.open(anat_gz, "rb") as f_in:
-#     with open(anat, "wb") as f_out:
+# # print("Unzipping...")
+# # TODO: DRY:
+# with gzip.open(t1_gz, "rb") as f_in:
+#     with open(t1_nii, "wb") as f_out:
+#         shutil.copyfileobj(f_in, f_out)
+# with gzip.open(t2_gz, "rb") as f_in:
+#     with open(t2_nii, "wb") as f_out:
 #         shutil.copyfileobj(f_in, f_out)
 # with gzip.open(bold_gz, "rb") as f_in:
-#     with open(bold, "wb") as f_out:
+#     with open(bold_nii, "wb") as f_out:
 #         shutil.copyfileobj(f_in, f_out)
 
 vdb_out = Path("tests/data/vdb_out")
@@ -125,138 +134,35 @@ def test_hello():
     nv.hello()
 
 
-def test_multi_grid():
-    print("multigrid testing with sphere and pyramid!")
-    sphere_arr = _build_sphere()[0]
-    pyramid_arr = _build_pyramid()[0]
-
-    grids = [nv.Grid("sphere", sphere_arr), nv.Grid("pyramid", pyramid_arr)]
-
-    # CLEAN: maybe save_config can be rolled better into volume tbh
-    save_config = nv.SaveConfig("shapes", folder=vdb_out)
-
-    vol = nv.Volume(grids, save_config)
-
-    vol.write()
+def _get_nii_data(nii_path: str) -> np.ndarray:
+    """
+    returns nii data prepared for neurovolume
+    """
+    os.makedirs(vdb_out, exist_ok=True)
+    img = nib.load(nii_path)
+    # some lsp issues with nibabel it seems
+    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    # more lsp gore
+    arr = nv.prep_ndarray(data, (0, 2, 1))
+    print(f"{nii_path}\n  {arr.shape=}  {img.affine=}")
 
 
-# TODO: Better testing! This is very incomplete as of now
+def test_mri():
+    t1 = _get_nii_data(t1_nii)
+    t2 = _get_nii_data(t2_nii)
+    # TODO: BOLD! but that requires a big sequence refactor!
 
 
-# DEPRECATED: we're using grids now!
-# TODO: rewrite this with the new functionality
-# def test_pyramid(size=64000):
-#     pyramid, built = _build_pyramid()
-#     assert built, "Pyramid should build successfully"
+# def test_multi_grid():
+#     print("multigrid testing with sphere and pyramid!")
+#     sphere_arr = _build_sphere()[0]
+#     pyramid_arr = _build_pyramid()[0]
 
-#     identity = np.eye(4)
-#     # perhaps this pattern isn't the best?
-#     print(f"identity matrix: \n{identity}")
-#     scaled = nv.transform.scale(identity, 0.030)
-#     print(f"scaled affine: \n{scaled}")
-#     translated = nv.transform.translate(scaled, 1.6, 0.7, 0.2)
-#     print(f"translated affine:\n{translated}")
-#     rotated = nv.transform.rotate(translated, 0, 0, np.deg2rad(44))
-#     print(f"rotated matrix: \n{rotated}")
+#     grids = [nv.Grid("sphere", sphere_arr), nv.Grid("pyramid", pyramid_arr)]
 
-#     prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
+#     # CLEAN: maybe save_config can be rolled better into volume tbh
+#     save_config = nv.SaveConfig("shapes", folder=vdb_out)
 
-#     os.makedirs(vdb_out, exist_ok=True)
-#     print(
-#         "saved to: ",
-#         nv.ndarray_to_vdb(
-#             prepped_pyramid,
-#             "pyramid_offset_default_prune",
-#             output_dir=vdb_out,
-#             transform=rotated,
-#         ),
-#     )
-#     print(
-#         "saved to: ",
-#         nv.ndarray_to_vdb(
-#             prepped_pyramid,
-#             "pyramid_offset_no_prune",
-#             output_dir=vdb_out,
-#             transform=rotated,
-#             prune=None,
-#         ),
-#     )
-#     print("pyramids saved")
+#     vol = nv.Volume(grids, save_config)
 
-
-# def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
-#     brain_scale = 0.01
-#     brain_y_move = -2.38251
-#     scaled = nv.scale(affine, brain_scale)
-#     moved = nv.translate(scaled, 0, brain_y_move, 0)
-#     return moved
-
-
-# def test_anat_static_no_prune():
-#     os.makedirs(vdb_out, exist_ok=True)
-#     img = nib.load(anat)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-
-#     print(
-#         "saved to: ",
-#         nv.ndarray_to_vdb(
-#             nv.prep_ndarray(data, (0, 2, 1)),
-#             "anat_offset_no_prune",
-#             output_dir=vdb_out,
-#             transform=_test_pattern_pos(img.affine),
-#             prune=None,
-#         ),
-#     )
-
-#     print(
-#         "saved to: ",
-#         nv.ndarray_to_vdb(
-#             nv.prep_ndarray(data, (0, 2, 1)),
-#             "anat_offset_0p05_prune",
-#             output_dir=vdb_out,
-#             transform=_test_pattern_pos(img.affine),
-#             prune=np.float32(0.05),
-#         ),
-#     )
-
-
-# def test_bold_seq_direct():
-#     img = nib.load(bold)
-#     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-
-#     print(
-#         "saved to: ",
-#         nv.ndarray_to_vdb(
-#             nv.prep_ndarray(data, (3, 0, 2, 1)),
-#             "bold_direct_offset",
-#             source_fps=_get_fps(img),
-#             output_dir=vdb_out,
-#             transform=_test_pattern_pos(img.affine),
-#         ),
-#     )
-#     print(
-#         "saved to: ",
-#         nv.ndarray_to_vdb(
-#             nv.prep_ndarray(data, (3, 0, 2, 1)),
-#             "bold_direct_offset_0p05_prune",
-#             source_fps=_get_fps(img),
-#             output_dir=vdb_out,
-#             transform=_test_pattern_pos(img.affine),
-#             prune=np.float32(0.05),
-#         ),
-#     )
-
-
-# #
-# #
-# # # def test_bold_seq_fade():
-# # #     img = nib.load(bold)
-# # #     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-# # #
-# # #     nv.ndarray_to_vdb(
-# # #         nv.prep_ndarray(data, (3, 0, 2, 1)),
-# # #         "bold_fade",
-# # #         source_fps=_get_fps(img),
-# # #         output_dir=vdb_out,
-# # #         interpolation_flag=1,  # TODO: enum on python side with named interpolations
-# # #     )
+#     vol.write()
