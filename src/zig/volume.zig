@@ -146,14 +146,14 @@ pub const Vol = struct {
         v: *Vol,
     ) !void {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        const gpa_alloc = gpa.allocator();
+        const alloc = gpa.allocator();
         defer _ = gpa.deinit();
-
-        var w: std.Io.Writer.Allocating = .init(gpa_alloc);
-        try w.writer.print("{s}/{s}.vdb", .{ v.save_config.folder, v.save_config.basename });
-
-        var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+        var arena = std.heap.ArenaAllocator.init(alloc);
         defer arena.deinit();
+
+        var w: std.Io.Writer.Allocating = .init(alloc);
+        defer w.deinit();
+        try w.writer.print("{s}/{s}.vdb", .{ v.save_config.folder, v.save_config.basename });
 
         var buffer: [2048]u8 = undefined;
         const file = try std.fs.cwd().createFile(w.written(), .{});
@@ -233,7 +233,7 @@ test "volume grid tests" {
         cube_arr.shape[0..3].*,
         prune,
     );
-    try cube_grid.populate(cube_prepped);
+    try cube_grid.populate(cube_prepped, null);
 
     //GATHER GRIDS:
     var grids = [_]vdb543.Grid{ sphere_grid.grid.?, cube_grid.grid.? };
