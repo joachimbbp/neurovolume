@@ -12,34 +12,42 @@ const SaveConfiguration = volume.SaveConfiguration;
 //TODO: integrate
 // this was originally in volume
 
-// FOUR_DIM:
-//Four dimensional volume structure
-//nothing is allocated in this struct so no deinit
-pub const Sequence = struct {
+//basically a Volume with a temporal dimension
+pub const Channel = struct {
+    // Maybe the chanel takes in the source 4D THEN builds the grids based on interpolation
+    // later these are reconciled for trailing frames in the Sequence
+    // this necesitates the source to be 4D (so if you want a constant anat scan under your
+    // bold or something then you'd have to build that numpy array!)
     name: []const u8,
     data: []const f32,
-    // cartesian_order: [3]usize, // ndarray: 0 1 2 (identity, prep_4D_ndarray handles reorder), nifti1: TBD
-    // source_format: SourceFormat,
-    // affine_transform: [4][4]f64, //spatial transform only!
+
+    //grids stuff
+    cartesian_order: [3]usize, //WARN: 4D specific prep_ndarray probably needed!
+    source_format: SourceFormat,
+    affine_transform: [4][4]f64, //might change for 4D? Not sure
+    normalize: bool,
+    dims: [3]usize,
+    prune: ?f32,
+    frames: []volume.Grid,
+
+    //determines how the grids get written:
     source_fps: f32,
-    playback_fps: f32,
     speed: f32, //0.0 for still, 1.0 for normal, 2.0 for 2X speed
-    // dims: [4]usize, // time first, then domain specific spatial layout
-    // frame_size: usize,
+
+    //ALWAYS set from the corresponding sequence:
+    playback_fps: f32,
     save_config: SaveConfiguration,
-    // normalizer: util.Normalizer,
-    // prune: ?f32,
 
     fn frameFile(
-        v: *Sequence,
+        c: *Channel,
         frame_num: usize,
-        scratch: std.mem.Allocator,
+        allocator: std.mem.Allocator,
     ) !std.fs.File {
-        var w: std.Io.Writer.Allocating = .init(scratch);
+        var w: std.Io.Writer.Allocating = .init(allocator);
         defer w.deinit();
         try w.writer.print("{s}/{s}_{d:0>4}.vdb", .{
-            v.save_config.folder,
-            v.save_config.basename,
+            c.save_config.folder,
+            c.save_config.basename,
             frame_num,
         });
         return try std.fs.cwd().createFile(w.written(), .{});
@@ -47,14 +55,14 @@ pub const Sequence = struct {
 
     //extracts a 3D slice of a 4D ndarray to a grid
     pub fn extractFrame(
-        self: *Sequence,
+        c: *Channel,
         allocator: std.mem.Allocator,
         frame_num: usize,
         vdb: *vdb543.VDB,
     ) !void {
-        if (frame_num >= self.dims[0]) return AccessError.IndexOutOBounds;
-        const start = frame_num * self.frame_size;
-        const end = ((frame_num + 1) * self.frame_size);
+        if (frame_num >= c.dims[0]) return AccessError.IndexOutOBounds;
+        const start = frame_num * c.frame_size;
+        const end = ((frame_num + 1) * c.frame_size);
 
         var i: usize = 0;
         var cart = [_]i32{ 0, 0, 0 };
@@ -62,11 +70,11 @@ pub const Sequence = struct {
             try vdb.putVoxel(
                 allocator,
                 .from(.{
-                    cart[self.cartesian_order[0]],
-                    cart[self.cartesian_order[1]],
-                    cart[self.cartesian_order[2]],
+                    cart[c.cartesian_order[0]],
+                    cart[c.cartesian_order[1]],
+                    cart[c.cartesian_order[2]],
                 }),
-                self.normalizer.apply(self.data[start..end][i]),
+                c.normalizer.apply(c.data[start..end][i]),
             );
 
             i += 1;
@@ -74,11 +82,19 @@ pub const Sequence = struct {
                 i32,
                 3,
                 &cart,
-                .{ self.dims[1], self.dims[2], self.dims[3] },
+                .{ c.dims[1], c.dims[2], c.dims[3] },
             )) break;
         }
-        if (self.prune) |tol| vdb.prune(tol);
+        if (c.prune) |tol| vdb.prune(tol);
     }
+};
+
+// FOUR_DIM:
+//Four dimensional volume structure
+//nothing is allocated in this struct so no deinit
+pub const Sequence = struct {
+    playback_fps: f32,
+    save_config: SaveConfiguration,
 
     //TODO: DRY maybe
     pub fn extractInterpolatedFrame(
@@ -110,7 +126,11 @@ pub const Sequence = struct {
             const voxel_value = (av * a_scalar) + (bv * b_scalar);
             try vdb.putVoxel(
                 allocator,
-                .from(.{ cart[self.cartesian_order[0]], cart[self.cartesian_order[1]], cart[self.cartesian_order[2]] }),
+                .from(.{
+                    cart[self.cartesian_order[0]],
+                    cart[self.cartesian_order[1]],
+                    cart[self.cartesian_order[2]],
+                }),
                 voxel_value,
             );
 
@@ -171,8 +191,6 @@ pub const Interpolator = struct {
     }
 
     pub fn write(self: *Interpolator) !void {
-        //HACK: I don't love this pattern, I feel like there is a more elegant way
-        //to chose a function below without having to write it out in two places
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const gpa_alloc = gpa.allocator();
         defer _ = gpa.deinit();

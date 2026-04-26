@@ -3,43 +3,44 @@ const random = std.crypto.random;
 const eql = std.mem.eql;
 const ArrayList = std.array_list.Managed;
 
-//and a function to do so to boot!
-pub const Normalizer = struct {
-    //Initializes the normalizer
-    //You need to get your min and max
-    //values from your volume.
-    //Set active to false if you don't
-    //want to normalize
-    pub fn init(
-        active: bool,
-        min_value: f32,
-        max_value: f32,
-    ) Normalizer {
-        //Note: f32 for now but one day this
-        //might be an arbitrary type to
-        //match the VDB functionality
-        const minmax_delta = min_value - max_value;
-        return .{
-            .active = active,
-            .min_val = min_value,
-            .minmax_delta = minmax_delta,
-        };
-    }
-    active: bool,
-    min_val: f32,
-    minmax_delta: f32,
+//DEPRECATED: all normalization takes place on Python level
+// (for now, uncomment and bring back for zig library)
+// pub const Normalizer = struct {
+//     //Initializes the normalizer
+//     //You need to get your min and max
+//     //values from your volume.
+//     //Set active to false if you don't
+//     //want to normalize
+//     pub fn init(
+//         active: bool,
+//         min_value: f32,
+//         max_value: f32,
+//     ) Normalizer {
+//         //Note: f32 for now but one day this
+//         //might be an arbitrary type to
+//         //match the VDB functionality
+//         const minmax_delta = min_value - max_value;
+//         return .{
+//             .active = active,
+//             .min_val = min_value,
+//             .minmax_delta = minmax_delta,
+//         };
+//     }
+//     active: bool,
+//     min_val: f32,
+//     minmax_delta: f32,
 
-    pub fn apply(self: Normalizer, value: f32) f32 {
-        if (!self.active) {
-            return value;
-        }
-        return (value - self.min_val) / self.minmax_delta;
-    }
-};
+//     pub fn apply(self: Normalizer, value: f32) f32 {
+//         if (!self.active) {
+//             return value;
+//         }
+//         return (value - self.min_val) / self.minmax_delta;
+//     }
+// };
 
 //from "/path/to/hamspam.nii.gz"
 //returns "hamspam"
-pub fn stripped_basename(path: []const u8) []const u8 {
+pub fn strippedBasename(path: []const u8) []const u8 {
     //CURSED: shared reference with what zig calls a "basename" but so be it!
     const filename = std.fs.path.basename(path);
     var splits = std.mem.splitSequence(u8, filename, ".");

@@ -1,5 +1,4 @@
 const std = @import("std");
-const ndarray = @import("ndarray.zig");
 const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 
@@ -66,7 +65,6 @@ pub const Grid = struct {
         data: []const f32,
     ) !void {
         //setup based on data source type (just numpy for now)
-        var normalizer: util.Normalizer = undefined;
         //switch prongs just open for possible future native fileparsing
         switch (g.source_format) {
             .ndarray => {
@@ -77,7 +75,6 @@ pub const Grid = struct {
                     );
                     return DataFormatError.UnsupportedUsage;
                 }
-                normalizer = util.Normalizer.init(false, 0.0, 1.0);
             },
             //extraction logic only works for slices derrived from ndarrays at the moment
             else => return DataFormatError.NotSupportedYet,
@@ -93,7 +90,7 @@ pub const Grid = struct {
             try g.vdb.putVoxel(
                 g.alloc,
                 .from(.{ cart[g.cartesian_order[0]], cart[g.cartesian_order[1]], cart[g.cartesian_order[2]] }),
-                normalizer.apply(data[i]),
+                data[i],
             );
             i += 1;
             if (!util.incrementCartesian(

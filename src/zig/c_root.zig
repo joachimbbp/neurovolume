@@ -1,4 +1,3 @@
-const ndarray = @import("ndarray.zig");
 const volume = @import("volume.zig");
 const std = @import("std");
 const vdb543 = @import("vdb543.zig");
