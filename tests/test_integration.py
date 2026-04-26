@@ -1,6 +1,7 @@
 # INSTRUCTIONS: must be run from project root, NOT ./tests
 import numpy as np
 import neurovolume as nv
+from neurovolume import transform as t
 from urllib.request import urlretrieve
 import gzip
 import shutil
@@ -160,6 +161,19 @@ def test_mri():
     print("mri tests...")
     t1_arr, t1_img = _get_nii_data(t1_nii)
     t2_arr, t2_img = _get_nii_data(t2_nii)
+
+    id = np.eye(4)
+    # ORDER MATTERS! probably bake that into a function
+    # CLAUDE FIX:
+    id = np.eye(4)
+    scaled = t.scale(id, x=0.514, y=4.087, z=0.535)
+    rotated = t.rotate(scaled, x=0, y=2.1012, z=0, degrees=True)
+    t2_transformed = t.translate(rotated, x=-141.62, y=-96.52, z=-88.623)
+
+    # translated = t.translate(id, x=-141.62, y=-96.52, z=-88.623)
+    # rotated = t.rotate(translated, x=0, y=2.1012, z=0)
+    # t2_transformed = t.scale(rotated, x=0.514, y=4.087, z=0.535)
+
     # bold_arr, bold_img = _get_nii_data(bold_nii)
     # bold_slice = get_3d_slice(bold_arr, transform=bold_img.affine)
     # TODO: BOLD! but that requires a big sequence refactor!
@@ -169,10 +183,10 @@ def test_mri():
     grids = [
         nv.Grid("t1", t1_arr, transform=t1_img.affine),
         # nv.Grid("bold_slice", bold_slice, transform=bold_img.affine),
-        # nv.Grid("t2", t2_arr, transform=t2_img.affine), # source issues with affine!
+        nv.Grid("t2", t2_arr, transform=t2_transformed),  # source issues with affine!
     ]
 
-    save_config = nv.SaveConfig("t1", folder=vdb_out)
+    save_config = nv.SaveConfig("mri_t1_t2_v2", folder=vdb_out)
     print("setting volume...")
     vol = nv.Volume(
         grids,
@@ -180,20 +194,6 @@ def test_mri():
     )
     vol.write()
     # TODO you REALLY need to have the save config go in write, it's so weird otherwise!
-    grids_t2 = [
-        # nv.Grid("t1", t1_arr, transform=t1_img.affine),
-        # nv.Grid("bold_slice", bold_slice, transform=bold_img.affine),
-        nv.Grid("t2_no_transform", t2_arr),  # source issues with affine!
-    ]
-    save_config_t2 = nv.SaveConfig("t2_no_tranform", folder=vdb_out)
-    print("setting volume...")
-    vol_t2 = nv.Volume(
-        grids_t2,
-        save_config=save_config_t2,
-    )
-
-    print("writing mri to disk...")
-    vol_t2.write()
 
 
 def test_multi_grid():

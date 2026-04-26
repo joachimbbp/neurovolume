@@ -1,5 +1,7 @@
+import math
 import numpy as np
 import sys
+
 
 def _verify_and_copy_affine(affine: np.ndarray) -> np.ndarray:
     if len(affine) != 4:
@@ -8,16 +10,18 @@ def _verify_and_copy_affine(affine: np.ndarray) -> np.ndarray:
         )
     return affine.copy()
 
-def scale(affine: np.ndarray, scale: float) -> np.ndarray:
+
+def scale(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
     """
-    modifies the affine matrix's scale
-    usage: scale is the percentage to scale by
-            0.5 is 50% etc
+    Modifies the affine matrix's scale per axis.
+    Usage: scale_x/y/z is the percentage to scale by (0.5 = 50%, etc.)
+    Preserves oblique orientation by scaling full columns, not just diagonal.
     """
     o = _verify_and_copy_affine(affine)
-    # LLM: scale full 3x3 submatrix (not just diagonal) to preserve oblique orientation
-    o[:3, :3] *= scale  # scale+rotation columns
-    o[:3, 3] *= scale  # translation
+    # Scale each spatial column independently to preserve oblique orientation
+    o[:3, 0] *= x  # i (x) column
+    o[:3, 1] *= y  # j (y) column
+    o[:3, 2] *= z  # k (z) column
     return o
 
 
@@ -34,13 +38,20 @@ def translate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
     return o
 
 
-def rotate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
+def rotate(
+    affine: np.ndarray, x: float, y: float, z: float, degrees=False
+) -> np.ndarray:
     """
     modifies the affine matrix's rotation
     usage: x y and z are respective theta in the 3D rotation
-    (i think its radians...)
+    uses radians. If you use degrees, tick 'degrees' to True and we'll convert
     """
     o = _verify_and_copy_affine(affine)
+
+    if degrees:
+        x = math.radians(x)
+        y = math.radians(y)
+        z = math.radians(z)
     # LLM: all below (I am way too lazy)
     Rx = np.array(
         [
