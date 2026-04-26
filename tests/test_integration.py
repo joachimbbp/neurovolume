@@ -162,14 +162,19 @@ def test_mri():
     t1_arr, t1_img = _get_nii_data(t1_nii)
     t2_arr, t2_img = _get_nii_data(t2_nii)
 
-    id = np.eye(4)
     # ORDER MATTERS! probably bake that into a function
     # CLAUDE FIX:
-    id = np.eye(4)
-    scaled = t.scale(id, x=0.514, y=4.087, z=0.535)
-    rotated = t.rotate(scaled, x=0, y=2.1012, z=0, degrees=True)
-    t2_transformed = t.translate(rotated, x=-141.62, y=-96.52, z=-88.623)
-
+    t2_transformed = t.from_blender(
+        translate_x=-141.62,
+        translate_y=-96.52,
+        translate_z=-88.623,
+        rotate_x=0,
+        rotate_y=2.1012,
+        rotate_z=0,
+        scale_x=0.514,
+        scale_y=4.087,
+        scale_z=0.535,
+    )
     # translated = t.translate(id, x=-141.62, y=-96.52, z=-88.623)
     # rotated = t.rotate(translated, x=0, y=2.1012, z=0)
     # t2_transformed = t.scale(rotated, x=0.514, y=4.087, z=0.535)
@@ -186,7 +191,7 @@ def test_mri():
         nv.Grid("t2", t2_arr, transform=t2_transformed),  # source issues with affine!
     ]
 
-    save_config = nv.SaveConfig("mri_t1_t2_v2", folder=vdb_out)
+    save_config = nv.SaveConfig("mri_t1_t2_v3", folder=vdb_out)
     print("setting volume...")
     vol = nv.Volume(
         grids,

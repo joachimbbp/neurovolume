@@ -11,6 +11,28 @@ def _verify_and_copy_affine(affine: np.ndarray) -> np.ndarray:
     return affine.copy()
 
 
+def from_blender(
+    translate_x: float,
+    translate_y: float,
+    translate_z: float,
+    rotate_x: float,
+    rotate_y: float,
+    rotate_z: float,
+    scale_x: float,
+    scale_y: float,
+    scale_z: float,
+) -> np.ndarray:
+    """
+    Builds an affine matrix from Blender transform values (Location, Rotation, Scale).
+    Rotation values are in degrees (as shown in Blender's UI).
+    Apply order: Scale -> Rotate -> Translate
+    """
+    id = np.eye(4)
+    scaled = scale(id, x=scale_x, y=scale_y, z=scale_z)
+    rotated = rotate(scaled, x=rotate_x, y=rotate_y, z=rotate_z, degrees=True)
+    return translate(rotated, x=translate_x, y=translate_y, z=translate_z)
+
+
 def scale(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
     """
     Modifies the affine matrix's scale per axis.
