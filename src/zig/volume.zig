@@ -63,6 +63,7 @@ pub const Grid = struct {
     pub fn populate(
         g: *Grid,
         data: []const f32,
+        start_end: ?[2]usize, // for sequences
     ) !void {
         //setup based on data source type (just numpy for now)
         //switch prongs just open for possible future native fileparsing
@@ -87,10 +88,14 @@ pub const Grid = struct {
         var i: usize = 0;
         var cart = [_]i32{ 0, 0, 0 };
         while (true) {
+            var value = data[i];
+            if (start_end) {
+                value = data[start_end[0]..start_end[1]][i];
+            }
             try g.vdb.putVoxel(
                 g.alloc,
                 .from(.{ cart[g.cartesian_order[0]], cart[g.cartesian_order[1]], cart[g.cartesian_order[2]] }),
-                data[i],
+                value,
             );
             i += 1;
             if (!util.incrementCartesian(
@@ -208,7 +213,7 @@ test "volume grid tests" {
         sphere_arr.shape[0..3].*,
         prune,
     );
-    try sphere_grid.populate(sphere_prepped);
+    try sphere_grid.populate(sphere_prepped, null);
 
     //CUBE:
     const cube_arr = try numpy.loadNpy(arena.allocator(), "cube.npy");
