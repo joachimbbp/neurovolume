@@ -1,6 +1,5 @@
 from . import _internal
 import ctypes as c
-import os
 import numpy as np  # DEPENDENCY: really the only one we should have!
 from pathlib import Path
 

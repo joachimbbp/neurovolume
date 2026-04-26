@@ -134,7 +134,7 @@ def test_hello():
     nv.hello()
 
 
-def _get_nii_data(nii_path: str) -> np.ndarray:
+def _get_nii_data(nii_path: str):
     """
     returns nii data prepared for neurovolume
     """
@@ -145,24 +145,67 @@ def _get_nii_data(nii_path: str) -> np.ndarray:
     # more lsp gore
     arr = nv.prep_ndarray(data, (0, 2, 1))
     print(f"{nii_path}\n  {arr.shape=}  {img.affine=}")
+    return arr, img
+
+
+# Using np.index_exp for dynamic slicing
+# CLAUDE WROTE:
+def get_3d_slice(arr, axis, index):
+    idx = [slice(None)] * arr.ndim
+    idx[axis] = index
+    return arr[tuple(idx)]
 
 
 def test_mri():
-    t1 = _get_nii_data(t1_nii)
-    t2 = _get_nii_data(t2_nii)
+    print("mri tests...")
+    t1_arr, t1_img = _get_nii_data(t1_nii)
+    t2_arr, t2_img = _get_nii_data(t2_nii)
+    # bold_arr, bold_img = _get_nii_data(bold_nii)
+    # bold_slice = get_3d_slice(bold_arr, transform=bold_img.affine)
     # TODO: BOLD! but that requires a big sequence refactor!
 
+    # this works BUT the t2 affine is faulty (source data issue!)
+    print("setting grids...")
+    grids = [
+        nv.Grid("t1", t1_arr, transform=t1_img.affine),
+        # nv.Grid("bold_slice", bold_slice, transform=bold_img.affine),
+        # nv.Grid("t2", t2_arr, transform=t2_img.affine), # source issues with affine!
+    ]
 
-# def test_multi_grid():
-#     print("multigrid testing with sphere and pyramid!")
-#     sphere_arr = _build_sphere()[0]
-#     pyramid_arr = _build_pyramid()[0]
+    save_config = nv.SaveConfig("t1", folder=vdb_out)
+    print("setting volume...")
+    vol = nv.Volume(
+        grids,
+        save_config=save_config,
+    )
+    vol.write()
+    # TODO you REALLY need to have the save config go in write, it's so weird otherwise!
+    grids_t2 = [
+        # nv.Grid("t1", t1_arr, transform=t1_img.affine),
+        # nv.Grid("bold_slice", bold_slice, transform=bold_img.affine),
+        nv.Grid("t2_no_transform", t2_arr),  # source issues with affine!
+    ]
+    save_config_t2 = nv.SaveConfig("t2_no_tranform", folder=vdb_out)
+    print("setting volume...")
+    vol_t2 = nv.Volume(
+        grids_t2,
+        save_config=save_config_t2,
+    )
 
-#     grids = [nv.Grid("sphere", sphere_arr), nv.Grid("pyramid", pyramid_arr)]
+    print("writing mri to disk...")
+    vol_t2.write()
 
-#     # CLEAN: maybe save_config can be rolled better into volume tbh
-#     save_config = nv.SaveConfig("shapes", folder=vdb_out)
 
-#     vol = nv.Volume(grids, save_config)
+def test_multi_grid():
+    print("multigrid testing with sphere and pyramid...")
+    sphere_arr = _build_sphere(30)[0]
+    pyramid_arr = _build_pyramid()[0]
 
-#     vol.write()
+    grids = [nv.Grid("sphere", sphere_arr), nv.Grid("pyramid", pyramid_arr)]
+
+    # CLEAN: maybe save_config can be rolled better into volume tbh
+    save_config = nv.SaveConfig("shapes_mismatch", folder=vdb_out)
+
+    vol = nv.Volume(grids, save_config)
+
+    vol.write()
