@@ -2,8 +2,6 @@ const std = @import("std");
 const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
 
-const numpy = @import("numpy.zig");
-
 pub const DataFormatError = error{ NotSupportedYet, UnsupportedUsage };
 pub const AccessError = error{IndexOutOBounds};
 
@@ -80,7 +78,6 @@ pub const Grid = struct {
             //extraction logic only works for slices derrived from ndarrays at the moment
             else => return DataFormatError.NotSupportedYet,
         }
-        // var vdb: vdb543.VDB = .init(0);
 
         //populate the data
         //formerly in fn extract()
@@ -122,15 +119,7 @@ pub const Grid = struct {
         try grid.addMetadata(g.alloc, g.name);
         g.grid = grid; // store into the optional field that's already on Grid
 
-        // //LLM suggestion to heap allocate
-        // //(probably a more memory efficient way to do this tbh!)
-        // const grid = try g.alloc.create(vdb543.Grid);
-        // grid.* = vdb543.Grid.init(&g.vdb, g.name, g.affine_transform, .empty);
-
         // //TODO: see if you can add prune level to metadata
-        // try grid.addMetadata(g.alloc, g.name);
-        // //ugh... deep copy might not be the best but idk?
-        // g.vdb = grid.*;
     }
 
     pub fn deinit(g: *Grid) void {
@@ -144,6 +133,7 @@ pub const Vol = struct {
 
     pub fn save(
         v: *Vol,
+        frame_num: ?usize,
     ) !void {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const alloc = gpa.allocator();
@@ -153,8 +143,15 @@ pub const Vol = struct {
 
         var w: std.Io.Writer.Allocating = .init(alloc);
         defer w.deinit();
-        try w.writer.print("{s}/{s}.vdb", .{ v.save_config.folder, v.save_config.basename });
-
+        if (frame_num) {
+            try w.writer.print("{s}/{s}_{d:0>4}.vdb", .{
+                v.save_config.folder,
+                v.save_config.basename,
+                frame_num,
+            });
+        } else {
+            try w.writer.print("{s}/{s}.vdb", .{ v.save_config.folder, v.save_config.basename });
+        }
         var buffer: [2048]u8 = undefined;
         const file = try std.fs.cwd().createFile(w.written(), .{});
         defer file.close();
@@ -175,6 +172,7 @@ pub const Vol = struct {
 };
 
 test "volume grid tests" {
+    const numpy = @import("numpy.zig");
     std.debug.print("🏁Grid tests\n", .{});
     const identity = [4][4]f64{
         .{ 1, 0, 0, 0 },
@@ -250,5 +248,5 @@ test "volume grid tests" {
             .overwrite = true,
         },
     };
-    try multi_grid_vol.save();
+    try multi_grid_vol.save(false);
 }

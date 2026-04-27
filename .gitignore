@@ -14,3 +14,7 @@ dist
 
 *.npy
 *.vdb
+
+
+*.nii
+*.gz
