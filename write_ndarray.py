@@ -114,4 +114,4 @@ def save_rotating_pyramid(radius=64, n_frames=48, filename="rotating_pyramid.npy
 save_sphere()
 save_cube()
 save_rotating_cube()
-save_rotating_cube()
+save_rotating_pyramid()

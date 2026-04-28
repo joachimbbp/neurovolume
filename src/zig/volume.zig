@@ -86,8 +86,8 @@ pub const Grid = struct {
         var cart = [_]i32{ 0, 0, 0 };
         while (true) {
             var value = data[i];
-            if (start_end) {
-                value = data[start_end[0]..start_end[1]][i];
+            if (start_end != null) {
+                value = data[start_end.?[0]..start_end.?[1]][i];
             }
             try g.vdb.putVoxel(
                 g.alloc,
@@ -143,11 +143,11 @@ pub const Vol = struct {
 
         var w: std.Io.Writer.Allocating = .init(alloc);
         defer w.deinit();
-        if (frame_num) {
+        if (frame_num != null) {
             try w.writer.print("{s}/{s}_{d:0>4}.vdb", .{
                 v.save_config.folder,
                 v.save_config.basename,
-                frame_num,
+                frame_num.?,
             });
         } else {
             try w.writer.print("{s}/{s}.vdb", .{ v.save_config.folder, v.save_config.basename });
@@ -155,7 +155,6 @@ pub const Vol = struct {
         var buffer: [2048]u8 = undefined;
         const file = try std.fs.cwd().createFile(w.written(), .{});
         defer file.close();
-        w.deinit();
         var writer = file.writer(&buffer);
 
         var vdb: vdb543.VDB = .init(0);
@@ -248,5 +247,5 @@ test "volume grid tests" {
             .overwrite = true,
         },
     };
-    try multi_grid_vol.save(false);
+    try multi_grid_vol.save(null);
 }

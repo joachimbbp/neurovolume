@@ -1,10 +1,12 @@
 const volume = @import("volume.zig");
+const sequence = @import("sequence.zig");
 const std = @import("std");
 const vdb543 = @import("vdb543.zig");
 
 //make sure even unused stuff from volume is testsed:
 test {
     std.testing.refAllDecls(volume);
+    std.testing.refAllDecls(sequence);
 }
 
 // WIP: moving threeDim to use grids
@@ -100,7 +102,7 @@ pub export fn populateGrid(
     if (ptr) |p| { //LLM: unwrapping pattern
         const grid_ptr: *volume.Grid = @ptrCast(@alignCast(p)); //LLM: casting pattern
         const len = grid_ptr.dims[0] * grid_ptr.dims[1] * grid_ptr.dims[2];
-        grid_ptr.populate(data[0..len]) catch |e| {
+        grid_ptr.populate(data[0..len], null) catch |e| {
             return cErr(e).code;
         };
     } //else would be a null ptr
@@ -203,7 +205,7 @@ pub export fn deinitVol(ptr: ?*anyopaque) void {
 pub export fn saveVol(ptr: ?*anyopaque) usize {
     if (ptr) |p| { //LLM: unwrapping pattern
         const vol_ptr: *volume.Vol = @ptrCast(@alignCast(p)); //LLM: casting pattern
-        vol_ptr.save() catch |e| {
+        vol_ptr.save(null) catch |e| {
             return cErr(e).code;
         };
     } //else would be a null ptr

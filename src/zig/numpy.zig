@@ -5,7 +5,7 @@ const std = @import("std");
 
 pub const NpyArray = struct {
     data: []u8,
-    shape: []usize,
+    shape: []usize, //jbbp: I believe t x y z
     dtype: []u8,
     fortran_order: bool,
     allocator: std.mem.Allocator,

@@ -20,16 +20,15 @@ pub const Channel = struct {
     source_format: SourceFormat,
     affine_transform: [4][4]f64, //might change for 4D? Not sure
     // normalize: bool, //unused rn
-    dims: [3]usize,
+    dims: [4]usize, //T X Y Z
     prune: ?f32,
     num_frames: usize,
-    frames: []volume.Grid,
 
     //extracts a 3D slice of a 4D ndarray to a grid
     pub fn extractFrame(
         c: *Channel,
         frame_num: usize,
-    ) !void {
+    ) !vdb543.Grid {
         if (frame_num >= c.dims[0]) return AccessError.IndexOutOBounds;
         var frame_grid = try volume.Grid.init(
             c.alloc,
@@ -38,49 +37,61 @@ pub const Channel = struct {
             .ndarray,
             c.affine_transform,
             false,
-            c.dims[1..4].*,
+            c.dims[1..4].*, //omits [0] (time dimension)
             c.prune,
         );
         errdefer frame_grid.deinit();
 
-        const start_end: [2]usize = .{ frame_num * c.frame_size, ((frame_num + 1) * c.frame_size) };
+        //TODO: eventually set this in a Channel.init() method!
+        const frame_size = c.dims[1] * c.dims[2] * c.dims[3];
+
+        const start_end: [2]usize = .{ frame_num * frame_size, ((frame_num + 1) * frame_size) };
         try frame_grid.populate(c.data, start_end);
-        c.frames[frame_num] = frame_grid;
+        return frame_grid.grid.?;
     }
 };
 
 //Four dimensional volume structure
 //nothing is allocated in this struct so no deinit
 pub const Sequence = struct {
-    channels: []Channel,
+    channels: []const *Channel,
     save_config: SaveConfiguration,
 
     //probably call in with an arena allocator if you are saving lots of frames!
-    pub fn saveFrame(s: *Sequence, frame_num: usize) !void {
+    pub fn saveFrame(s: *Sequence, frame_num: usize, alloc: std.mem.Allocator) !void {
+        const grids = try alloc.alloc(vdb543.Grid, s.channels.len);
+
         //this more or less builds a volume with all the grids in the channels
         // at the appropriate frame
 
-        var grids: [s.channels.len]volume.Grid = .{};
-        for (s.channel, 0..) |channel, i| {
-            grids[i] = channel.frames[frame_num];
+        for (s.channels, 0..) |channel, i| {
+            //BOOKMARK:
+            grids[i] = try channel.extractFrame(frame_num);
         }
 
-        const frame_vol: volume.Vol = .{
+        var frame_vol: volume.Vol = .{
             .grids = grids,
             .save_config = s.save_config,
         };
-        frame_vol.save(frame_num);
+        try frame_vol.save(frame_num);
     }
 
-    pub fn saveSequence(s: *Sequence) !void {
-        const seq_len = s.channel[0].num_frames;
+    pub fn save(s: *Sequence) !void {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        const gpa_alloc = gpa.allocator();
+        defer _ = gpa.deinit();
+
+        var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+        defer arena.deinit();
+
+        const seq_len = s.channels[0].num_frames;
         for (s.channels) |channel| {
             if (seq_len != channel.num_frames) {
                 // pad these on the python level in numpy if need be
                 return ChannelError.MismatchedChannelLengths;
             }
             for (0..seq_len) |frame| {
-                saveFrame(frame);
+                try s.saveFrame(frame, arena.allocator());
             }
         }
     }
@@ -93,7 +104,7 @@ test "sequence tests" {
     // /Users/joachimpfefferkorn/repos/neurovolume/tests/data/sub-02_task-emotionalfaces_run-1_bold.nii
 
     const numpy = @import("numpy.zig");
-    std.debug.print("🏁Grid tests\n", .{});
+    std.debug.print("📽️ Sequence tests\n", .{});
     const identity = [4][4]f64{
         .{ 1, 0, 0, 0 },
         .{ 0, 1, 0, 0 },
@@ -111,7 +122,7 @@ test "sequence tests" {
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
 
-    //CUBE
+    //CUBE:
     const cube_arr = try numpy.loadNpy(arena.allocator(), "rotating_cube.npy");
     std.debug.print("CUBE SHAPE: {any}\n", .{cube_arr.shape});
     const cube_prepped = try numpy.prepNdarray(
@@ -126,12 +137,38 @@ test "sequence tests" {
         .frame_cartesian_order = [3]usize{ 0, 1, 2 },
         .source_format = .ndarray,
         .affine_transform = identity,
-        .dims = cube_arr.shape[0..3].*,
+        .dims = cube_arr.shape[0..4].*,
         .prune = prune,
-        .num_frames = cube_arr[0], //FIX: wait this is not quite right ubt it's late
-        //BOOKMARK:
-        // TODO: init with .frames most likely?
-
+        .num_frames = cube_arr.shape[0],
     };
-    _ = cube_channel; // autofix
+
+    //PYRAMID:
+    const pyramid_arr = try numpy.loadNpy(arena.allocator(), "rotating_pyramid.npy");
+    std.debug.print("PYRAMID SHAPE: {any}\n", .{pyramid_arr.shape});
+    const pyramid_prepped = try numpy.prepNdarray(
+        arena.allocator(),
+        pyramid_arr,
+        &[_]usize{ 3, 0, 2, 1 }, //IIRC this is correct for sequences?
+    );
+    var pyramid_channel: Channel = .{
+        .alloc = arena.allocator(),
+        .name = "pyramid",
+        .data = pyramid_prepped,
+        .frame_cartesian_order = [3]usize{ 0, 1, 2 },
+        .source_format = .ndarray,
+        .affine_transform = identity,
+        .dims = pyramid_arr.shape[0..4].*,
+        .prune = prune,
+        .num_frames = pyramid_arr.shape[0],
+    };
+
+    var shapes_seq: Sequence = .{
+        .channels = &[_]*Channel{ &cube_channel, &pyramid_channel },
+        .save_config = .{
+            .basename = "shapes",
+            .folder = "./tests/data/vdb_out",
+            .overwrite = true,
+        },
+    };
+    try shapes_seq.save();
 }
