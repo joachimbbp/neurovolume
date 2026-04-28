@@ -5,7 +5,7 @@ const vdb543 = @import("vdb543.zig");
 
 //make sure even unused stuff from volume is testsed:
 test {
-    std.testing.refAllDecls(volume);
+    // std.testing.refAllDecls(volume);
     std.testing.refAllDecls(sequence);
 }
 

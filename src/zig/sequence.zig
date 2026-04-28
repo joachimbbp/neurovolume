@@ -77,6 +77,9 @@ pub const Sequence = struct {
     }
 
     pub fn save(s: *Sequence) !void {
+        std.fs.cwd().access(s.save_config.folder, .{}) catch {
+            try std.fs.cwd().makeDir(s.save_config.folder);
+        };
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const gpa_alloc = gpa.allocator();
         defer _ = gpa.deinit();
@@ -85,14 +88,16 @@ pub const Sequence = struct {
         defer arena.deinit();
 
         const seq_len = s.channels[0].num_frames;
+        //validate first...:
         for (s.channels) |channel| {
             if (seq_len != channel.num_frames) {
-                // pad these on the python level in numpy if need be
                 return ChannelError.MismatchedChannelLengths;
             }
-            for (0..seq_len) |frame| {
-                try s.saveFrame(frame, arena.allocator());
-            }
+        }
+
+        // save each frame once
+        for (0..seq_len) |frame| {
+            try s.saveFrame(frame, arena.allocator());
         }
     }
 };
@@ -121,14 +126,14 @@ test "sequence tests" {
 
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
-
     //CUBE:
+    std.debug.print("cube seq...", .{});
     const cube_arr = try numpy.loadNpy(arena.allocator(), "rotating_cube.npy");
     std.debug.print("CUBE SHAPE: {any}\n", .{cube_arr.shape});
     const cube_prepped = try numpy.prepNdarray(
         arena.allocator(),
         cube_arr,
-        &[_]usize{ 3, 0, 2, 1 }, //IIRC this is correct for sequences?
+        &[_]usize{ 0, 1, 2, 3 },
     );
     var cube_channel: Channel = .{
         .alloc = arena.allocator(),
@@ -143,12 +148,15 @@ test "sequence tests" {
     };
 
     //PYRAMID:
+
+    std.debug.print("pyramid seq...", .{});
+
     const pyramid_arr = try numpy.loadNpy(arena.allocator(), "rotating_pyramid.npy");
     std.debug.print("PYRAMID SHAPE: {any}\n", .{pyramid_arr.shape});
     const pyramid_prepped = try numpy.prepNdarray(
         arena.allocator(),
         pyramid_arr,
-        &[_]usize{ 3, 0, 2, 1 }, //IIRC this is correct for sequences?
+        &[_]usize{ 0, 1, 2, 3 },
     );
     var pyramid_channel: Channel = .{
         .alloc = arena.allocator(),
@@ -162,13 +170,15 @@ test "sequence tests" {
         .num_frames = pyramid_arr.shape[0],
     };
 
+    std.debug.print("initializing sequence...", .{});
     var shapes_seq: Sequence = .{
         .channels = &[_]*Channel{ &cube_channel, &pyramid_channel },
         .save_config = .{
-            .basename = "shapes",
-            .folder = "./tests/data/vdb_out",
+            .basename = "shapes_multigrid",
+            .folder = "./tests/data/vdb_out/shapes_seq/",
             .overwrite = true,
         },
     };
+    std.debug.print("saving sequence...", .{});
     try shapes_seq.save();
 }
