@@ -23,6 +23,36 @@ pub const Channel = struct {
     dims: [4]usize, //T X Y Z
     prune: ?f32,
     num_frames: usize,
+    frame_size: usize,
+
+    pub fn init(
+        alloc: std.mem.Allocator,
+        name: []const u8,
+        data: []const f32,
+        //grids stuff
+        frame_cartesian_order: [3]usize, //WARN: 4D specific prep_ndarray probably needed!
+        source_format: SourceFormat,
+        affine_transform: [4][4]f64, //might change for 4D? Not sure
+        // normalize: bool, //unused rn
+        dims: [4]usize, //T X Y Z
+        prune: ?f32,
+        num_frames: usize,
+    ) !Channel {
+        return .{
+            .alloc = alloc,
+            .name = name,
+            .data = data,
+            .frame_cartesian_order = frame_cartesian_order,
+            .source_format = source_format,
+            .affine_transform = affine_transform,
+            .dims = dims,
+            .prune = prune,
+            .num_frames = num_frames,
+            .frame_size = dims[1] * dims[2] * dims[3],
+        };
+    }
+
+    //no deinit as nothing is heap allocated
 
     //extracts a 3D slice of a 4D ndarray to a grid
     pub fn extractFrame(
@@ -40,12 +70,8 @@ pub const Channel = struct {
             c.dims[1..4].*, //omits [0] (time dimension)
             c.prune,
         );
-        errdefer frame_grid.deinit();
 
-        //TODO: eventually set this in a Channel.init() method!
-        const frame_size = c.dims[1] * c.dims[2] * c.dims[3];
-
-        const start_end: [2]usize = .{ frame_num * frame_size, ((frame_num + 1) * frame_size) };
+        const start_end: [2]usize = .{ frame_num * c.frame_size, ((frame_num + 1) * c.frame_size) };
         try frame_grid.populate(c.data, start_end);
         return frame_grid.grid.?;
     }
@@ -135,17 +161,17 @@ test "sequence tests" {
         cube_arr,
         &[_]usize{ 0, 1, 2, 3 },
     );
-    var cube_channel: Channel = .{
-        .alloc = arena.allocator(),
-        .name = "cube",
-        .data = cube_prepped,
-        .frame_cartesian_order = [3]usize{ 0, 1, 2 },
-        .source_format = .ndarray,
-        .affine_transform = identity,
-        .dims = cube_arr.shape[0..4].*,
-        .prune = prune,
-        .num_frames = cube_arr.shape[0],
-    };
+    var cube_channel = try Channel.init(
+        arena.allocator(),
+        "cube",
+        cube_prepped,
+        [3]usize{ 0, 1, 2 },
+        .ndarray,
+        identity,
+        cube_arr.shape[0..4].*,
+        prune,
+        cube_arr.shape[0],
+    );
 
     //PYRAMID:
 
@@ -158,17 +184,17 @@ test "sequence tests" {
         pyramid_arr,
         &[_]usize{ 0, 1, 2, 3 },
     );
-    var pyramid_channel: Channel = .{
-        .alloc = arena.allocator(),
-        .name = "pyramid",
-        .data = pyramid_prepped,
-        .frame_cartesian_order = [3]usize{ 0, 1, 2 },
-        .source_format = .ndarray,
-        .affine_transform = identity,
-        .dims = pyramid_arr.shape[0..4].*,
-        .prune = prune,
-        .num_frames = pyramid_arr.shape[0],
-    };
+    var pyramid_channel = try Channel.init(
+        arena.allocator(),
+        "pyramid",
+        pyramid_prepped,
+        [3]usize{ 0, 1, 2 },
+        .ndarray,
+        identity,
+        pyramid_arr.shape[0..4].*,
+        prune,
+        pyramid_arr.shape[0],
+    );
 
     std.debug.print("initializing sequence...", .{});
     var shapes_seq: Sequence = .{

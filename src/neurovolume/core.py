@@ -29,6 +29,10 @@ def prep_ndarray(
 
 
 class SaveConfig:
+    """
+    Holds all the information needed to write out a VDB to disk
+    """
+
     def __init__(
         self,
         basename: str,
@@ -38,11 +42,8 @@ class SaveConfig:
         overwrite=True,
     ):
         """
-        Holds all the information needed to write out a VDB to disk
-
         Parameters:
         ----------
-
         basename: str
             the name of the VDB, or VDB sequence.
         folder: Path
@@ -63,8 +64,17 @@ class SaveConfig:
 
 
 class Grid:
-    # I must admit the naming repititions throughout this entire
-    # stack are mildly cursed!
+    """
+    A grid is a discrete part of your VDB, think "smoke" vs "fire"
+    in an explosions simulation. This class holds everything you need
+    to create a vdb Grid.
+
+    I must admit the naming repititions throughout this entire
+    stack are mildly cursed! There is a "grid" for VDBs and a "grid"
+    here that holds all the things you need to make a grid.
+    If you have a better name for this "meta grid", submit a PR!
+    """
+
     def __init__(
         self,
         name: str,
@@ -107,13 +117,6 @@ class Grid:
             Note to self and those curious, iirc 4D time series sequences are (3,0,1,2)
 
         """
-        self.name = name
-        self.data = data
-        self.transform = transform
-        self.prune = prune
-        self.normalize = normalize
-        self.cartesian_order = cartesian_order
-        self.dims = data.shape
         if data.ndim != 3:
             # for vdbs with arbitrarily high (or low) dimensions... submit a PR you maniac!
             # (it is possible according to the paper fyi)
@@ -126,6 +129,13 @@ class Grid:
             raise ValueError(
                 f"{source_format} not supported yet. Presently only numpy arrays are supported!"
             )
+        self.name = name
+        self.data = data
+        self.transform = transform
+        self.prune = prune
+        self.normalize = normalize
+        self.cartesian_order = cartesian_order
+        self.dims = data.shape
 
     def c_ptr(self) -> c.c_void_p:
         """
@@ -143,6 +153,11 @@ class Grid:
 
 
 class Volume:
+    """
+    A "Volume" holds all the information you need to write a static
+    VDB to disk
+    """
+
     def __init__(
         self,
         grids: list[Grid],
@@ -168,10 +183,6 @@ class Volume:
     def write(self):
         """
         Writes the VDB to disk
-
-        WARN: this assumes the grids are the same dimensions
-            definately write some functionality to make them
-            take different dimensions!
         """
 
         grid_ptrs = []
@@ -192,3 +203,62 @@ class Volume:
 
         for gp in grid_ptrs:
             _internal._deinit_grid(gp)
+
+
+class Channel:
+    """
+    A Channel holds all data that will be transformed into
+    a series of grids within a VDB sequence.
+
+    plz open a PR to explain this better!
+    """
+
+    def __init__(
+        # TODO: docstring
+        self,
+        name: str,
+        data: np.ndarray,
+        transform: np.ndarray,
+        dims: tuple,
+        num_frames: int,
+        prune: np.float32 | None,
+        source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
+        frame_cartesian_order: tuple = (0, 1, 2),
+    ):
+
+        if data.ndim != 4:
+            raise ValueError(
+                f"Channels must be 4D (Time X Y Z)! {data.ndim}D grids not supported\nFor a 3D ndarray use a Grid!"
+            )
+        if source_format == "ndarray":
+            self.source_format_int = 0
+        else:
+            raise ValueError(
+                f"{source_format} not supported yet. Presently only numpy arrays are supported!"
+            )
+
+        self.name = name
+        self.name = name
+        self.data = data
+        self.transform = transform
+        self.dims = dims
+        self.num_frames = num_frames
+        self.prune = prune
+        self.source_format = source_format
+        self.frame_cartesian_order = frame_cartesian_order
+
+    def c_ptr(self) -> c.c_void_p:
+        """
+        Returns the C pointer to the initialized channel
+        """
+        # BOOKMARK: find a way to unpack the robot generated code
+        return _internal._init_channel(
+            self.name,
+            self.data,
+            self.transform,
+            self.dims,
+            self.num_frames,
+            self.prune,
+            self.source_format_int,
+            self.cartesian_order,
+        )
