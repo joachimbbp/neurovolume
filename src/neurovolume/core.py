@@ -264,16 +264,16 @@ class Sequence:
         self.save_config = save_config
 
     def write(self):
-        _cn = []
+        _channels = []
 
         for channel in self.channels:
-            _cn.append(
+            _channels.append(
                 _internal._Channel(
                     channel.name,
                     channel.data,
                     channel.transform,
                     channel.dims,
-                    channel.dims[0],  # WARN: redundant!
+                    channel.dims[0],  # TODO: fix redundancy!
                     channel.prune,
                     channel.source_format_int,
                     channel.frame_cartesian_order,
@@ -284,6 +284,7 @@ class Sequence:
             self.save_config.basename,
             self.save_config.folder,
             self.save_config.overwrite,
-            _cn,
-            # TODO: channels
+            _channels,
         )
+        _sq.save()
+        # LLM's _Sequence.__del__() func should handle memory mgmt

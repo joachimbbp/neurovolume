@@ -9,7 +9,7 @@ const DataFormatError = volume.DataFormatError;
 const AccessError = volume.AccessError;
 const SourceFormat = volume.SourceFormat;
 const SaveConfiguration = volume.SaveConfiguration;
-const ChannelError = error{MismatchedChannelLengths};
+const ChannelError = error{ MismatchedRuntimes, NonValidDims };
 
 pub const Channel = struct {
     alloc: std.mem.Allocator,
@@ -18,26 +18,37 @@ pub const Channel = struct {
     //grids stuff
     frame_cartesian_order: [3]usize, //WARN: 4D specific prep_ndarray probably needed!
     source_format: SourceFormat,
-    affine_transform: [4][4]f64, //might change for 4D? Not sure
-    // normalize: bool, //unused rn
-    dims: [4]usize, //T X Y Z
-    prune: ?f32,
+    affine_transform: [4][4]f64,
+    spatial_dims: [3]usize,
     num_frames: usize,
-    frame_size: usize,
+    prune: ?f32,
+    frozen: bool,
 
+    //passing in a 3D array will result in a "frozen" array
+    // that just repeats the same volume for the duration of num_frames
     pub fn init(
         alloc: std.mem.Allocator,
         name: []const u8,
         data: []const f32,
         //grids stuff
-        frame_cartesian_order: [3]usize, //WARN: 4D specific prep_ndarray probably needed!
+        frame_cartesian_order: [3]usize, //WARN: 4D specific prep_ndarray probably needed?!
         source_format: SourceFormat,
-        affine_transform: [4][4]f64, //might change for 4D? Not sure
-        // normalize: bool, //unused rn
-        dims: [4]usize, //T X Y Z
+        affine_transform: [4][4]f64,
+        //WARN: don't forget to extract 0th dim to num_frames higher up
+        dims: [3]usize, // X Y Z
+        num_frames: usize, //the 0th dim in the numpy array
         prune: ?f32,
-        num_frames: usize,
     ) !Channel {
+        var frozen: bool = undefined;
+        if (num_frames == 1) {
+            frozen = true;
+        } else if (num_frames > 1) {
+            frozen = false;
+        } else {
+            std.debug.print("num_frames: {d}\n", .{});
+            return ChannelError.NonValidDims;
+        }
+
         return .{
             .alloc = alloc,
             .name = name,
@@ -45,10 +56,10 @@ pub const Channel = struct {
             .frame_cartesian_order = frame_cartesian_order,
             .source_format = source_format,
             .affine_transform = affine_transform,
-            .dims = dims,
+            .spatial_dims = dims,
             .prune = prune,
             .num_frames = num_frames,
-            .frame_size = dims[1] * dims[2] * dims[3],
+            .frozen = frozen,
         };
     }
 
@@ -59,20 +70,35 @@ pub const Channel = struct {
         c: *Channel,
         frame_num: usize,
     ) !vdb543.Grid {
-        if (frame_num >= c.dims[0]) return AccessError.IndexOutOBounds;
-        var frame_grid = try volume.Grid.init(
-            c.alloc,
-            c.name,
-            [3]usize{ 0, 1, 2 },
-            .ndarray,
-            c.affine_transform,
-            false,
-            c.dims[1..4].*, //omits [0] (time dimension)
-            c.prune,
-        );
+        var frame_grid: volume.Grid = undefined;
+        if (c.frozen) {
+            frame_grid = try volume.Grid.init(
+                c.alloc,
+                c.name,
+                [3]usize{ 0, 1, 2 },
+                .ndarray,
+                c.affine_transform,
+                false,
+                c.spatial_dims,
+                c.prune,
+            );
+            try frame_grid.populate(c.data, null);
+        } else {
+            frame_grid = try volume.Grid.init(
+                c.alloc,
+                c.name,
+                [3]usize{ 0, 1, 2 },
+                .ndarray,
+                c.affine_transform,
+                false,
+                c.spatial_dims,
+                c.prune,
+            );
 
-        const start_end: [2]usize = .{ frame_num * c.frame_size, ((frame_num + 1) * c.frame_size) };
-        try frame_grid.populate(c.data, start_end);
+            const frame_size = c.spatial_dims[0] * c.spatial_dims[1] * c.spatial_dims[2];
+            const start_end: [2]usize = .{ frame_num * frame_size, ((frame_num + 1) * frame_size) };
+            try frame_grid.populate(c.data, start_end);
+        }
         return frame_grid.grid.?;
     }
 };
@@ -117,7 +143,7 @@ pub const Sequence = struct {
         //validate first...:
         for (s.channels) |channel| {
             if (seq_len != channel.num_frames) {
-                return ChannelError.MismatchedChannelLengths;
+                return ChannelError.MismatchedRuntimes;
             }
         }
 
@@ -129,11 +155,6 @@ pub const Sequence = struct {
 };
 
 test "sequence tests" {
-    // BOOKMARK:
-    //TODO: download and align another BOLD image
-    // (probably best to test that on the python layer if you have to pad it)
-    // /Users/joachimpfefferkorn/repos/neurovolume/tests/data/sub-02_task-emotionalfaces_run-1_bold.nii
-
     const numpy = @import("numpy.zig");
     std.debug.print("📽️ Sequence tests\n", .{});
     const identity = [4][4]f64{
@@ -152,6 +173,11 @@ test "sequence tests" {
 
     var arena = std.heap.ArenaAllocator.init(gpa_alloc);
     defer arena.deinit();
+
+    //NOTES:
+    // cube seq...CUBE SHAPE: { 48, 128, 128, 128 }
+    // 0th is time here!
+
     //CUBE:
     std.debug.print("cube seq...", .{});
     const cube_arr = try numpy.loadNpy(arena.allocator(), "rotating_cube.npy");
@@ -168,15 +194,13 @@ test "sequence tests" {
         [3]usize{ 0, 1, 2 },
         .ndarray,
         identity,
-        cube_arr.shape[0..4].*,
-        prune,
+        cube_arr.shape[1..4].*,
         cube_arr.shape[0],
+        prune,
     );
 
     //PYRAMID:
-
     std.debug.print("pyramid seq...", .{});
-
     const pyramid_arr = try numpy.loadNpy(arena.allocator(), "rotating_pyramid.npy");
     std.debug.print("PYRAMID SHAPE: {any}\n", .{pyramid_arr.shape});
     const pyramid_prepped = try numpy.prepNdarray(
@@ -191,14 +215,44 @@ test "sequence tests" {
         [3]usize{ 0, 1, 2 },
         .ndarray,
         identity,
-        pyramid_arr.shape[0..4].*,
-        prune,
+        // WARN: assumption is time is 4th dim!
+        pyramid_arr.shape[1..4].*,
         pyramid_arr.shape[0],
+        prune,
     );
+
+    //STATIC SPHERE:
+    std.debug.print("sphere static seq...", .{});
+    const sphere_arr = try numpy.loadNpy(arena.allocator(), "sphere.npy");
+    std.debug.print("SPHERE SHAPE: {any}\n", .{sphere_arr.shape});
+
+    const sphere_prepped = try numpy.prepNdarray(
+        arena.allocator(),
+        sphere_arr,
+        &[_]usize{ 0, 1, 2, 3 },
+    );
+
+    var sphere_channel = try Channel.init(
+        arena.allocator(),
+        "sphere",
+        sphere_prepped,
+        [3]usize{ 0, 1, 2 },
+        .ndarray,
+        identity,
+        sphere_arr.shape[0..3].*, //i guess you need to make this explicit if it's open ended []usize
+        cube_arr.shape[0],
+        prune,
+    );
+
+    // SHAPES:
 
     std.debug.print("initializing sequence...", .{});
     var shapes_seq: Sequence = .{
-        .channels = &[_]*Channel{ &cube_channel, &pyramid_channel },
+        .channels = &[_]*Channel{
+            &cube_channel,
+            &pyramid_channel,
+            &sphere_channel,
+        },
         .save_config = .{
             .basename = "shapes_multigrid",
             .folder = "./tests/data/vdb_out/shapes_seq/",
