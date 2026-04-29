@@ -28,6 +28,14 @@ def prep_ndarray(
     return arr
 
 
+# WARN: mirroring the zig level for this is kinda ... meh?
+# not super needed imho
+# and not the best pattern on the Python side
+# might not even be a good idea on the zig side!
+# LOOK: you have to unpack this class just for it to get
+# re-packed on the zig side, so if that's a not sign to
+# get rid of it I don't know what is!
+# TODO: deprecate and replace!
 class SaveConfig:
     """
     Holds all the information needed to write out a VDB to disk
@@ -206,29 +214,29 @@ class Volume:
 
 
 class Channel:
-    """
-    A Channel holds all data that will be transformed into
-    a series of grids within a VDB sequence.
-
-    plz open a PR to explain this better!
-    """
+    # just a holder for the information
+    # sequence will deal with the lifetimes etc
 
     def __init__(
-        # TODO: docstring
         self,
         name: str,
         data: np.ndarray,
-        transform: np.ndarray,
-        dims: tuple,
-        num_frames: int,
-        prune: np.float32 | None,
-        source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
+        transform: np.ndarray = np.eye(4),
+        prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
+        normalize: bool = False,
+        source_format: str = "ndarray",
         frame_cartesian_order: tuple = (0, 1, 2),
     ):
+        # WARN: we need some cleanup around the
+        # frame_cartesian_order and the 4D sequence stuff
 
-        if data.ndim != 4:
+        if data.ndim != 3:
+            if data.ndim == 3:
+                print(
+                    "HINT: looks like you want a static VDB. Try initializing this in a Grid!"
+                )
             raise ValueError(
-                f"Channels must be 4D (Time X Y Z)! {data.ndim}D grids not supported\nFor a 3D ndarray use a Grid!"
+                f"Sequences must be 4D: time plus cartesian coords! {data.ndim}D grids not supported"
             )
         if source_format == "ndarray":
             self.source_format_int = 0
@@ -238,27 +246,44 @@ class Channel:
             )
 
         self.name = name
-        self.name = name
         self.data = data
         self.transform = transform
-        self.dims = dims
-        self.num_frames = num_frames
+        self.dims = data.shape
         self.prune = prune
-        self.source_format = source_format
+        self.normalize = normalize
         self.frame_cartesian_order = frame_cartesian_order
 
-    def c_ptr(self) -> c.c_void_p:
-        """
-        Returns the C pointer to the initialized channel
-        """
-        # BOOKMARK: find a way to unpack the robot generated code
-        return _internal._init_channel(
-            self.name,
-            self.data,
-            self.transform,
-            self.dims,
-            self.num_frames,
-            self.prune,
-            self.source_format_int,
-            self.cartesian_order,
+
+class Sequence:
+    def __init__(
+        self,
+        channels: list[Channel],
+        save_config: SaveConfig,
+    ):
+        self.channels = channels
+        self.save_config = save_config
+
+    def write(self):
+        _cn = []
+
+        for channel in self.channels:
+            _cn.append(
+                _internal._Channel(
+                    channel.name,
+                    channel.data,
+                    channel.transform,
+                    channel.dims,
+                    channel.dims[0],  # WARN: redundant!
+                    channel.prune,
+                    channel.source_format_int,
+                    channel.frame_cartesian_order,
+                )
+            )
+
+        _sq = _internal._Sequence(
+            self.save_config.basename,
+            self.save_config.folder,
+            self.save_config.overwrite,
+            _cn,
+            # TODO: channels
         )

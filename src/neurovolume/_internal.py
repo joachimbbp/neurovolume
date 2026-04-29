@@ -256,197 +256,159 @@ def _deinit_vol(vol_ptr: c.c_void_p) -> None:
 # ============================================================================
 
 
-# LLM: claude wrote this function
-def _init_channel(
-    name: str,
-    data: np.ndarray,
-    transform: np.ndarray,
-    dims: tuple,
-    num_frames: int,
-    prune: np.float32 | None,
-    source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
-    frame_cartesian_order: tuple = (0, 1, 2),
-) -> tuple[c.c_void_p, bytes, np.ndarray]:
+# LLM: claude wrote this class
+class _Channel:
     """
-    Initializes a sequence.Channel on the Zig heap and returns an opaque pointer.
+    Internal owner of a Zig sequence.Channel.
 
     BORROWING SEMANTICS: the Zig Channel does NOT copy `name` or `data` — it
-    holds pointers into Python-owned memory. The caller MUST keep the returned
-    `name_bytes` and `data_contig` alive for as long as the Channel pointer is
-    in use. The Python Channel class wraps these as instance attributes to
-    enforce this via reference counting.
+    holds raw pointers into Python-owned memory. This class pins that memory
+    as instance attributes (`_name_bytes`, `_data_contig`) so the Zig pointer
+    stays valid for the lifetime of the instance.
 
-    Parameters:
-    ------------
-    name: str
-        Identifier for this channel (becomes the VDB grid name on each frame).
-    data: np.ndarray
-        4D voxel data, will be made C-contiguous float32. Shape (T, X, Y, Z),
-        flattened length must equal dims[0]*dims[1]*dims[2]*dims[3].
-    transform: np.ndarray
-        4x4 affine as float64.
-    dims: tuple
-        (T, X, Y, Z) dimensions.
-    num_frames: int
-        Number of frames in the sequence (typically dims[0]).
-    prune:
-        Tolerance for sparsification. None disables pruning.
-    source_format: int
-        0 = ndarray (mirrors volume.zig SourceFormat enum)
-    frame_cartesian_order: tuple
-        Per-frame axis remap, usually (0, 1, 2).
-
-    Returns:
-    ------------
-    (channel_ptr, name_bytes, data_contig)
-        - channel_ptr: opaque ctypes pointer to the Channel on the Zig heap.
-          Must be freed by calling _deinit_channel().
-        - name_bytes: utf-8 encoded name. MUST be held alive by the caller.
-        - data_contig: C-contiguous float32 view of `data`. MUST be held alive
-          by the caller (may be the same object as `data` or a fresh copy).
+    Cleanup is automatic via __del__: the Zig Channel is freed first, then the
+    borrowed memory drops as the attribute dict is torn down.
     """
-    # Make data C-contiguous float32; keep a reference to return to caller
-    data_contig = np.ascontiguousarray(data, dtype=np.float32)
-    # Encode the name once, hand the same bytes object back to the caller
-    name_bytes = _b(name)
 
-    transform_arr = (c.c_double * 16)(
-        *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
-    )
-    dims_arr = (c.c_size_t * 4)(*dims)
-    cartesian_arr = (c.c_size_t * 3)(*frame_cartesian_order)
-    prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
+    def __init__(
+        self,
+        name: str,
+        data: np.ndarray,
+        transform: np.ndarray,
+        dims: tuple,
+        num_frames: int,
+        prune: np.float32 | None,
+        source_format: int = 0,
+        frame_cartesian_order: tuple = (0, 1, 2),
+    ):
+        # Pin the borrowed memory as instance attributes BEFORE handing
+        # pointers to Zig. If ascontiguousarray needs to copy, the copy is
+        # what Zig will read from, so it's what we need to hold alive.
+        self._data_contig = np.ascontiguousarray(data, dtype=np.float32)
+        self._name_bytes = _b(name)
 
-    nv.initChannel.argtypes = [
-        c.c_char_p,  # name
-        c.POINTER(c.c_float),  # data
-        c.POINTER(c.c_size_t),  # frame_cartesian_order [3]usize
-        c.c_int,  # source_format
-        c.POINTER(c.c_double),  # transform_flat [16]f64
-        c.POINTER(c.c_size_t),  # dims [4]usize
-        c.POINTER(c.c_float),  # prune ?f32, null = no pruning
-        c.c_size_t,  # num_frames
-    ]
-    nv.initChannel.restype = c.c_void_p
+        # Marshal scalars/fixed-size arrays into ctypes
+        transform_arr = (c.c_double * 16)(
+            *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
+        )
+        dims_arr = (c.c_size_t * 4)(*dims)
+        cartesian_arr = (c.c_size_t * 3)(*frame_cartesian_order)
+        prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
 
-    ptr = nv.initChannel(
-        name_bytes,
-        data_contig.ctypes.data_as(c.POINTER(c.c_float)),
-        cartesian_arr,
-        source_format,
-        transform_arr,
-        dims_arr,
-        prune_ptr,
-        num_frames,
-    )
-    if ptr is None:
-        raise RuntimeError("initChannel returned null — allocation or init failed")
-    return ptr, name_bytes, data_contig
+        nv.initChannel.argtypes = [
+            c.c_char_p,  # name
+            c.POINTER(c.c_float),  # data
+            c.POINTER(c.c_size_t),  # frame_cartesian_order [3]usize
+            c.c_int,  # source_format
+            c.POINTER(c.c_double),  # transform_flat [16]f64
+            c.POINTER(c.c_size_t),  # dims [4]usize
+            c.POINTER(c.c_float),  # prune ?f32, null = no pruning
+            c.c_size_t,  # num_frames
+        ]
+        nv.initChannel.restype = c.c_void_p
+
+        ptr = nv.initChannel(
+            self._name_bytes,
+            self._data_contig.ctypes.data_as(c.POINTER(c.c_float)),
+            cartesian_arr,
+            source_format,
+            transform_arr,
+            dims_arr,
+            prune_ptr,
+            num_frames,
+        )
+        if ptr is None:
+            raise RuntimeError("initChannel returned null — allocation or init failed")
+        self._ptr: c.c_void_p | None = ptr
+
+    @property
+    def c_ptr(self) -> c.c_void_p | None:
+        """The Zig Channel pointer. For internal use by _Sequence."""
+        return self._ptr
+
+    def __del__(self):
+        # Guard against partial construction (e.g. _init_channel raised before
+        # self._ptr was assigned).
+        if getattr(self, "_ptr", None):
+            nv.deinitChannel.argtypes = [c.c_void_p]
+            nv.deinitChannel.restype = None
+            nv.deinitChannel(self._ptr)
+            self._ptr = None
+        # _name_bytes and _data_contig are released automatically when the
+        # attribute dict is torn down after this method returns.
 
 
-# LLM: claude wrote this function
-def _deinit_channel(channel_ptr: c.c_void_p) -> None:
+# LLM: claude wrote this class
+class _Sequence:
     """
-    Frees a Channel previously returned by _init_channel().
-
-    Does NOT free the underlying name/data — those are Python-owned and will
-    be cleaned up by Python's GC once the Python Channel wrapper drops its
-    references.
-
-    IMPORTANT: any Sequence that references this channel must be saved and
-    deinitialized first.
-    """
-    nv.deinitChannel.argtypes = [c.c_void_p]
-    nv.deinitChannel.restype = None
-    nv.deinitChannel(channel_ptr)
-
-
-# LLM: claude wrote this function
-def _init_sequence(
-    basename: str,
-    save_folder: Path,
-    overwrite: bool,
-    channel_ptrs: list[c.c_void_p],
-) -> tuple[c.c_void_p, bytes, bytes]:
-    """
-    Initializes a sequence.Sequence on the Zig heap from a list of Channel
-    pointers and returns an opaque pointer.
+    Internal owner of a Zig sequence.Sequence.
 
     BORROWING SEMANTICS: the Zig Sequence does NOT copy `basename` or
-    `save_folder` — it holds pointers into Python-owned memory. The caller
-    MUST keep the returned bytes objects alive for as long as the Sequence
-    pointer is in use. The referenced Channel objects must also outlive the
-    Sequence; the Python Sequence wrapper enforces this by holding refs to
-    the Python Channel objects.
+    `save_folder`, and holds raw pointers to each Channel. This class pins:
+      - the encoded basename/folder bytes as instance attributes
+      - strong references to the _Channel objects (so they can't be GC'd
+        before this Sequence)
 
-    Parameters:
-    ------------
-    basename: str
-        Output filename prefix (without extension).
-    save_folder: Path
-        Folder to write the per-frame .vdb files into.
-    overwrite: bool
-        If False, saves with a version suffix instead of clobbering.
-    channel_ptrs: list[c.c_void_p]
-        Pointers from _init_channel(). Must outlive the Sequence.
-
-    Returns:
-    ------------
-    (sequence_ptr, basename_bytes, folder_bytes)
-        - sequence_ptr: opaque ctypes pointer. Must be freed by _deinit_sequence().
-        - basename_bytes, folder_bytes: utf-8 encoded strings. MUST be held alive
-          by the caller.
+    Cleanup ordering is enforced by the reference graph, not by __del__ timing:
+    _Sequence holds refs to its _Channels, so when _Sequence.__del__ runs the
+    Channels are still alive. Once _Sequence is collected, the Channels become
+    unreachable and their __del__s run.
     """
-    basename_bytes = _b(basename)
-    folder_bytes = _b(str(save_folder))
 
-    channel_count = len(channel_ptrs)
-    channels_arr = (c.c_void_p * channel_count)(*channel_ptrs)
+    def __init__(
+        self,
+        basename: str,
+        save_folder: Path,
+        overwrite: bool,
+        channels: list[_Channel],
+    ):
+        # Pin the channel objects so their _ptr / _name_bytes / _data_contig
+        # all stay alive for our lifetime.
+        self._channels = channels
 
-    nv.initSequence.argtypes = [
-        c.c_char_p,  # basename
-        c.c_char_p,  # save_folder
-        c.c_bool,  # overwrite
-        c.POINTER(c.c_void_p),  # channel_ptrs
-        c.c_size_t,  # channel_count
-    ]
-    nv.initSequence.restype = c.c_void_p
+        # Pin the borrowed strings
+        self._basename_bytes = _b(basename)
+        self._folder_bytes = _b(str(save_folder))
 
-    ptr = nv.initSequence(
-        basename_bytes,
-        folder_bytes,
-        overwrite,
-        channels_arr,
-        channel_count,
-    )
-    if ptr is None:
-        raise RuntimeError("initSequence returned null — allocation or init failed")
-    return ptr, basename_bytes, folder_bytes
+        # Build the C array of channel pointers (Zig copies these into its
+        # own slice during initSequence, so this local can be released after)
+        channel_count = len(channels)
+        channels_arr = (c.c_void_p * channel_count)(*[ch.c_ptr for ch in channels])
 
+        nv.initSequence.argtypes = [
+            c.c_char_p,  # basename
+            c.c_char_p,  # save_folder
+            c.c_bool,  # overwrite
+            c.POINTER(c.c_void_p),  # channel_ptrs
+            c.c_size_t,  # channel_count
+        ]
+        nv.initSequence.restype = c.c_void_p
 
-# LLM: claude wrote this function
-def _save_sequence(sequence_ptr: c.c_void_p) -> None:
-    """
-    Writes each frame of the Sequence to disk as a separate .vdb file,
-    using the basename/folder supplied at _init_sequence() time.
-    """
-    nv.saveSequence.argtypes = [c.c_void_p]
-    nv.saveSequence.restype = c.c_size_t
+        ptr = nv.initSequence(
+            self._basename_bytes,
+            self._folder_bytes,
+            overwrite,
+            channels_arr,
+            channel_count,
+        )
+        if ptr is None:
+            raise RuntimeError("initSequence returned null — allocation or init failed")
+        self._ptr: c.c_void_p | None = ptr
 
-    code = nv.saveSequence(sequence_ptr)
-    if code != 0:
-        raise RuntimeError(f"saveSequence failed with error code {code}")
+    def save(self) -> None:
+        """Writes each frame to disk as a separate .vdb file."""
+        nv.saveSequence.argtypes = [c.c_void_p]
+        nv.saveSequence.restype = c.c_size_t
 
+        code = nv.saveSequence(self._ptr)
+        if code != 0:
+            raise RuntimeError(f"saveSequence failed with error code {code}")
 
-# LLM: claude wrote this function
-def _deinit_sequence(sequence_ptr: c.c_void_p) -> None:
-    """
-    Frees a Sequence previously returned by _init_sequence().
-
-    Does NOT free the underlying Channel pointers — those must be freed
-    separately with _deinit_channel() after this call returns. Does NOT free
-    the basename/folder bytes — those are Python-owned.
-    """
-    nv.deinitSequence.argtypes = [c.c_void_p]
-    nv.deinitSequence.restype = None
-    nv.deinitSequence(sequence_ptr)
+    def __del__(self):
+        if getattr(self, "_ptr", None):
+            nv.deinitSequence.argtypes = [c.c_void_p]
+            nv.deinitSequence.restype = None
+            nv.deinitSequence(self._ptr)
+            self._ptr = None
+        # self._channels is released after this returns; each Channel's
+        # __del__ then runs in turn to free its Zig Channel.
