@@ -119,18 +119,18 @@ test {
 //     }
 // }
 
-// // ============================================================================
-// // Vol C ABI
-// // ============================================================================
+// ============================================================================
+// Vol C ABI
+// ============================================================================
 
-// // Initializes a volume.Vol from an array of Grid pointers (from initGrid,
-// // each one already populated via populateGrid).
-// // grid_ptrs: pointer to an array of ?*anyopaque, each pointing to a volume.Grid
-// // grid_count: number of grids in grid_ptrs
-// // returns a ptr to the Vol (or null on failure)
-// //
-// // NOTE: the referenced volume.Grid objects must outlive the Vol — do NOT call
-// // deinitGrid on any of them until after saveVol + deinitVol are done.
+// Initializes a volume.Vol from an array of Grid pointers (from initGrid,
+// each one already populated via populateGrid).
+// grid_ptrs: pointer to an array of ?*anyopaque, each pointing to a volume.Grid
+// grid_count: number of grids in grid_ptrs
+// returns a ptr to the Vol (or null on failure)
+//
+// NOTE: the referenced volume.Grid objects must outlive the Vol — do NOT call
+// deinitGrid on any of them until after saveVol + deinitVol are done.
 // pub export fn initVol(
 //     basename: [*:0]const u8,
 //     save_folder: [*:0]const u8,
@@ -278,6 +278,8 @@ test {
 //         allocator.destroy(channel_ptr);
 //     }
 // }
+
+//LLM: needs updating!
 
 // // ============================================================================
 // // Sequence C ABI

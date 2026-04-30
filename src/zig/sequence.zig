@@ -10,6 +10,13 @@ const AccessError = volume.AccessError;
 const SourceFormat = volume.SourceFormat;
 const SaveConfiguration = volume.SaveConfiguration;
 const ChannelError = error{ MismatchedRuntimes, NonValidDims };
+const WIPError = error{NotImplementedYet};
+
+const Interpolation = enum {
+    direct, //write the frames directly to disk
+    frozen, //just one frame repeated for the duration, assumes 3D input
+    fade, //cross fade between frames to stretch to the runtime
+};
 
 pub const Channel = struct {
     alloc: std.mem.Allocator,
@@ -21,8 +28,9 @@ pub const Channel = struct {
     affine_transform: [4][4]f64,
     spatial_dims: [3]usize,
     num_frames: usize,
+    interpolation: Interpolation,
     prune: ?f32,
-    frozen: bool,
+    //FPS probably as optionals!
 
     //passing in a 3D array will result in a "frozen" array
     // that just repeats the same volume for the duration of num_frames
@@ -37,10 +45,10 @@ pub const Channel = struct {
         //WARN: don't forget to extract 0th dim to num_frames higher up
         dims: [3]usize, // X Y Z
         num_frames: usize, //the 0th dim in the numpy array
-        frozen: bool,
         prune: ?f32,
+        interpolation: Interpolation,
     ) !Channel {
-        std.debug.print("{s}\n   num_frames: {d}\n   frozen: {}\n", .{ name, num_frames, frozen });
+        std.debug.print("{s}\n   num_frames: {d}\n   frozen: {}\n", .{ name, num_frames, interpolation });
 
         return .{
             .alloc = alloc,
@@ -50,21 +58,28 @@ pub const Channel = struct {
             .source_format = source_format,
             .affine_transform = affine_transform,
             .spatial_dims = dims,
-            .prune = prune,
             .num_frames = num_frames,
-            .frozen = frozen,
+            .interpolation = interpolation,
+            .prune = prune,
         };
     }
 
-    //no deinit as nothing is heap allocated
+    pub fn extractFrame(c: *Channel, frame_num: ?usize) !vdb543.Grid {
+        return switch (c.interpolation) {
+            .direct => try direct(c, frame_num, false),
+            .frozen => try direct(c, null, true),
+            .fade => WIPError.NotImplementedYet,
+        };
+    }
 
-    //extracts a 3D slice of a 4D ndarray to a grid
-    pub fn extractFrame(
+    pub fn direct(
         c: *Channel,
-        frame_num: usize,
+        frame_num: ?usize,
+        frozen: bool,
     ) !vdb543.Grid {
         var frame_grid: volume.Grid = undefined;
-        if (c.frozen) {
+        if (frozen) {
+            //TODO: option to freeze a specific frame from a 4D seq
             frame_grid = try volume.Grid.init(
                 c.alloc,
                 c.name,
@@ -89,7 +104,7 @@ pub const Channel = struct {
             );
 
             const frame_size = c.spatial_dims[0] * c.spatial_dims[1] * c.spatial_dims[2];
-            const start_end: [2]usize = .{ frame_num * frame_size, ((frame_num + 1) * frame_size) };
+            const start_end: [2]usize = .{ frame_num.? * frame_size, ((frame_num.? + 1) * frame_size) };
             try frame_grid.populate(c.data, start_end);
         }
         return frame_grid.grid.?;
@@ -189,8 +204,8 @@ test "sequence tests" {
         identity,
         cube_arr.shape[1..4].*,
         cube_arr.shape[0],
-        false,
         prune,
+        Interpolation.direct,
     );
 
     //PYRAMID:
@@ -212,8 +227,8 @@ test "sequence tests" {
         // WARN: assumption is time is 4th dim!
         pyramid_arr.shape[1..4].*,
         pyramid_arr.shape[0],
-        false,
         prune,
+        Interpolation.direct,
     );
 
     //STATIC SPHERE:
@@ -236,8 +251,8 @@ test "sequence tests" {
         identity,
         sphere_arr.shape[0..3].*, //i guess you need to make this explicit if it's open ended []usize
         cube_arr.shape[0],
-        true,
         prune,
+        Interpolation.frozen,
     );
 
     // SHAPES:
