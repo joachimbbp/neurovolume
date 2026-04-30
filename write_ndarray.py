@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def save_sphere(radius=128, filename="sphere.npy"):
+def save_sphere(radius=64, filename="sphere.npy"):
     diameter = radius * 2
     grid = np.zeros((diameter, diameter, diameter), dtype=np.float32)
     cx, cy, cz = radius, radius, radius

@@ -37,17 +37,10 @@ pub const Channel = struct {
         //WARN: don't forget to extract 0th dim to num_frames higher up
         dims: [3]usize, // X Y Z
         num_frames: usize, //the 0th dim in the numpy array
+        frozen: bool,
         prune: ?f32,
     ) !Channel {
-        var frozen: bool = undefined;
-        if (num_frames == 1) {
-            frozen = true;
-        } else if (num_frames > 1) {
-            frozen = false;
-        } else {
-            std.debug.print("num_frames: {d}\n", .{});
-            return ChannelError.NonValidDims;
-        }
+        std.debug.print("{s}\n   num_frames: {d}\n   frozen: {}\n", .{ name, num_frames, frozen });
 
         return .{
             .alloc = alloc,
@@ -196,6 +189,7 @@ test "sequence tests" {
         identity,
         cube_arr.shape[1..4].*,
         cube_arr.shape[0],
+        false,
         prune,
     );
 
@@ -218,6 +212,7 @@ test "sequence tests" {
         // WARN: assumption is time is 4th dim!
         pyramid_arr.shape[1..4].*,
         pyramid_arr.shape[0],
+        false,
         prune,
     );
 
@@ -229,7 +224,7 @@ test "sequence tests" {
     const sphere_prepped = try numpy.prepNdarray(
         arena.allocator(),
         sphere_arr,
-        &[_]usize{ 0, 1, 2, 3 },
+        &[_]usize{ 0, 1, 2 },
     );
 
     var sphere_channel = try Channel.init(
@@ -241,6 +236,7 @@ test "sequence tests" {
         identity,
         sphere_arr.shape[0..3].*, //i guess you need to make this explicit if it's open ended []usize
         cube_arr.shape[0],
+        true,
         prune,
     );
 
