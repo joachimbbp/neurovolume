@@ -12,7 +12,7 @@ const SaveConfiguration = volume.SaveConfiguration;
 const ChannelError = error{ MismatchedRuntimes, NonValidDims };
 const WIPError = error{NotImplementedYet};
 
-const Interpolation = enum {
+pub const Interpolation = enum {
     direct, //write the frames directly to disk
     frozen, //just one frame repeated for the duration, assumes 3D input
     fade, //cross fade between frames to stretch to the runtime

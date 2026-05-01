@@ -7,6 +7,7 @@ import ctypes as c
 import numpy as np  # DEPENDENCY:, the only one we should have!
 import sys
 import ctypes
+from enum import IntEnum
 from pathlib import Path
 
 
@@ -51,6 +52,14 @@ def _b(string):
     Equivalent to 'b"inputstring"'
     """
     return string.encode("utf-8")
+
+
+# Mirrors the sequence.zig Interpolation enum.
+# Order must stay in lockstep with the Zig declaration.
+class Interpolation(IntEnum):
+    direct = 0  # write source frames straight to disk
+    frozen = 1  # single 3D frame held for the entire output runtime
+    fade = 2  # cross-fade between source frames to stretch runtime
 
 
 # ============================================================================
@@ -275,9 +284,13 @@ class _Channel:
         name: str,
         data: np.ndarray,
         transform: np.ndarray,
-        dims: tuple,
+        dims: tuple,  # (X, Y, Z) — spatial only
         num_frames: int,
+        interpolation: Interpolation,
         prune: np.float32 | None,
+        source_fps: float | None = None,
+        playback_fps: float | None = None,
+        speed: float | None = None,
         source_format: int = 0,
         frame_cartesian_order: tuple = (0, 1, 2),
     ):
@@ -287,13 +300,26 @@ class _Channel:
         self._data_contig = np.ascontiguousarray(data, dtype=np.float32)
         self._name_bytes = _b(name)
 
+        # fade interpolation requires fps + speed; fail early in Python so we
+        # don't trip the .? unwrap panic on the Zig side.
+        if interpolation == Interpolation.fade:
+            if source_fps is None or playback_fps is None or speed is None:
+                raise ValueError(
+                    "Interpolation.fade requires source_fps, playback_fps, and speed"
+                )
+
         # Marshal scalars/fixed-size arrays into ctypes
         transform_arr = (c.c_double * 16)(
             *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
         )
-        dims_arr = (c.c_size_t * 4)(*dims)
+        dims_arr = (c.c_size_t * 3)(*dims)
         cartesian_arr = (c.c_size_t * 3)(*frame_cartesian_order)
         prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
+        source_fps_ptr = (c.c_float * 1)(source_fps) if source_fps is not None else None
+        playback_fps_ptr = (
+            (c.c_float * 1)(playback_fps) if playback_fps is not None else None
+        )
+        speed_ptr = (c.c_float * 1)(speed) if speed is not None else None
 
         nv.initChannel.argtypes = [
             c.c_char_p,  # name
@@ -301,9 +327,13 @@ class _Channel:
             c.POINTER(c.c_size_t),  # frame_cartesian_order [3]usize
             c.c_int,  # source_format
             c.POINTER(c.c_double),  # transform_flat [16]f64
-            c.POINTER(c.c_size_t),  # dims [4]usize
-            c.POINTER(c.c_float),  # prune ?f32, null = no pruning
+            c.POINTER(c.c_size_t),  # dims [3]usize  (X, Y, Z)
             c.c_size_t,  # num_frames
+            c.c_int,  # interpolation (Interpolation enum)
+            c.POINTER(c.c_float),  # prune ?f32, null = no pruning
+            c.POINTER(c.c_float),  # source_fps ?f32
+            c.POINTER(c.c_float),  # playback_fps ?f32
+            c.POINTER(c.c_float),  # speed ?f32
         ]
         nv.initChannel.restype = c.c_void_p
 
@@ -314,8 +344,12 @@ class _Channel:
             source_format,
             transform_arr,
             dims_arr,
-            prune_ptr,
             num_frames,
+            int(interpolation),
+            prune_ptr,
+            source_fps_ptr,
+            playback_fps_ptr,
+            speed_ptr,
         )
         if ptr is None:
             raise RuntimeError("initChannel returned null — allocation or init failed")
