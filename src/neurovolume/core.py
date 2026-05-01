@@ -1,7 +1,12 @@
 from . import _internal
+from . import modes
 import ctypes as c
 import numpy as np  # DEPENDENCY: really the only one we should have!
 from pathlib import Path
+
+
+# Mirrors the sequence.zig Interpolation enum.
+# Order must stay in lockstep with the Zig declaration.
 
 
 def hello():
@@ -218,13 +223,19 @@ class Channel:
     # sequence will deal with the lifetimes etc
 
     def __init__(
+        # BOOKMARK: leaving it off here for the night...
         self,
         name: str,
         data: np.ndarray,
-        transform: np.ndarray = np.eye(4),
-        prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
-        normalize: bool = False,
-        source_format: str = "ndarray",
+        transform: np.ndarray,
+        dims: tuple,  # (X, Y, Z) — spatial only
+        num_frames: int,
+        interpolation: modes.Interpolation,
+        prune: np.float32 | None,
+        source_fps: float | None = None,
+        playback_fps: float | None = None,
+        speed: float | None = None,
+        source_format: int = 0,  # TODO: add this to a modes enum when you introduce more!
         frame_cartesian_order: tuple = (0, 1, 2),
     ):
         # WARN: we need some cleanup around the
@@ -287,4 +298,3 @@ class Sequence:
             _channels,
         )
         _sq.save()
-        # LLM's _Sequence.__del__() func should handle memory mgmt

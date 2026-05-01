@@ -36,7 +36,10 @@ test "hello" {
     hello();
 }
 
-// 100% AI LLM copypasta (eventually a heuristic should translate this!):
+//Like _internal.py this is almost all LLM generated
+// in the future a heuristic will generate it!
+// so, fair WARNING if you find yourself poking around in here:
+
 // ============================================================================
 // Grid C ABI
 // ============================================================================

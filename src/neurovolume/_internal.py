@@ -1,14 +1,16 @@
 # this is mostly the zig/c/python translation layer
-# all pretty unruley and should be automatically
+# WARNING all pretty unruley and should be automatically
 # generated in the future!
+
+#
 # For now, most of this is LLM generated
 
 import ctypes as c
 import numpy as np  # DEPENDENCY:, the only one we should have!
 import sys
 import ctypes
-from enum import IntEnum
 from pathlib import Path
+from . import modes
 
 
 # LLM:
@@ -52,14 +54,6 @@ def _b(string):
     Equivalent to 'b"inputstring"'
     """
     return string.encode("utf-8")
-
-
-# Mirrors the sequence.zig Interpolation enum.
-# Order must stay in lockstep with the Zig declaration.
-class Interpolation(IntEnum):
-    direct = 0  # write source frames straight to disk
-    frozen = 1  # single 3D frame held for the entire output runtime
-    fade = 2  # cross-fade between source frames to stretch runtime
 
 
 # ============================================================================
@@ -286,7 +280,7 @@ class _Channel:
         transform: np.ndarray,
         dims: tuple,  # (X, Y, Z) — spatial only
         num_frames: int,
-        interpolation: Interpolation,
+        interpolation: modes.Interpolation,
         prune: np.float32 | None,
         source_fps: float | None = None,
         playback_fps: float | None = None,
@@ -302,7 +296,7 @@ class _Channel:
 
         # fade interpolation requires fps + speed; fail early in Python so we
         # don't trip the .? unwrap panic on the Zig side.
-        if interpolation == Interpolation.fade:
+        if interpolation == modes.Interpolation.fade:
             if source_fps is None or playback_fps is None or speed is None:
                 raise ValueError(
                     "Interpolation.fade requires source_fps, playback_fps, and speed"
