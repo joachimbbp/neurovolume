@@ -51,22 +51,22 @@ bold_nii = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
 vdb_out = Path("tests/data/vdb_out")
 
 
-# def _get_fps(img, loud=False):
-#     # this should probably live in whatever
-#     # fMRI processing pipeline you are working on
-#     header = img.header
-#     tr = header["pixdim"][4]
-#     time_unit = header.get_xyzt_units()[1]
+def _get_fps(img, loud=False):
+    # this should probably live in whatever
+    # fMRI processing pipeline you are working on
+    header = img.header
+    tr = header["pixdim"][4]
+    time_unit = header.get_xyzt_units()[1]
 
-#     if time_unit == "msec":
-#         tr /= 1000
-#     elif time_unit == "usec":
-#         tr /= 1_000_000
+    if time_unit == "msec":
+        tr /= 1000
+    elif time_unit == "usec":
+        tr /= 1_000_000
 
-#     fps = 1.0 / tr if tr > 0 else None
-#     if loud:
-#         print(f"time unit {time_unit}, FPS: {fps}")
-#     return fps
+    fps = 1.0 / tr if tr > 0 else None
+    if loud:
+        print(f"time unit {time_unit}, FPS: {fps}")
+    return fps
 
 
 # # TODO:
@@ -277,31 +277,35 @@ def test_sequence():
     bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
     t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
+    fps = _get_fps(bold_img, loud=True)
+
     print("setting a bold channel..")
     # TODO: try with fade (but that is very heavy!!!!)
     bold_diff = nv.Channel(
         "bold",
         sub(nv.prep_ndarray(bold_arr)),
         transform=bold_affine,
+        source_fps=fps,
+        playback_fps=24,
+        speed=1,
         # prune=np.float32(0.1),
-        # interpolation=nv.modes.Interpolation.fade,
+        interpolation=nv.modes.Interpolation.fade,
     )
     print("setting t1 channel")
     t1 = nv.Channel(
         "t1",
         nv.prep_ndarray(t1_arr),
         transform=t1_affine,
-        num_frames=bold_diff.num_frames,
+        num_source_frames=bold_diff.num_output_frames,
         interpolation=nv.modes.Interpolation.frozen,
         prune=np.float32(0.1),
     )
 
     print("setting save config...")
-    save_config = nv.SaveConfig("fmri_bold_sub", folder=vdb_out / "fmri_seq")
+    save_config = nv.SaveConfig("fmri_bold_sub_fade", folder=vdb_out / "fmri_seq")
     print("Setting fmri sequence...")
     fmri = nv.Sequence([bold_diff, t1], save_config)
     print("writing fmri VDB...")
     fmri.write()
 
-
-#     print("done!")
+    print("done!")

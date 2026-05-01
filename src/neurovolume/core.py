@@ -230,10 +230,8 @@ class Volume:
             _internal._deinit_grid(gp)
 
 
+# LLM refactor:
 class Channel:
-    # just a holder for the information
-    # sequence will deal with the lifetimes etc
-
     """
     Make sure your data is T X Y Z!
     """
@@ -244,47 +242,56 @@ class Channel:
         data: np.ndarray,
         interpolation: modes.Interpolation = modes.Interpolation.direct,
         transform: np.ndarray = np.eye(4),
-        num_frames: int | None = None,
+        num_source_frames: int | None = None,
         source_fps: float | None = None,
         playback_fps: float | None = None,
-        speed: float | None = 1,
-        source_format: str = "ndarray",  # TODO: add this to a modes enum when you introduce more!
+        speed: float = 1,
+        source_format: str = "ndarray",
         prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
         frame_cartesian_order: tuple = (0, 1, 2),
     ):
-
-        # TODO: cleanup
-        # probably an debug line sanity check for axis gore too
-        if data.ndim != 4 and (
-            data.ndim != 3 and interpolation != modes.Interpolation.frozen
-        ):
-            raise ValueError(
-                f"Unsupported dimensions: {data.ndim} (note: 3D must have frozen interp)"
-            )
-
-        # not super consice I know
+        # dims + default num_source_frames from data shape
         if data.ndim == 4:
-            self.dims = data.shape[1:]  # prep_ndarray SHOULD give 0 as time?
-            if num_frames is None:
-                num_frames = data.shape[0]
-        if data.ndim == 3:
-            self.dims = data.shape
-            if num_frames is None:
+            self.dims = data.shape[1:]
+            if num_source_frames is None:
+                num_source_frames = data.shape[0]
+        elif data.ndim == 3:
+            if interpolation != modes.Interpolation.frozen:
                 raise ValueError(
-                    "3D channels need to be frozen AND have num_frames specified"
+                    f"3D data must use frozen interpolation (got {interpolation.name})"
                 )
+            self.dims = data.shape
+            if num_source_frames is None:
+                raise ValueError(
+                    "Frozen channels need num_source_frames specified "
+                    "(use another channel's .num_output_frames to match runtime)"
+                )
+        else:
+            raise ValueError(f"Unsupported dimensions: {data.ndim} (must be 3 or 4)")
 
+        # source_format
         if source_format == "ndarray":
             self.source_format_int = 0
         else:
-            raise ValueError(
-                f"{source_format} not supported yet. Presently only numpy arrays are supported!"
+            raise ValueError(f"{source_format} not supported yet")
+
+        # num_output_frames — must match across all channels in a Sequence
+        if interpolation == modes.Interpolation.fade:
+            if source_fps is None or playback_fps is None or speed is None:
+                raise ValueError(
+                    "fade interpolation requires source_fps, playback_fps, and speed"
+                )
+            self.num_output_frames = int(
+                num_source_frames / source_fps / speed * playback_fps
             )
+        else:
+            # direct: source==output count; frozen: user-supplied output duration
+            self.num_output_frames = num_source_frames
 
         self.name = name
         self.data = data
         self.transform = transform
-        self.num_frames = num_frames
+        self.num_frames = num_source_frames  # what zig's Channel.init wants
         self.interpolation = interpolation
         self.prune = prune
         self.source_fps = source_fps
