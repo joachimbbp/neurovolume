@@ -111,7 +111,55 @@ def save_rotating_pyramid(radius=64, n_frames=48, filename="rotating_pyramid.npy
     print(f"Saved {filename} — shape: {frames.shape}, size: {mb:.1f} MB")
 
 
-save_sphere()
-save_cube()
-save_rotating_cube()
-save_rotating_pyramid()
+def save_jittery_cube(
+    radius=64,
+    full_n_frames=48,
+    n_keyframes=4,
+    filename="jittery_cube.npy",
+):
+    diameter = radius * 2
+    cube = np.ones((diameter, diameter, diameter), dtype=np.float32)
+    frames = np.zeros((n_keyframes, diameter, diameter, diameter), dtype=np.float32)
+
+    c = (diameter - 1) / 2.0
+    ax = np.arange(diameter) - c
+    X, Y, Z = np.meshgrid(ax, ax, ax, indexing="ij")
+
+    kept = np.linspace(0, full_n_frames, n_keyframes, endpoint=False)
+
+    for out_i, i in enumerate(kept):
+        angle = i * (2.0 * np.pi / full_n_frames)
+        cos_a, sin_a = np.cos(angle), np.sin(angle)
+
+        src_x = cos_a * X + sin_a * Y + c
+        src_y = -sin_a * X + cos_a * Y + c
+        src_z = Z + c
+
+        ix = np.round(src_x).astype(np.int32)
+        iy = np.round(src_y).astype(np.int32)
+        iz = np.round(src_z).astype(np.int32)
+
+        valid = (
+            (ix >= 0)
+            & (ix < diameter)
+            & (iy >= 0)
+            & (iy < diameter)
+            & (iz >= 0)
+            & (iz < diameter)
+        )
+        ix = np.clip(ix, 0, diameter - 1)
+        iy = np.clip(iy, 0, diameter - 1)
+        iz = np.clip(iz, 0, diameter - 1)
+
+        frames[out_i] = np.where(valid, cube[ix, iy, iz], 0.0)
+
+    mb = frames.nbytes / (1024**2)
+    np.save(filename, frames)
+    print(f"Saved {filename} — shape: {frames.shape}, size: {mb:.1f} MB")
+
+
+# save_sphere()
+# save_cube()
+# save_rotating_cube()
+# save_rotating_pyramid()
+save_jittery_cube()

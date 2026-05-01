@@ -18,6 +18,9 @@ pub const SaveConfiguration = struct {
     overwrite: bool, // if false, saves version number
 };
 
+//FIX: the naming conventions here are not great
+// try to rename these structs so we don't have
+// multiple things named "grid" across the codebase
 pub const Grid = struct {
     alloc: std.mem.Allocator,
     name: []const u8,
@@ -29,7 +32,6 @@ pub const Grid = struct {
     prune: ?f32,
     vdb: *vdb543.VDB,
     grid: ?vdb543.Grid,
-
     pub fn init(
         alloc: std.mem.Allocator,
         name: []const u8,
