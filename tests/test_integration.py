@@ -229,43 +229,61 @@ def _get_nii_data(nii_path: str):
 #     vol.write()
 
 
-def test_static():
-    bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
-    t1_arr, _, t1_affine = _get_nii_data(t1_nii)
+# def test_static():
+#     bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
+#     t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
-    print("setting a bold channel..")
-    # TODO: try with fade (but that is very heavy!!!!)
-    # bold = nv.Grid(
-    #     "bold",
-    #     nv.prep_ndarray(bold_arr),
-    #     transform=bold_affine,
-    #     # interpolation=nv.modes.Interpolation.fade,
-    # )
-    print("setting t1 channel")
-    t1 = nv.Grid(
-        "t1",
-        nv.prep_ndarray(t1_arr),
-        transform=t1_affine,
-    )
+#     # print("setting a bold channel..")
+#     # TODO: try with fade (but that is very heavy!!!!)
+#     bold = nv.Grid(
+#         "bold",
+#         nv.prep_ndarray(bold_arr)[1],
+#         # obvs will mis-align but Im just trying to dial in the prune
+#         # transform=bold_affine,
+#         prune=np.float32(0.1),
+#     )
+#     print("setting t1 channel")
+#     t1 = nv.Grid(
+#         "t1",
+#         nv.prep_ndarray(t1_arr),
+#         transform=t1_affine,
+#         prune=np.float32(0.1),
+#     )
+#     # 0.1 is more or less good
+#     save_config = nv.SaveConfig("combined_0p1", folder=vdb_out)
 
-    save_config = nv.SaveConfig("t1", folder=vdb_out)
+#     vol = nv.Volume([t1, bold], save_config)
 
-    vol = nv.Volume([t1], save_config)
-
-    vol.write()
+#     vol.write()
 
 
-# MULTI-CHANNEL VOLUME SEQUENCES
+def frame_diff(arr):
+    out = np.zeros_like(arr)
+    out[1:] = np.diff(arr, axis=0)
+    return out  # MULTI-CHANNEL VOLUME SEQUENCES
+
+
+def sub(arr):
+    # scientifically nonsense
+    # obviously you want to preserve the sub zero
+    # values and color them as blue or something
+    # idk what exactly but THEY ARE IMPORTANT
+    out = np.zeros_like(arr)
+    out[1:] = arr[1:] - arr[:-1]
+    return out  # MULTI-CHANNEL VOLUME SEQUENCES
+
+
 def test_sequence():
     bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
     t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
     print("setting a bold channel..")
     # TODO: try with fade (but that is very heavy!!!!)
-    bold = nv.Channel(
+    bold_diff = nv.Channel(
         "bold",
-        nv.prep_ndarray(bold_arr),
+        sub(nv.prep_ndarray(bold_arr)),
         transform=bold_affine,
+        # prune=np.float32(0.1),
         # interpolation=nv.modes.Interpolation.fade,
     )
     print("setting t1 channel")
@@ -273,14 +291,17 @@ def test_sequence():
         "t1",
         nv.prep_ndarray(t1_arr),
         transform=t1_affine,
-        num_frames=bold.num_frames,
+        num_frames=bold_diff.num_frames,
         interpolation=nv.modes.Interpolation.frozen,
+        prune=np.float32(0.1),
     )
 
     print("setting save config...")
-    save_config = nv.SaveConfig("fmri", folder=vdb_out / "fmri_seq")
+    save_config = nv.SaveConfig("fmri_bold_sub", folder=vdb_out / "fmri_seq")
     print("Setting fmri sequence...")
-    fmri = nv.Sequence([bold, t1], save_config)
+    fmri = nv.Sequence([bold_diff, t1], save_config)
     print("writing fmri VDB...")
     fmri.write()
-    print("done!")
+
+
+#     print("done!")
