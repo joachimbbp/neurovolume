@@ -403,8 +403,8 @@ test "sequence tests" {
         jcube_arr.shape[1..4].*,
         jcube_arr.shape[0],
         Interpolation.fade,
-        prune,
-        2,
+        0.1,
+        6,
         24,
         1,
     );

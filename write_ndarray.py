@@ -114,7 +114,7 @@ def save_rotating_pyramid(radius=64, n_frames=48, filename="rotating_pyramid.npy
 def save_jittery_cube(
     radius=64,
     full_n_frames=48,
-    n_keyframes=4,
+    n_keyframes=12,
     filename="jittery_cube.npy",
 ):
     diameter = radius * 2
