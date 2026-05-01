@@ -271,7 +271,15 @@ pub export fn initChannel(
 
     // Borrow name and data — no dupes. Python holds the lifetime.
     const name_borrowed = std.mem.span(name);
-    const total_len = num_frames * dims[0] * dims[1] * dims[2];
+
+    // Frozen channels carry exactly one 3D frame in the buffer, regardless of how
+    // many output frames they span in the sequence. Slicing by num_frames here
+    // would walk off the end of the Python-owned numpy array.
+    const source_frames: usize = switch (interpolation_val) {
+        .frozen => 1,
+        else => num_frames,
+    };
+    const total_len = source_frames * dims[0] * dims[1] * dims[2];
     const data_borrowed = data[0..total_len];
 
     const channel_ptr = allocator.create(sequence.Channel) catch return null;

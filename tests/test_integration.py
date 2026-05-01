@@ -3,6 +3,7 @@ import numpy as np
 from numpy._typing import _BoolLike_co
 import neurovolume as nv
 from neurovolume import transform as t
+
 from urllib.request import urlretrieve
 import gzip
 import shutil
@@ -150,15 +151,15 @@ def _get_nii_data(nii_path: str):
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
     # more lsp gore
 
-    if data.ndim == 3:
-        arr = nv.prep_ndarray(data, (0, 2, 1))
-    if data.ndim == 4:
-        # WARN: I am not entirely sure about this!
-        # might be (3, 0, 1, 2) iirc
-        arr = nv.prep_ndarray(data, (0, 1, 2, 3))
+    # if data.ndim == 3:
+    #     arr = nv.prep_ndarray(data, (0, 2, 1))
+    # if data.ndim == 4:
+    #     # WARN: I am not entirely sure about this!
+    #     # might be (3, 0, 1, 2) iirc
+    #     arr = nv.prep_ndarray(data, (0, 1, 2, 3))
 
-    print(f"{nii_path}\n  {arr.shape=}  {img.affine=}")
-    return arr, img, img.affine
+    print(f"{nii_path}\n  {data.shape=}  {img.affine=}")
+    return data, img, img.affine
 
 
 # # Using np.index_exp for dynamic slicing
@@ -228,30 +229,56 @@ def _get_nii_data(nii_path: str):
 #     vol.write()
 
 
-# MULTI-CHANNEL VOLUME SEQUENCES
-def test_sequence():
-    bold_arr, _, bold_affine = _get_nii_data(bold_nii)
+def test_static():
+    bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
     t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
-    # T1 "background" for the bold to sit atop
-    # sort of hacky
-    # TODO: optimal version in zig
-    print("freezing t1 into an array...")
+    print("setting a bold channel..")
+    # TODO: try with fade (but that is very heavy!!!!)
+    # bold = nv.Grid(
+    #     "bold",
+    #     nv.prep_ndarray(bold_arr),
+    #     transform=bold_affine,
+    #     # interpolation=nv.modes.Interpolation.fade,
+    # )
+    print("setting t1 channel")
+    t1 = nv.Grid(
+        "t1",
+        nv.prep_ndarray(t1_arr),
+        transform=t1_affine,
+    )
 
-    # BOOKMARK: oh no, this needs to happen on the zig level!
+    save_config = nv.SaveConfig("t1", folder=vdb_out)
 
-    # t1_freeze = np.broadcast_to(t1_arr[..., np.newaxis], bold_arr.shape)
-    # t1_freeze = np.stack(
-    #     [t1_arr] * bold_arr.shape[3], axis=-1
-    # )  # or axis=0 to put it first
+    vol = nv.Volume([t1], save_config)
+
+    vol.write()
+
+
+# MULTI-CHANNEL VOLUME SEQUENCES
+def test_sequence():
+    bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
+    t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
     print("setting a bold channel..")
-    bold = nv.Channel("bold", bold_arr, bold_affine)
-    print("setting a T1 channel...")
-    t1 = nv.Channel("t1", t1_freeze, t1_affine)
+    # TODO: try with fade (but that is very heavy!!!!)
+    bold = nv.Channel(
+        "bold",
+        nv.prep_ndarray(bold_arr),
+        transform=bold_affine,
+        # interpolation=nv.modes.Interpolation.fade,
+    )
+    print("setting t1 channel")
+    t1 = nv.Channel(
+        "t1",
+        nv.prep_ndarray(t1_arr),
+        transform=t1_affine,
+        num_frames=bold.num_frames,
+        interpolation=nv.modes.Interpolation.frozen,
+    )
 
     print("setting save config...")
-    save_config = nv.SaveConfig("fmri", folder=vdb_out)
+    save_config = nv.SaveConfig("fmri", folder=vdb_out / "fmri_seq")
     print("Setting fmri sequence...")
     fmri = nv.Sequence([bold, t1], save_config)
     print("writing fmri VDB...")

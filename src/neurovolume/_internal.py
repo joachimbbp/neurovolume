@@ -1,5 +1,5 @@
 # this is mostly the zig/c/python translation layer
-# WARNING all pretty unruley and should be automatically
+# all pretty unruley and should be automatically
 # generated in the future!
 
 #
@@ -288,6 +288,7 @@ class _Channel:
         source_format: int = 0,
         frame_cartesian_order: tuple = (0, 1, 2),
     ):
+
         # Pin the borrowed memory as instance attributes BEFORE handing
         # pointers to Zig. If ascontiguousarray needs to copy, the copy is
         # what Zig will read from, so it's what we need to hold alive.
@@ -348,6 +349,20 @@ class _Channel:
         if ptr is None:
             raise RuntimeError("initChannel returned null — allocation or init failed")
         self._ptr: c.c_void_p | None = ptr
+
+        print(f"DEBUG _Channel '{name}':")
+        print(f"  data shape={self._data_contig.shape}")
+        print(f"  data dtype={self._data_contig.dtype}")
+        print(f"  data contig={self._data_contig.flags['C_CONTIGUOUS']}")
+        print(f"  data size={self._data_contig.size}")
+        print(f"  dims={tuple(dims)}")
+        print(f"  num_frames={num_frames}")
+        print(f"  expected size={num_frames * dims[0] * dims[1] * dims[2]}")
+        print(f"  data range=[{self._data_contig.min()}, {self._data_contig.max()}]")
+        print(f"  first 5 voxels of frame 0: {self._data_contig.flat[:5]}")
+        print(
+            f"  first 5 voxels of frame 1: {self._data_contig.flat[dims[0] * dims[1] * dims[2] : dims[0] * dims[1] * dims[2] + 5]}"
+        )
 
     @property
     def c_ptr(self) -> c.c_void_p | None:

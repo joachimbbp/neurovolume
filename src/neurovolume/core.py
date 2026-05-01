@@ -1,3 +1,4 @@
+from shutil import Error
 from . import _internal
 from . import modes
 import ctypes as c
@@ -16,11 +17,22 @@ def hello():
 
 def prep_ndarray(
     arr: np.ndarray,
-    transpose: tuple,
+    transpose: tuple | None = None,
 ) -> np.ndarray:
     """
     Returns an ndarray that is useable by neurovolume
+
+    transpose defaults to (3,0,1,2), which converts nibabel
+    ndarrays to neurovolume's ndarray
     """
+    if transpose is None:
+        if arr.ndim == 4:
+            transpose = (3, 0, 1, 2)
+        elif arr.ndim == 3:
+            transpose = (0, 1, 2)
+        else:
+            raise ValueError(f"Transpose has {arr.ndim} dimensions! Must be 3 or 4!")
+
     # order matters here:
     arr = np.transpose(arr, transpose)
     arr = np.array(arr, order="C", dtype=np.float32)
@@ -222,33 +234,46 @@ class Channel:
     # just a holder for the information
     # sequence will deal with the lifetimes etc
 
+    """
+    Make sure your data is T X Y Z!
+    """
+
     def __init__(
-        # BOOKMARK: leaving it off here for the night...
         self,
         name: str,
         data: np.ndarray,
-        transform: np.ndarray,
-        dims: tuple,  # (X, Y, Z) — spatial only
-        num_frames: int,
-        interpolation: modes.Interpolation,
-        prune: np.float32 | None,
+        interpolation: modes.Interpolation = modes.Interpolation.direct,
+        transform: np.ndarray = np.eye(4),
+        num_frames: int | None = None,
         source_fps: float | None = None,
         playback_fps: float | None = None,
-        speed: float | None = None,
-        source_format: int = 0,  # TODO: add this to a modes enum when you introduce more!
+        speed: float | None = 1,
+        source_format: str = "ndarray",  # TODO: add this to a modes enum when you introduce more!
+        prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
         frame_cartesian_order: tuple = (0, 1, 2),
     ):
-        # WARN: we need some cleanup around the
-        # frame_cartesian_order and the 4D sequence stuff
 
-        if data.ndim != 3:
-            if data.ndim == 3:
-                print(
-                    "HINT: looks like you want a static VDB. Try initializing this in a Grid!"
-                )
+        # TODO: cleanup
+        # probably an debug line sanity check for axis gore too
+        if data.ndim != 4 and (
+            data.ndim != 3 and interpolation != modes.Interpolation.frozen
+        ):
             raise ValueError(
-                f"Sequences must be 4D: time plus cartesian coords! {data.ndim}D grids not supported"
+                f"Unsupported dimensions: {data.ndim} (note: 3D must have frozen interp)"
             )
+
+        # not super consice I know
+        if data.ndim == 4:
+            self.dims = data.shape[1:]  # prep_ndarray SHOULD give 0 as time?
+            if num_frames is None:
+                num_frames = data.shape[0]
+        if data.ndim == 3:
+            self.dims = data.shape
+            if num_frames is None:
+                raise ValueError(
+                    "3D channels need to be frozen AND have num_frames specified"
+                )
+
         if source_format == "ndarray":
             self.source_format_int = 0
         else:
@@ -259,9 +284,12 @@ class Channel:
         self.name = name
         self.data = data
         self.transform = transform
-        self.dims = data.shape
+        self.num_frames = num_frames
+        self.interpolation = interpolation
         self.prune = prune
-        self.normalize = normalize
+        self.source_fps = source_fps
+        self.playback_fps = playback_fps
+        self.speed = speed
         self.frame_cartesian_order = frame_cartesian_order
 
 
@@ -278,16 +306,23 @@ class Sequence:
         _channels = []
 
         for channel in self.channels:
+            if channel.num_frames == None:
+                # which is REALLY shouldn't
+                raise ValueError("undefined number of frames!")
             _channels.append(
                 _internal._Channel(
-                    channel.name,
-                    channel.data,
-                    channel.transform,
-                    channel.dims,
-                    channel.dims[0],  # TODO: fix redundancy!
-                    channel.prune,
-                    channel.source_format_int,
-                    channel.frame_cartesian_order,
+                    name=channel.name,
+                    data=channel.data,
+                    transform=channel.transform,
+                    dims=channel.dims,
+                    num_frames=channel.num_frames,
+                    interpolation=channel.interpolation,
+                    prune=channel.prune,
+                    source_fps=channel.source_fps,
+                    playback_fps=channel.playback_fps,
+                    speed=channel.speed,
+                    source_format=channel.source_format_int,
+                    frame_cartesian_order=channel.frame_cartesian_order,
                 )
             )
 
