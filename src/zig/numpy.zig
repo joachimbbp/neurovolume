@@ -1,6 +1,7 @@
 //DISCLAIMER:
 // this entire module is claude copypasta!
-
+// it is really just here for testing purposes!
+//
 const std = @import("std");
 
 pub const NpyArray = struct {
