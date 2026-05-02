@@ -4,7 +4,7 @@ Neurovolume is a Python library for manipulating and visualizing volumetric data
 
 While this project focuses on neuroscience, it includes `ndarray` to `VDB` to support virtually any volumetric data pipeline.
 
-This project is under active development and might not have everything you need. Please reference the "Missing Features" section.
+This project is under active development and might not have everything you need. Please reference reference our [roadmap](ROADMAP.md) to see what is in the works!
 
 This project is available as a pre-release alpha on [pypi](https://pypi.org/project/neurovolume/). Presently it is only available for arm64. More operating systems coming soon!
 
@@ -41,7 +41,7 @@ t1 = nv.Channel(
 save_config = nv.SaveConfig("fmri_bold_sub_fade", folder=vdb_out / "fmri_seq")
 fmri = nv.Sequence([bold_diff, t1], save_config)
 fmri.write()
-```
+````
 
 See `tests/test_integration.py` for 
 
@@ -54,14 +54,6 @@ Higher sparsity amounts will result in better performance and lower disk space u
 
 # ☁️ Why VDB?
 VDBs are a highly performant, art-directable, sparse volumetric data structure. Our volume-based approach aims to provide easy access to the original density data throughout the visualization and analysis pipeline. Unlike the [openVDB repo](https://www.openvdb.org/), our smaller version is much more readable and does not need to be run in a docker container.
-
-# 🛠️ Missing Features
-While a comprehensive road-map will be published soon, there are a few important considerations to take into account now.
-- pypi package presently only supports arm64. Coverage for linux and windows is in the works.
-- Documentation has not been written yet. Specifically:
-    - Documentation for sparsity: we should establish how/when sparsity might result in a lossy compression.
-- Multiple grids has yet to be implemented
-
 
 # 🧠 Dataset Citation
 This software was tested using the following datasets.
