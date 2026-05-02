@@ -1,6 +1,8 @@
 - [ ] Contributors code of conduct 
 	- [ ] Find a balanced AI policy
 
+- [ ] Write documentation
+
 - [ ] Automate the Zig-Python interface with a heuristic
 
 - [ ] Add to VDB metadata (if possible):
@@ -31,3 +33,4 @@
 	- If this happens, all the core functionality should live here. However, it is important that all of this functionality is also available in Python. The libraries should really look like each other.
 
 - [ ] Dry all errors in some unified spot
+
