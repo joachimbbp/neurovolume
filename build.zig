@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     const nvol_mod = b.createModule(.{
         .root_source_file = b.path("./src/zig/c_root.zig"),
         .target = target,
-        .optimize = optimize,
+        .optimize = b.standardOptimizeOption(.{}),
     });
 
     const libneurovolume = b.addLibrary(.{
