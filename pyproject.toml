@@ -1,12 +1,12 @@
 [project]
 name = "neurovolume"
-version = "0.1.0a18"
+version = "0.1.0a19"
 description = "Python library for Neurovolume. Build VDBs for scientific visualizations"
 readme = "README.md"
 authors = [
     { name = "joachimbbp", email = "jbbpfefferkorn@gmail.com" }
 ]
-requires-python = ">=3.14" 
+requires-python = ">=3.10" 
 dependencies = [
     "nibabel>=5.4.0",
     "numpy>=1.26.4",
