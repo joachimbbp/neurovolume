@@ -13,34 +13,38 @@ If you are building locally, we use uv to build and test the project:
 ```bash
 uv run python -m ziglang build && uv run pytest tests -s
 ```
-# 
-This is how you could save a BOLD sequence from a .nii file
+#
+
+This is how you might overlay a BOLD sequence onto an anatomical scan:
 
 ````python
-import numpy as np
-import neurovolume as nv
-import nibabel as nib
+# acquire arrays and fps from the nibable image (see test_integration.py)
 
-img = nib.load(anat)
-data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+bold_diff = nv.Channel(
+    "bold",
+    sub(nv.prep_ndarray(bold_arr)),
+    transform=bold_affine,
+    source_fps=fps,
+    playback_fps=24,
+    speed=1,
+    interpolation=nv.modes.Interpolation.direct,
+)
+t1 = nv.Channel(
+    "t1",
+    nv.prep_ndarray(t1_arr),
+    transform=t1_affine,
+    num_source_frames=bold_diff.num_output_frames,
+    interpolation=nv.modes.Interpolation.frozen,
+    prune=np.float32(0.1),
+)
 
-nv.ndarray_to_vdb(
-    nv.prep_ndarray(data, (0, 2, 1)),
-    "anat_offset",
-    output_dir=save_dir_path,
-    transform=nv.scale(img.affine, 0.01), # scaled for blender viewport
-)
-````
-To use sparsity, add a `prune` value to your `ndarray_to_vdb` function call. This example gives good results for our T1 Anatomy scan:
-```python
-nv.ndarray_to_vdb(
-    nv.prep_ndarray(data, (0, 2, 1)),
-    "anat_offset_0p05_prune",
-    output_dir=save_dir_path,
-    transform=_test_pattern_pos(img.affine),
-    prune=np.float32(0.05),
-)
+save_config = nv.SaveConfig("fmri_bold_sub_fade", folder=vdb_out / "fmri_seq")
+fmri = nv.Sequence([bold_diff, t1], save_config)
+fmri.write()
 ```
+
+See `tests/test_integration.py` for 
+
 Higher sparsity amounts will result in better performance and lower disk space usage. However, after a certain point, they begin to degrade the VDB quality.
 
 # 📀 Projects

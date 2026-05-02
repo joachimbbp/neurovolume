@@ -1,12 +1,10 @@
 //TODO:
-// [ ] True Sparcity (I believe this includes "tiles")
-// [ ] Add multiple grids
+// [x] True Sparcity (I believe this includes "tiles")
+// [x] Add multiple grids
 // [ ] Arbitrary input data (presently locked at f32)
 // [ ] Optimizations (if needed)
 //      [ ]  setVoxels one 3-node at a time to reduce syscalls (
 // [ ] Improve error handling
-//DEPRECATED: remove this abstraction eventually
-const ArrayList = std.array_list.Managed;
 
 const std = @import("std");
 const print = std.debug.print;
@@ -262,6 +260,7 @@ pub fn VDBType(comptime V: type, comptime A: u5, comptime B: u5, comptime C: u5,
         values: std.ArrayListUnmanaged([]V),
         background: V,
 
+        //background value is almost always 0
         pub fn init(background: V) Self {
             return .{
                 .map = .empty,
@@ -898,11 +897,14 @@ pub fn GridType(comptime vdb_type: type) type {
             };
         }
 
-        pub fn addDefaultMetadata(grid: *Self, gpa: std.mem.Allocator) !void {
+        pub fn addMetadata(grid: *Self, gpa: std.mem.Allocator, name: []const u8) !void {
+            //WARN: these are hard coded as defaults
             try grid.metadata.put(gpa, "class", .{ .string = try gpa.dupe(u8, "unknown") });
             try grid.metadata.put(gpa, "file_compression", .{ .string = try gpa.dupe(u8, "none") });
             try grid.metadata.put(gpa, "is_saved_as_half_float", .{ .boolean = false });
-            try grid.metadata.put(gpa, "name", .{ .string = try gpa.dupe(u8, "density") });
+
+            //TODO: add prune level here (if possible)
+            try grid.metadata.put(gpa, "name", .{ .string = try gpa.dupe(u8, name) });
         }
 
         /// Grids do not own their tree or name,
@@ -1054,12 +1056,15 @@ pub fn writeVDBFile(
 
     // write out the grids
     for (grids, names, 0..) |*grid, unique_name, i| {
+        var is_instance = false;
         for (grids[0..i], names[0..i]) |other, other_name| {
             if (other.tree == grid.tree) {
                 try grid.writeInstance(file, unique_name, other_name);
+                is_instance = true;
+                break;
             }
-            break;
-        } else try grid.write(file, unique_name);
+        }
+        if (!is_instance) try grid.write(file, unique_name);
     }
     try file.interface.flush();
 }
@@ -1083,25 +1088,4 @@ pub fn subVec(a: [3]f32, b: [3]f32) [3]f32 {
 
 pub fn lengthSquared(v: [3]f32) f32 {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
-}
-//SECTION: writing frames
-
-// Writes a static VDB frame to disk
-pub fn writeFrame(
-    vdb: *VDB,
-    filename: []const u8,
-    arena_alloc: std.mem.Allocator,
-    transform: [4][4]f64,
-) !std.array_list.Managed(u8) {
-    // FIXME: the semantics of this function are awful
-    const name = try save.versionName(filename, arena_alloc);
-    const file = try std.fs.cwd().createFile(name.items, .{});
-    defer file.close();
-
-    var buf: [2048]u8 = undefined;
-    var w: std.fs.File.Writer = .init(file, &buf);
-    var g: Grid = .init(vdb, "density", transform, .empty);
-    try g.addDefaultMetadata(arena_alloc);
-    try writeVDBFile(&w, arena_alloc, &.{g}, .empty);
-    return name; // this seems wrong
 }

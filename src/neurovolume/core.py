@@ -1,174 +1,342 @@
-from neurovolume._internal import (
-    _hello,
-    _init_three_dim,
-    _save_three_dim,
-    _deinit_three_dim,
-    _init_four_dim,
-    _save_four_dim,
-    _deinit_four_dim,
-)
-import os
-import sys
+from shutil import Error
+from . import _internal
+from . import modes
+import ctypes as c
 import numpy as np  # DEPENDENCY: really the only one we should have!
 from pathlib import Path
 
 
+# Mirrors the sequence.zig Interpolation enum.
+# Order must stay in lockstep with the Zig declaration.
+
+
 def hello():
     """Prints 'hello neurovolume' from the c_root.zig"""
-    _hello()
+    _internal._hello()
 
 
 def prep_ndarray(
     arr: np.ndarray,
-    transpose: tuple,
+    transpose: tuple | None = None,
 ) -> np.ndarray:
     """
     Returns an ndarray that is useable by neurovolume
+
+    transpose defaults to (3,0,1,2), which converts nibabel
+    ndarrays to neurovolume's ndarray
     """
+    if transpose is None:
+        if arr.ndim == 4:
+            transpose = (3, 0, 1, 2)
+        elif arr.ndim == 3:
+            transpose = (0, 1, 2)
+        else:
+            raise ValueError(f"Transpose has {arr.ndim} dimensions! Must be 3 or 4!")
+
     # order matters here:
     arr = np.transpose(arr, transpose)
     arr = np.array(arr, order="C", dtype=np.float32)
 
     max_val = arr.max()
 
-    # LLM: had this in the test suite
     # completes 0-1 f32 normalization
     if max_val > 0:
         arr = arr / max_val
     return arr
 
 
-def _verify_and_copy_affine(affine: np.ndarray) -> np.ndarray:
-    if len(affine) != 4:
-        sys.exit(
-            f"Invalid affine len, must be 4 (3D plus homogonized coordinate): {len(affine)}"
+# WARN: mirroring the zig level for this is kinda ... meh?
+# not super needed imho
+# and not the best pattern on the Python side
+# might not even be a good idea on the zig side!
+# LOOK: you have to unpack this class just for it to get
+# re-packed on the zig side, so if that's a not sign to
+# get rid of it I don't know what is!
+# TODO: deprecate and replace!
+class SaveConfig:
+    """
+    Holds all the information needed to write out a VDB to disk
+    """
+
+    def __init__(
+        self,
+        basename: str,
+        # default assumes running from root:
+        folder=Path("output"),
+        # version numbering not implemented yet:
+        overwrite=True,
+    ):
+        """
+        Parameters:
+        ----------
+        basename: str
+            the name of the VDB, or VDB sequence.
+        folder: Path
+            The locaiton where you want to save the VDB to.
+            Defaults to an "output" folder on root (so update your gitignores to include *.vdb!)
+        overwrite: bool
+            Right now the only available option is True
+            if False, you should get numbered versions of your VDB (but I haven't implemented that yet)
+        """
+        folder.mkdir(parents=True, exist_ok=True)
+        if not overwrite:
+            raise ValueError(
+                "Non overwrite functions (like numbering) not implemented yet!"
+            )
+        self.basename = basename
+        self.folder = folder
+        self.overwrite = overwrite
+
+
+class Grid:
+    """
+    A grid is a discrete part of your VDB, think "smoke" vs "fire"
+    in an explosions simulation. This class holds everything you need
+    to create a vdb Grid.
+
+    I must admit the naming repititions throughout this entire
+    stack are mildly cursed! There is a "grid" for VDBs and a "grid"
+    here that holds all the things you need to make a grid.
+    If you have a better name for this "meta grid", submit a PR!
+    """
+
+    def __init__(
+        self,
+        name: str,
+        data: np.ndarray,
+        transform: np.ndarray = np.eye(4),
+        prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
+        normalize: bool = False,
+        source_format: str = "ndarray",
+        cartesian_order: tuple = (0, 1, 2),
+    ):
+        """
+        Gathers all the information you need to build a grid
+
+        Parameters:
+        ------------
+        name:
+            The name of the grid
+        data: np.ndarray
+            The data to put in the grid!
+            Don't forget to prepare it using prep_ndarray!
+            right now this should probably be f32!
+        transform: np.ndarray
+            The affine transform matrix to apply to this grid to move it around. .nii files often include these
+            for alignment. Otherwise, check out the `transform` module for some sane abstractions (rotation,
+            translation, etc)
+        prune: np.float32
+            The higher this is, the more sparse the volume becomes. At some point it begins to degrade the volume
+            Balance between disk space usage and fidelity as per your use case.
+            Robbie has set this to a very specific, small default for some math reasons that, frankly, elude
+            me at this time (perhaps he will write a blog post!)
+        normalize: bool
+            WARNING:
+            Not used at the moment! Keeping it around as it might be needed in VDB sequences, normally you should
+            normalize before yeeting your arrays into the grids (prep_ndarray does normalize for you)
+        source_format: str (although it should be an enum or something later)
+            ndarray is the only option here! Similar story as normalize.
+        cartesian_order:
+            The order in which the dimensions are laid out. prep_ndarray makes it so (0,1,2) works just fine,
+            but if you want to do something weird, this is here for you.
+            Note to self and those curious, iirc 4D time series sequences are (3,0,1,2)
+
+        """
+        if data.ndim != 3:
+            # for vdbs with arbitrarily high (or low) dimensions... submit a PR you maniac!
+            # (it is possible according to the paper fyi)
+            # just think of the posibilities: n-dimensional physarum simulations!
+            # higher dimensional slime!
+            raise ValueError(f"Grids must be 3D! {data.ndim}D grids not supported")
+        if source_format == "ndarray":
+            self.source_format_int = 0
+        else:
+            raise ValueError(
+                f"{source_format} not supported yet. Presently only numpy arrays are supported!"
+            )
+        self.name = name
+        self.data = data
+        self.transform = transform
+        self.prune = prune
+        self.normalize = normalize
+        self.cartesian_order = cartesian_order
+        self.dims = data.shape
+
+    def c_ptr(self) -> c.c_void_p:
+        """
+        Returns the C pointer to the initialized grid
+        """
+        return _internal._init_grid(
+            self.name,
+            self.transform,
+            self.dims,
+            self.prune,
+            self.normalize,
+            self.source_format_int,
+            self.cartesian_order,
         )
-    return affine.copy()
 
 
-def scale(affine: np.ndarray, scale: float) -> np.ndarray:
+class Volume:
     """
-    modifies the affine matrix's scale
-    usage: scale is the percentage to scale by
-            0.5 is 50% etc
+    A "Volume" holds all the information you need to write a static
+    VDB to disk
     """
-    o = _verify_and_copy_affine(affine)
-    # LLM: scale full 3x3 submatrix (not just diagonal) to preserve oblique orientation
-    o[:3, :3] *= scale  # scale+rotation columns
-    o[:3, 3] *= scale  # translation
-    return o
 
+    def __init__(
+        self,
+        grids: list[Grid],
+        save_config: SaveConfig,
+    ):
+        """
+        Gathers all the information you need to build a VDB volume!
+        (i.e, a static VDB, not a squence)
 
-def translate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
-    """
-    modifies the affine matrix's translation
-    usage: x y and z inputs are added to the translation column
-    """
-    # o for output
-    o = _verify_and_copy_affine(affine)
-    o[0][3] += x
-    o[1][3] += y
-    o[2][3] += z
-    return o
+        Parameters:
+        -----------
+        name:
+            The name of your VDB.
+            Will be saved out as <name>.vdb
+        grids:
+            The individual grids that make up your VDB
+        save_config: SaveConfig
+           All the info you need to write a VDB to disk!
+        """
+        self.grids = grids
+        self.save_config = save_config
 
+    def write(self):
+        """
+        Writes the VDB to disk
+        """
 
-def rotate(affine: np.ndarray, x: float, y: float, z: float) -> np.ndarray:
-    """
-    modifies the affine matrix's rotation
-    usage: x y and z are respective theta in the 3D rotation
-    (i think its radians...)
-    """
-    o = _verify_and_copy_affine(affine)
-    # LLM: all below (I am way too lazy)
-    Rx = np.array(
-        [
-            [1, 0, 0],
-            [0, np.cos(x), -np.sin(x)],
-            [0, np.sin(x), np.cos(x)],
-        ]
-    )
+        grid_ptrs = []
+        for g in self.grids:
+            grid_ptr = g.c_ptr()
+            grid_ptrs.append(grid_ptr)
+            _internal._populate_grid(grid_ptr, g.data)
 
-    Ry = np.array(
-        [
-            [np.cos(y), 0, np.sin(y)],
-            [0, 1, 0],
-            [-np.sin(y), 0, np.cos(y)],
-        ]
-    )
-
-    Rz = np.array(
-        [
-            [np.cos(z), -np.sin(z), 0],
-            [np.sin(z), np.cos(z), 0],
-            [0, 0, 1],
-        ]
-    )
-
-    # Combined rotation: R = Rz @ Ry @ Rx (applied right-to-left)
-    R = Rz @ Ry @ Rx
-
-    o[:3, :3] = R @ o[:3, :3]
-
-    return o
-
-
-def ndarray_to_vdb(
-    arr: np.ndarray,  # dont for get to prep this!
-    basename: str,
-    source_fps=1,  # static default
-    output_dir:Path=Path("../../output/"),
-    overwrite=True,  # presently the only option
-    transform=np.eye(4),
-    playback_fps=24.0,
-    speed=1.0,
-    interpolation_flag=0,  # default to direct, chose 1 for cross
-    # Robbie's reccomended default prune amount
-    # very specfici but it works quite well
-    # translated from zig to Python with Claude
-    prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
-) -> Path:
-    """
-    returns path to VDB
-    if VDB sequence, returns path to folder
-    """
-    dims = arr.shape
-    if arr.ndim == 3:
-        vol = _init_three_dim(
-            basename=basename,
-            save_folder=output_dir,
-            overwrite=True,
-            data=arr,
-            transform=transform,  # 4x4 affine float64
-            dims=dims,  # (x, y, z)
-            prune = prune,
+        vol = _internal._init_vol(
+            self.save_config.basename,
+            self.save_config.folder,
+            self.save_config.overwrite,
+            grid_ptrs,
         )
-        _save_three_dim(vol)
-        _deinit_three_dim(vol)
-        # kinda hacky tbh
-        # this happens way down on the zig level and it would be
-        # cooler to have the path percolate back up
-        return output_dir / f"{basename}.vdb"
+        _internal._save_vol(vol)
 
-    elif arr.ndim == 4:
-        seq_out = output_dir / basename 
-        os.makedirs(seq_out, exist_ok=True)
-        vol = _init_four_dim(
-            basename=basename,
-            save_folder=seq_out,
-            overwrite=True,
-            data=arr,
-            transform=transform,
-            source_fps=source_fps,
-            playback_fps=playback_fps,
-            speed=speed,
-            dims=dims,
-            prune=prune,
-            
+        _internal._deinit_vol(vol)
+
+        for gp in grid_ptrs:
+            _internal._deinit_grid(gp)
+
+
+# LLM refactor:
+class Channel:
+    """
+    Make sure your data is T X Y Z!
+    """
+
+    def __init__(
+        self,
+        name: str,
+        data: np.ndarray,
+        interpolation: modes.Interpolation = modes.Interpolation.direct,
+        transform: np.ndarray = np.eye(4),
+        num_source_frames: int | None = None,
+        source_fps: float | None = None,
+        playback_fps: float | None = None,
+        speed: float = 1,
+        source_format: str = "ndarray",
+        prune: np.float32 | None = 4 * np.finfo(np.float32).eps,
+        frame_cartesian_order: tuple = (0, 1, 2),
+    ):
+        # dims + default num_source_frames from data shape
+        if data.ndim == 4:
+            self.dims = data.shape[1:]
+            if num_source_frames is None:
+                num_source_frames = data.shape[0]
+        elif data.ndim == 3:
+            if interpolation != modes.Interpolation.frozen:
+                raise ValueError(
+                    f"3D data must use frozen interpolation (got {interpolation.name})"
+                )
+            self.dims = data.shape
+            if num_source_frames is None:
+                raise ValueError(
+                    "Frozen channels need num_source_frames specified "
+                    "(use another channel's .num_output_frames to match runtime)"
+                )
+        else:
+            raise ValueError(f"Unsupported dimensions: {data.ndim} (must be 3 or 4)")
+
+        # source_format
+        if source_format == "ndarray":
+            self.source_format_int = 0
+        else:
+            raise ValueError(f"{source_format} not supported yet")
+
+        # num_output_frames — must match across all channels in a Sequence
+        if interpolation == modes.Interpolation.fade:
+            if source_fps is None or playback_fps is None or speed is None:
+                raise ValueError(
+                    "fade interpolation requires source_fps, playback_fps, and speed"
+                )
+            self.num_output_frames = int(
+                num_source_frames / source_fps / speed * playback_fps
+            )
+        else:
+            # direct: source==output count; frozen: user-supplied output duration
+            self.num_output_frames = num_source_frames
+
+        self.name = name
+        self.data = data
+        self.transform = transform
+        self.num_frames = num_source_frames  # what zig's Channel.init wants
+        self.interpolation = interpolation
+        self.prune = prune
+        self.source_fps = source_fps
+        self.playback_fps = playback_fps
+        self.speed = speed
+        self.frame_cartesian_order = frame_cartesian_order
+
+
+class Sequence:
+    def __init__(
+        self,
+        channels: list[Channel],
+        save_config: SaveConfig,
+    ):
+        self.channels = channels
+        self.save_config = save_config
+
+    def write(self):
+        _channels = []
+
+        for channel in self.channels:
+            if channel.num_frames == None:
+                # which is REALLY shouldn't
+                raise ValueError("undefined number of frames!")
+            _channels.append(
+                _internal._Channel(
+                    name=channel.name,
+                    data=channel.data,
+                    transform=channel.transform,
+                    dims=channel.dims,
+                    num_frames=channel.num_frames,
+                    interpolation=channel.interpolation,
+                    prune=channel.prune,
+                    source_fps=channel.source_fps,
+                    playback_fps=channel.playback_fps,
+                    speed=channel.speed,
+                    source_format=channel.source_format_int,
+                    frame_cartesian_order=channel.frame_cartesian_order,
+                )
+            )
+
+        _sq = _internal._Sequence(
+            self.save_config.basename,
+            self.save_config.folder,
+            self.save_config.overwrite,
+            _channels,
         )
-        _save_four_dim(vol, interpolation_flag)
-        _deinit_four_dim(vol)
-        # should return the folder containing the seq
-        # see above comment at end of .ndim == 3
-        return Path(f"{output_dir}/{basename}")
-    else:
-        raise ValueError(f"{arr.ndim}D not supported")
+        _sq.save()

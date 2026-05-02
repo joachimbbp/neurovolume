@@ -2,11 +2,15 @@
 # all pretty unruley and should be automatically
 # generated in the future!
 
+#
+# For now, most of this is LLM generated
+
 import ctypes as c
 import numpy as np  # DEPENDENCY:, the only one we should have!
 import sys
 import ctypes
 from pathlib import Path
+from . import modes
 
 
 # LLM:
@@ -52,206 +56,402 @@ def _b(string):
     return string.encode("utf-8")
 
 
-# LLM: claude wrote this function (more or less)
-def _init_four_dim(
-    basename: str,
-    save_folder: Path,
-    overwrite: bool,
-    data: np.ndarray,
-    transform: np.ndarray,
-    source_fps: float,
-    playback_fps: float,
-    speed: float,
-    dims: tuple,
-    prune: np.float32 | None,
-    source_format: int = 0,  # 0=ndarray, 1=nifti1 (mirrors volume.zig SourceFormat)
-    cartesian_order: tuple = (0, 1, 2),  # almost always 0 1 2
-) -> c.c_void_p:
-    """
-    Initializes a FourDim volume on the Zig heap and returns an opaque pointer.
-
-    Parameters:
-    ------------
-    source_format: int
-        0 = ndarray, 1 = nifti1 (mirrors volume.zig SourceFormat enum)
-    data: np.ndarray
-        All frames flattened, C-contiguous float32.
-    transform: np.ndarray
-        4x4 affine as float64, shape (4,4) or (16,).
-    dims: tuple
-        (x, y, z, t) voxel dimensions.
-    prune:
-        amount to sparsify
-    Returns:
-    ------------
-    Opaque ctypes pointer to the FourDim on the Zig heap.
-    Must be freed by calling deinit_four_dim() or save_four_dim().
-    """
-    data = np.ascontiguousarray(data, dtype=np.float32)
-    transform_arr = (c.c_double * 16)(
-        *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
-    )
-    dims_arr = (c.c_size_t * 4)(*dims)
-    cartesian_arr = (c.c_size_t * 3)(*cartesian_order)  # LLM: fix on this line
-
-    # full up claude line:
-    prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
-
-    nv.initFourDim.argtypes = [
-        c.c_char_p,  # base_name
-        c.c_char_p,  # save_folder
-        c.c_bool,  # overwrite
-        c.c_int,  # source_format
-        c.POINTER(c.c_float),  # data
-        c.POINTER(c.c_size_t),  # cartesian_order [3]usize
-        c.POINTER(c.c_double),  # transform_flat [16]f64
-        c.c_float,  # source_fps
-        c.c_float,  # playback_fps
-        c.c_float,  # speed
-        c.POINTER(c.c_size_t),  # dims [4]usize
-        c.POINTER(c.c_float), # prune ?f32, null = no pruning
-    ]
-    nv.initFourDim.restype = c.c_void_p
-
-    ptr = nv.initFourDim(
-        _b(basename),
-        _b(str(save_folder)),
-        overwrite,
-        source_format,
-        data.ctypes.data_as(c.POINTER(c.c_float)),
-        cartesian_arr,
-        transform_arr,
-        c.c_float(source_fps),
-        c.c_float(playback_fps),
-        c.c_float(speed),
-        dims_arr,
-        prune_ptr,
-    )
-    if ptr is None:
-        raise RuntimeError("initFourDim returned null — allocation or init failed")
-    return ptr
+# ============================================================================
+# C INTEROP VOLUMES:
+# ============================================================================
 
 
 # LLM: claude wrote this function
-def _deinit_four_dim(ptr: c.c_void_p) -> None:
-    """
-    Frees a FourDim volume allocated by init_four_dim() without saving.
-    """
-    nv.deinitFourDim.argtypes = [c.c_void_p]
-    nv.deinitFourDim.restype = None
-    nv.deinitFourDim(ptr)
-
-
-# LLM: claude wrote this function
-def _save_four_dim(ptr: c.c_void_p, interpolation_mode: int) -> None:
-    """
-    Saves the FourDim volume to VDB files and frees it.
-    The pointer is invalid after this call.
-
-    Parameters:
-    ------------
-    ptr: opaque pointer returned by init_four_dim().
-    interpolation_mode: int
-        0 = direct (mirrors volume.zig InterpolationMode enum)
-    """
-    nv.saveFourDim.argtypes = [c.c_void_p, c.c_int]
-    nv.saveFourDim.restype = None
-    nv.saveFourDim(ptr, interpolation_mode)
-
-
-# LLM: claude wrote this function
-def _init_three_dim(
-    basename: str,
-    save_folder: Path,
-    overwrite: bool,
-    data: np.ndarray,
+def _init_grid(
+    name: str,
     transform: np.ndarray,
     dims: tuple,
     prune: np.float32 | None,
+    normalize: bool = False,
     source_format: int = 0,  # 0=ndarray (mirrors volume.zig SourceFormat)
     cartesian_order: tuple = (0, 1, 2),
 ) -> c.c_void_p:
     """
-    Initializes a ThreeDim volume on the Zig heap and returns an opaque pointer.
+    Initializes a volume.Grid on the Zig heap and returns an opaque pointer.
+
+    Note: this does NOT populate the grid. Call _populate_grid() next.
 
     Parameters:
     ------------
-    source_format: int
-        0 = ndarray (mirrors volume.zig SourceFormat enum)
-    data: np.ndarray
-        3D volume, C-contiguous float32, normalized to [0, 1].
+    name: str
+        Identifier for this grid (becomes the VDB grid name).
     transform: np.ndarray
         4x4 affine as float64.
     dims: tuple
         (x, y, z) voxel dimensions.
     prune:
-        amount to sparsify
+        Tolerance for sparsification. None disables pruning.
+    normalize: bool
+        Whether to normalize on the Zig side. For ndarray source_format this
+        must be False — use prep_ndarray in Python instead.
+    source_format: int
+        0 = ndarray (mirrors volume.zig SourceFormat enum)
+    cartesian_order: tuple
+        Axis remap, usually (0, 1, 2).
+
     Returns:
     ------------
-    Opaque ctypes pointer to the ThreeDim on the Zig heap.
-    Must be freed by calling deinit_three_dim().
+    Opaque ctypes pointer to the Grid on the Zig heap.
+    Must be freed by calling _deinit_grid().
     """
-    data = np.ascontiguousarray(data, dtype=np.float32)
     transform_arr = (c.c_double * 16)(
         *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
     )
     dims_arr = (c.c_size_t * 3)(*dims)
     cartesian_arr = (c.c_size_t * 3)(*cartesian_order)
-
-    # full up claude line:
     prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
 
-    nv.initThreeDim.argtypes = [
-        c.c_char_p,  # base_name
-        c.c_char_p,  # save_folder
-        c.c_bool,  # overwrite
+    nv.initGrid.argtypes = [
+        c.c_char_p,  # name
         c.c_int,  # source_format
-        c.POINTER(c.c_float),  # data
         c.POINTER(c.c_size_t),  # cartesian_order [3]usize
         c.POINTER(c.c_double),  # transform_flat [16]f64
+        c.c_bool,  # normalize
         c.POINTER(c.c_size_t),  # dims [3]usize
-        c.POINTER(c.c_float), # prune ?f32, null = no pruning
+        c.POINTER(c.c_float),  # prune ?f32, null = no pruning
     ]
-    nv.initThreeDim.restype = c.c_void_p
+    nv.initGrid.restype = c.c_void_p
 
-    ptr = nv.initThreeDim(
-        _b(basename),
-        _b(str(save_folder)),
-        overwrite,
+    ptr = nv.initGrid(
+        _b(name),
         source_format,
-        data.ctypes.data_as(c.POINTER(c.c_float)),
         cartesian_arr,
         transform_arr,
+        normalize,
         dims_arr,
         prune_ptr,
     )
     if ptr is None:
-        raise RuntimeError("initThreeDim returned null — allocation or init failed")
+        raise RuntimeError("initGrid returned null — allocation or init failed")
     return ptr
 
 
 # LLM: claude wrote this function
-def _deinit_three_dim(ptr: c.c_void_p) -> None:
+def _populate_grid(
+    grid_ptr: c.c_void_p,
+    data: np.ndarray,
+) -> None:
     """
-    Frees a ThreeDim volume allocated by init_three_dim() without saving.
-    """
-    nv.deinitThreeDim.argtypes = [c.c_void_p]
-    nv.deinitThreeDim.restype = None
-    nv.deinitThreeDim(ptr)
-
-
-# LLM: claude wrote this function
-def _save_three_dim(ptr: c.c_void_p) -> None:
-    """
-    Saves the ThreeDim volume to a single VDB file.
-    The pointer remains valid after this call; free with deinit_three_dim().
+    Populates a Grid's VDB with voxel data.
 
     Parameters:
     ------------
-    ptr: opaque pointer returned by init_three_dim().
+    grid_ptr: c.c_void_p
+        Pointer from _init_grid().
+    data: np.ndarray
+        Flattened voxel data, length must equal dims[0]*dims[1]*dims[2].
+        C-contiguous float32.
     """
-    nv.saveThreeDim.argtypes = [c.c_void_p]
-    nv.saveThreeDim.restype = c.c_size_t
-    result = nv.saveThreeDim(ptr)
-    if result != 0:
-        raise RuntimeError(f"saveThreeDim returned error code {result}")
+    data = np.ascontiguousarray(data, dtype=np.float32)
+
+    nv.populateGrid.argtypes = [
+        c.c_void_p,  # grid ptr
+        c.POINTER(c.c_float),  # data
+    ]
+    nv.populateGrid.restype = c.c_size_t
+
+    code = nv.populateGrid(
+        grid_ptr,
+        data.ctypes.data_as(c.POINTER(c.c_float)),
+    )
+    if code != 0:
+        raise RuntimeError(f"populateGrid failed with error code {code}")
+
+
+# LLM: claude wrote this function
+def _deinit_grid(grid_ptr: c.c_void_p) -> None:
+    """
+    Frees a Grid previously returned by _init_grid().
+
+    IMPORTANT: any Vol that references this grid must be saved and deinitialized
+    first — the Vol holds pointers back into the Grid's heap-allocated VDB.
+    """
+    nv.deinitGrid.argtypes = [c.c_void_p]
+    nv.deinitGrid.restype = None
+    nv.deinitGrid(grid_ptr)
+
+
+# LLM: claude wrote this function
+def _init_vol(
+    basename: str,
+    save_folder: Path,
+    overwrite: bool,
+    grid_ptrs: list[c.c_void_p],
+) -> c.c_void_p:
+    """
+    Initializes a volume.Vol on the Zig heap from a list of already-populated Grid
+    pointers and returns an opaque pointer.
+
+    Parameters:
+    ------------
+    basename: str
+        Output filename (without extension).
+    save_folder: Path
+        Folder to write the .vdb file into.
+    overwrite: bool
+        If False, saves with a version suffix instead of clobbering.
+    grid_ptrs: list[c.c_void_p]
+        Pointers from _init_grid() + _populate_grid(). Must outlive the Vol.
+
+    Returns:
+    ------------
+    Opaque ctypes pointer to the Vol on the Zig heap.
+    Must be freed by calling _deinit_vol().
+    """
+    grid_count = len(grid_ptrs)
+    grids_arr = (c.c_void_p * grid_count)(*grid_ptrs)
+
+    nv.initVol.argtypes = [
+        c.c_char_p,  # basename
+        c.c_char_p,  # save_folder
+        c.c_bool,  # overwrite
+        c.POINTER(c.c_void_p),  # grid_ptrs
+        c.c_size_t,  # grid_count
+    ]
+    nv.initVol.restype = c.c_void_p
+
+    ptr = nv.initVol(
+        _b(basename),
+        _b(str(save_folder)),
+        overwrite,
+        grids_arr,
+        grid_count,
+    )
+    if ptr is None:
+        raise RuntimeError("initVol returned null — allocation or init failed")
+    return ptr
+
+
+# LLM: claude wrote this function
+def _save_vol(vol_ptr: c.c_void_p) -> None:
+    """
+    Writes the Vol's grids to disk as a .vdb file, using the basename/folder
+    supplied at _init_vol() time.
+    """
+    nv.saveVol.argtypes = [c.c_void_p]
+    nv.saveVol.restype = c.c_size_t
+
+    code = nv.saveVol(vol_ptr)
+    if code != 0:
+        raise RuntimeError(f"saveVol failed with error code {code}")
+
+
+# LLM: claude wrote this function
+def _deinit_vol(vol_ptr: c.c_void_p) -> None:
+    """
+    Frees a Vol previously returned by _init_vol().
+
+    Does NOT free the underlying Grid pointers — those must be freed
+    separately with _deinit_grid() after this call returns.
+    """
+    nv.deinitVol.argtypes = [c.c_void_p]
+    nv.deinitVol.restype = None
+    nv.deinitVol(vol_ptr)
+
+
+# ============================================================================
+# C INTEROP SEQUENCES:
+# ============================================================================
+
+
+# LLM: claude wrote this class
+class _Channel:
+    """
+    Internal owner of a Zig sequence.Channel.
+
+    BORROWING SEMANTICS: the Zig Channel does NOT copy `name` or `data` — it
+    holds raw pointers into Python-owned memory. This class pins that memory
+    as instance attributes (`_name_bytes`, `_data_contig`) so the Zig pointer
+    stays valid for the lifetime of the instance.
+
+    Cleanup is automatic via __del__: the Zig Channel is freed first, then the
+    borrowed memory drops as the attribute dict is torn down.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        data: np.ndarray,
+        transform: np.ndarray,
+        dims: tuple,  # (X, Y, Z) — spatial only
+        num_frames: int,
+        interpolation: modes.Interpolation,
+        prune: np.float32 | None,
+        source_fps: float | None = None,
+        playback_fps: float | None = None,
+        speed: float | None = None,
+        source_format: int = 0,
+        frame_cartesian_order: tuple = (0, 1, 2),
+    ):
+
+        # Pin the borrowed memory as instance attributes BEFORE handing
+        # pointers to Zig. If ascontiguousarray needs to copy, the copy is
+        # what Zig will read from, so it's what we need to hold alive.
+        self._data_contig = np.ascontiguousarray(data, dtype=np.float32)
+        self._name_bytes = _b(name)
+
+        # fade interpolation requires fps + speed; fail early in Python so we
+        # don't trip the .? unwrap panic on the Zig side.
+        if interpolation == modes.Interpolation.fade:
+            if source_fps is None or playback_fps is None or speed is None:
+                raise ValueError(
+                    "Interpolation.fade requires source_fps, playback_fps, and speed"
+                )
+
+        # Marshal scalars/fixed-size arrays into ctypes
+        transform_arr = (c.c_double * 16)(
+            *np.ascontiguousarray(transform.flatten(), dtype=np.float64)
+        )
+        dims_arr = (c.c_size_t * 3)(*dims)
+        cartesian_arr = (c.c_size_t * 3)(*frame_cartesian_order)
+        prune_ptr = (c.c_float * 1)(prune) if prune is not None else None
+        source_fps_ptr = (c.c_float * 1)(source_fps) if source_fps is not None else None
+        playback_fps_ptr = (
+            (c.c_float * 1)(playback_fps) if playback_fps is not None else None
+        )
+        speed_ptr = (c.c_float * 1)(speed) if speed is not None else None
+
+        nv.initChannel.argtypes = [
+            c.c_char_p,  # name
+            c.POINTER(c.c_float),  # data
+            c.POINTER(c.c_size_t),  # frame_cartesian_order [3]usize
+            c.c_int,  # source_format
+            c.POINTER(c.c_double),  # transform_flat [16]f64
+            c.POINTER(c.c_size_t),  # dims [3]usize  (X, Y, Z)
+            c.c_size_t,  # num_frames
+            c.c_int,  # interpolation (Interpolation enum)
+            c.POINTER(c.c_float),  # prune ?f32, null = no pruning
+            c.POINTER(c.c_float),  # source_fps ?f32
+            c.POINTER(c.c_float),  # playback_fps ?f32
+            c.POINTER(c.c_float),  # speed ?f32
+        ]
+        nv.initChannel.restype = c.c_void_p
+
+        ptr = nv.initChannel(
+            self._name_bytes,
+            self._data_contig.ctypes.data_as(c.POINTER(c.c_float)),
+            cartesian_arr,
+            source_format,
+            transform_arr,
+            dims_arr,
+            num_frames,
+            int(interpolation),
+            prune_ptr,
+            source_fps_ptr,
+            playback_fps_ptr,
+            speed_ptr,
+        )
+        if ptr is None:
+            raise RuntimeError("initChannel returned null — allocation or init failed")
+        self._ptr: c.c_void_p | None = ptr
+
+        print(f"DEBUG _Channel '{name}':")
+        print(f"  data shape={self._data_contig.shape}")
+        print(f"  data dtype={self._data_contig.dtype}")
+        print(f"  data contig={self._data_contig.flags['C_CONTIGUOUS']}")
+        print(f"  data size={self._data_contig.size}")
+        print(f"  dims={tuple(dims)}")
+        print(f"  num_frames={num_frames}")
+        print(f"  expected size={num_frames * dims[0] * dims[1] * dims[2]}")
+        print(f"  data range=[{self._data_contig.min()}, {self._data_contig.max()}]")
+        print(f"  first 5 voxels of frame 0: {self._data_contig.flat[:5]}")
+        print(
+            f"  first 5 voxels of frame 1: {self._data_contig.flat[dims[0] * dims[1] * dims[2] : dims[0] * dims[1] * dims[2] + 5]}"
+        )
+
+    @property
+    def c_ptr(self) -> c.c_void_p | None:
+        """The Zig Channel pointer. For internal use by _Sequence."""
+        return self._ptr
+
+    def __del__(self):
+        # Guard against partial construction (e.g. _init_channel raised before
+        # self._ptr was assigned).
+        if getattr(self, "_ptr", None):
+            nv.deinitChannel.argtypes = [c.c_void_p]
+            nv.deinitChannel.restype = None
+            nv.deinitChannel(self._ptr)
+            self._ptr = None
+        # _name_bytes and _data_contig are released automatically when the
+        # attribute dict is torn down after this method returns.
+
+
+# LLM: claude wrote this class
+class _Sequence:
+    """
+    Internal owner of a Zig sequence.Sequence.
+
+    BORROWING SEMANTICS: the Zig Sequence does NOT copy `basename` or
+    `save_folder`, and holds raw pointers to each Channel. This class pins:
+      - the encoded basename/folder bytes as instance attributes
+      - strong references to the _Channel objects (so they can't be GC'd
+        before this Sequence)
+
+    Cleanup ordering is enforced by the reference graph, not by __del__ timing:
+    _Sequence holds refs to its _Channels, so when _Sequence.__del__ runs the
+    Channels are still alive. Once _Sequence is collected, the Channels become
+    unreachable and their __del__s run.
+    """
+
+    def __init__(
+        self,
+        basename: str,
+        save_folder: Path,
+        overwrite: bool,
+        channels: list[_Channel],
+    ):
+        # Pin the channel objects so their _ptr / _name_bytes / _data_contig
+        # all stay alive for our lifetime.
+        self._channels = channels
+
+        # Pin the borrowed strings
+        self._basename_bytes = _b(basename)
+        self._folder_bytes = _b(str(save_folder))
+
+        # Build the C array of channel pointers (Zig copies these into its
+        # own slice during initSequence, so this local can be released after)
+        channel_count = len(channels)
+        channels_arr = (c.c_void_p * channel_count)(*[ch.c_ptr for ch in channels])
+
+        nv.initSequence.argtypes = [
+            c.c_char_p,  # basename
+            c.c_char_p,  # save_folder
+            c.c_bool,  # overwrite
+            c.POINTER(c.c_void_p),  # channel_ptrs
+            c.c_size_t,  # channel_count
+        ]
+        nv.initSequence.restype = c.c_void_p
+
+        ptr = nv.initSequence(
+            self._basename_bytes,
+            self._folder_bytes,
+            overwrite,
+            channels_arr,
+            channel_count,
+        )
+        if ptr is None:
+            raise RuntimeError("initSequence returned null — allocation or init failed")
+        self._ptr: c.c_void_p | None = ptr
+
+    def save(self) -> None:
+        """Writes each frame to disk as a separate .vdb file."""
+        nv.saveSequence.argtypes = [c.c_void_p]
+        nv.saveSequence.restype = c.c_size_t
+
+        code = nv.saveSequence(self._ptr)
+        if code != 0:
+            raise RuntimeError(f"saveSequence failed with error code {code}")
+
+    def __del__(self):
+        if getattr(self, "_ptr", None):
+            nv.deinitSequence.argtypes = [c.c_void_p]
+            nv.deinitSequence.restype = None
+            nv.deinitSequence(self._ptr)
+            self._ptr = None
+        # self._channels is released after this returns; each Channel's
+        # __del__ then runs in turn to free its Zig Channel.

@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     const nvol_mod = b.createModule(.{
         .root_source_file = b.path("./src/zig/c_root.zig"),
         .target = target,
-        .optimize = optimize,
+        .optimize = b.standardOptimizeOption(.{}),
     });
 
     const libneurovolume = b.addLibrary(.{
@@ -35,6 +35,10 @@ pub fn build(b: *std.Build) void {
         .root_module = nvol_mod,
     });
     const run_mod_tests = b.addRunArtifact(mod_tests);
+    //get your print statements:
+    run_mod_tests.has_side_effects = true;
+    // run_mod_tests.stdio = .inherit; //doesn't capture stderr for some reason (LLM suggested)
+
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
 

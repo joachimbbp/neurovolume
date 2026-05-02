@@ -1,6 +1,9 @@
 # INSTRUCTIONS: must be run from project root, NOT ./tests
 import numpy as np
+from numpy._typing import _BoolLike_co
 import neurovolume as nv
+from neurovolume import transform as t
+
 from urllib.request import urlretrieve
 import gzip
 import shutil
@@ -12,28 +15,39 @@ import os
 # dependencies to somewhere that doesn't
 # effect the rest of the project!# move nibabel and other testing only
 # import nibabel as nib
+#
+# On that note: WARNING: your LSP might give some red squiggles throughout!
 import nibabel as nib  # DEPENDENCY: it's only for testing, see above todo
 
 
-anat_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
+t1_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T1w.nii.gz?versionId=5ZTXVLawdWoVNWe5XVuV6DfF2BnmxzQz"
+t2_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/anat/sub-01_T2w.nii.gz?versionId=03RdL5vjveFH52_H3viGPwhXCrbRcGau"
 bold_url = "https://s3.amazonaws.com/openneuro.org/ds003548/sub-01/func/sub-01_task-emotionalfaces_run-1_bold.nii.gz?versionId=tq8Y3ktm31Aa8JB0991n9K0XNmHyRS1Q"
 # # HACK: this whole thing is a little hacky/messy
-anat_gz = "./tests/data/sub-01_T1w.nii.gz"
-anat = "./tests/data/sub-01_t1w.nii"
+t1_gz = "./tests/data/sub-01_T1w.nii.gz"
+t2_gz = "./tests/data/sub-01_T2w.nii.gz"
+t1_nii = "./tests/data/sub-01_T1w.nii"
+t2_nii = "./tests/data/sub-01_T2w.nii"
 bold_gz = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii.gz"
-bold = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
+bold_nii = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
+
 print("Downloading test data...")
 # TODO: check if not present?
-urlretrieve(anat_url, anat_gz)
+urlretrieve(t1_url, t1_gz)
+urlretrieve(t2_url, t2_gz)
 urlretrieve(bold_url, bold_gz)
+
 print("Test data downloaded")
-print("Unzipping...")
+# print("Unzipping...")
 # TODO: DRY:
-with gzip.open(anat_gz, "rb") as f_in:
-    with open(anat, "wb") as f_out:
+with gzip.open(t1_gz, "rb") as f_in:
+    with open(t1_nii, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+with gzip.open(t2_gz, "rb") as f_in:
+    with open(t2_nii, "wb") as f_out:
         shutil.copyfileobj(f_in, f_out)
 with gzip.open(bold_gz, "rb") as f_in:
-    with open(bold, "wb") as f_out:
+    with open(bold_nii, "wb") as f_out:
         shutil.copyfileobj(f_in, f_out)
 
 vdb_out = Path("tests/data/vdb_out")
@@ -55,153 +69,177 @@ def _get_fps(img, loud=False):
     if loud:
         print(f"time unit {time_unit}, FPS: {fps}")
     return fps
-    fps = img.header["pixdim"][4]
 
 
-# TODO:
-# this is blocky and making it higher resolution makes it gigantic
-# once we add transform, make this much MUCH larger and then scale down
-# so it matches the default cube!
-def _build_pyramid(size=64):
-    # LLM: generated this for testing
+def _get_nii_data(nii_path: str):
     """
-    Build a 3D pyramid in a numpy array.
-
-    Args:
-        size: Size of the cubic array (default 64x64x64)
-
-    Returns:
-        3D numpy array with pyramid structure (1.0 inside, 0.0 outside)
+    returns nii data prepared for neurovolume
+    returns: array, img, affine
     """
-    arr = np.zeros((size, size, size), dtype=np.float32)
-
-    center = size // 2
-
-    # Build pyramid layer by layer from bottom to top
-    for z in range(size):
-        # Calculate the radius at this height
-        # Pyramid tapers from base (bottom) to point (top)
-        height_ratio = 1.0 - (z / size)
-        max_radius = center * height_ratio
-
-        # Fill the square cross-section at this height
-        for y in range(size):
-            for x in range(size):
-                # Distance from center in x and y
-                dx = abs(x - center)
-                dy = abs(y - center)
-
-                # Check if point is inside pyramid at this height
-                # Using Chebyshev distance (square pyramid)
-                if max(dx, dy) <= max_radius:
-                    arr[z, y, x] = 1.0
-
-    print("Pyramid build")
-    return arr, True
-
-
-def test_hello():
-    nv.hello()
-
-
-# TODO: Better testing! This is very incomplete as of now
-
-
-# TODO: rewrite this with the new functionality
-def test_pyramid(size=64000):
-    pyramid, built = _build_pyramid()
-    assert built, "Pyramid should build successfully"
-
-    identity = np.eye(4)
-    # perhaps this pattern isn't the best?
-    print(f"identity matrix: \n{identity}")
-    scaled = nv.scale(identity, 0.030)
-    print(f"scaled affine: \n{scaled}")
-    translated = nv.translate(scaled, 1.6, 0.7, 0.2)
-    print(f"translated affine:\n{translated}")
-    rotated = nv.rotate(translated, 0, 0, np.deg2rad(44))
-    print(f"rotated matrix: \n{rotated}")
-
-    prepped_pyramid = nv.prep_ndarray(pyramid, (2, 1, 0))
-
+    # LSP complains heavily!
+    # TODO: have your test data as saved out npy arrays
+    # or wait unitl zig-native .nii parsing
     os.makedirs(vdb_out, exist_ok=True)
-    print("saved to: ", nv.ndarray_to_vdb(
-        prepped_pyramid,
-        "pyramid_offset_default_prune",
-        output_dir=vdb_out,
-        transform=rotated,
-    ))
-    print("saved to: ", nv.ndarray_to_vdb(
-        prepped_pyramid,
-        "pyramid_offset_no_prune",
-        output_dir=vdb_out,
-        transform=rotated,
-        prune=None,
-    ))
-    print("pyramids saved")
-
-
-
-def _test_pattern_pos(affine: np.ndarray) -> np.ndarray:
-    brain_scale = 0.01
-    brain_y_move = -2.38251
-    scaled = nv.scale(affine, brain_scale)
-    moved = nv.translate(scaled, 0, brain_y_move, 0)
-    return moved
-
-
-def test_anat_static_no_prune():
-    os.makedirs(vdb_out, exist_ok=True)
-    img = nib.load(anat)
+    img = nib.load(nii_path)
+    # some lsp issues with nibabel it seems
     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+    # more lsp gore
 
-    print("saved to: ", nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (0, 2, 1)),
-        "anat_offset_no_prune",
-        output_dir=vdb_out,
-        transform=_test_pattern_pos(img.affine),
-        prune=None,
-    ))
+    # if data.ndim == 3:
+    #     arr = nv.prep_ndarray(data, (0, 2, 1))
+    # if data.ndim == 4:
+    #     # WARN: I am not entirely sure about this!
+    #     # might be (3, 0, 1, 2) iirc
+    #     arr = nv.prep_ndarray(data, (0, 1, 2, 3))
 
-    print("saved to: ", nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (0, 2, 1)),
-        "anat_offset_0p05_prune",
-        output_dir=vdb_out,
-        transform=_test_pattern_pos(img.affine),
-        prune=np.float32(0.05),
-    ))
+    print(f"{nii_path}\n  {data.shape=}  {img.affine=}")
+    return data, img, img.affine
 
 
-def test_bold_seq_direct():
-    img = nib.load(bold)
-    data = np.array(img.get_fdata(), order="C", dtype=np.float32)
+def test_static():
+    bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
+    t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
-    print("saved to: ", nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (3, 0, 2, 1)),
-        "bold_direct_offset",
-        source_fps=_get_fps(img),
-        output_dir=vdb_out,
-        transform=_test_pattern_pos(img.affine),
-        ))
-    print("saved to: ", nv.ndarray_to_vdb(
-        nv.prep_ndarray(data, (3, 0, 2, 1)),
-        "bold_direct_offset_0p05_prune",
-        source_fps=_get_fps(img),
-        output_dir=vdb_out,
-        transform=_test_pattern_pos(img.affine),
-        prune=np.float32(0.05)
-        ))
+    # print("setting a bold channel..")
+    # TODO: try with fade (but that is very heavy!!!!)
+    bold = nv.Grid(
+        "bold",
+        nv.prep_ndarray(bold_arr)[1],
+        # obvs will mis-align but Im just trying to dial in the prune
+        # transform=bold_affine,
+        prune=np.float32(0.1),
+    )
+    print("setting t1 channel")
+    t1 = nv.Grid(
+        "t1",
+        nv.prep_ndarray(t1_arr),
+        transform=t1_affine,
+        prune=np.float32(0.1),
+    )
+    # 0.1 is more or less good
+    save_config = nv.SaveConfig("combined_0p1", folder=vdb_out)
 
-#
-#
-# # def test_bold_seq_fade():
-# #     img = nib.load(bold)
-# #     data = np.array(img.get_fdata(), order="C", dtype=np.float32)
-# #
-# #     nv.ndarray_to_vdb(
-# #         nv.prep_ndarray(data, (3, 0, 2, 1)),
-# #         "bold_fade",
-# #         source_fps=_get_fps(img),
-# #         output_dir=vdb_out,
-# #         interpolation_flag=1,  # TODO: enum on python side with named interpolations
-# #     )
+    vol = nv.Volume([t1, bold], save_config)
+
+    vol.write()
+
+
+def frame_diff(arr):
+    out = np.zeros_like(arr)
+    out[1:] = np.diff(arr, axis=0)
+    return out  # MULTI-CHANNEL VOLUME SEQUENCES
+
+
+def sub(arr):
+    # scientifically nonsense
+    # obviously you want to preserve the sub zero
+    # values and color them as blue or something
+    # idk what exactly but THEY ARE IMPORTANT
+    out = np.zeros_like(arr)
+    out[1:] = arr[1:] - arr[:-1]
+    return out  # MULTI-CHANNEL VOLUME SEQUENCES
+
+
+def test_sequence():
+    bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
+    t1_arr, _, t1_affine = _get_nii_data(t1_nii)
+
+    fps = _get_fps(bold_img, loud=True)
+
+    print("setting a bold channel..")
+    bold_diff = nv.Channel(
+        "bold",
+        sub(nv.prep_ndarray(bold_arr)),
+        transform=bold_affine,
+        source_fps=fps,
+        playback_fps=24,
+        speed=1,
+        interpolation=nv.modes.Interpolation.direct,
+    )
+    print("setting t1 channel")
+    t1 = nv.Channel(
+        "t1",
+        nv.prep_ndarray(t1_arr),
+        transform=t1_affine,
+        num_source_frames=bold_diff.num_output_frames,
+        interpolation=nv.modes.Interpolation.frozen,
+        prune=np.float32(0.1),
+    )
+
+    print("setting save config...")
+    save_config = nv.SaveConfig("fmri_sub", folder=vdb_out / "fmri_seq")
+    print("Setting fmri sequence...")
+    fmri = nv.Sequence([bold_diff, t1], save_config)
+    print("writing fmri VDB...")
+    fmri.write()
+
+    print("done!")
+
+
+# # TODO rewrite this with updated logic:
+# # also:
+# # this is blocky and making it higher resolution makes it gigantic
+# # once we add transform, make this much MUCH larger and then scale down
+# # so it matches the default cube!
+# def _build_pyramid(size=64):
+#     # LLM: generated this for testing
+#     """
+#     Build a 3D pyramid in a numpy array.
+
+#     Args:
+#         size: Size of the cubic array (default 64x64x64)
+
+#     Returns:
+#         3D numpy array with pyramid structure (1.0 inside, 0.0 outside)
+#     """
+#     arr = np.zeros((size, size, size), dtype=np.float32)
+
+#     center = size // 2
+
+#     # Build pyramid layer by layer from bottom to top
+#     for z in range(size):
+#         # Calculate the radius at this height
+#         # Pyramid tapers from base (bottom) to point (top)
+#         height_ratio = 1.0 - (z / size)
+#         max_radius = center * height_ratio
+
+#         # Fill the square cross-section at this height
+#         for y in range(size):
+#             for x in range(size):
+#                 # Distance from center in x and y
+#                 dx = abs(x - center)
+#                 dy = abs(y - center)
+
+#                 # Check if point is inside pyramid at this height
+#                 # Using Chebyshev distance (square pyramid)
+#                 if max(dx, dy) <= max_radius:
+#                     arr[z, y, x] = 1.0
+
+#     print(f"Pyramid build. Arr shape: {arr.shape}")
+#     return arr, True
+
+
+# # LLM:
+# def _build_sphere(size=64):
+#     """
+#     Build a 3D sphere in a numpy array.
+#     Args:
+#         size: Size of the cubic array (default 64x64x64)
+#     Returns:
+#         3D numpy array with sphere structure (1.0 inside, 0.0 outside)
+#     """
+#     arr = np.zeros((size, size, size), dtype=np.float32)
+#     center = size // 2
+#     radius = center
+
+#     # Use numpy broadcasting for efficiency instead of triple nested loop
+#     z, y, x = np.ogrid[:size, :size, :size]
+#     dist_sq = (x - center) ** 2 + (y - center) ** 2 + (z - center) ** 2
+#     arr[dist_sq <= radius**2] = 1.0
+
+#     print(f"Sphere built. Arr shape: {arr.shape}")
+#     return arr, True
+
+
+# def test_hello():
+#     nv.hello()

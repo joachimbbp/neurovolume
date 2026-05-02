@@ -7,8 +7,8 @@ name = "python"
 auto-format = true
 formatter = { command = "ruff", args = ["format", "-"] }
 language-servers = [
-    {name = "pyright"},
-    {name = "ruff-lsp"},
+    {name = "pyright"}, # type chekcer
+    {name = "ruff"}, # linter and formatter
 ]
 
 [language-server.pyright]
@@ -16,7 +16,7 @@ command = "pyright-langserver"
 args = ["--stdio"]
 config = {}
 
-[language-server.ruff-lsp]
+[language-server.ruff]
 command = "ruff"
 args = ["server"]
 config = {}
@@ -32,3 +32,8 @@ build_on_save_args = ["check", "-fincremental", "--watch"]
 force_autofix = true
 warn_style = true
 highlight_global_var_declarations = true
+#inlay hints. Copypasta:
+enable_inlay_hints = true
+inlay_hints_show_variable_type_hints = true
+inlay_hints_show_parameter_name_hints = true
+inlay_hints_show_struct_literal_field_type = true
