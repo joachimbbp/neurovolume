@@ -36,6 +36,7 @@ pub const Channel = struct {
     speed: ?f32,
     num_output_frames: usize, //TODO PERHAPS: set this for all num_framse just for clean
     hold_duration: usize,
+    frozen_grid: ?volume.Grid = null, // <- LLM cache for frozen interpolation
 
     pub fn init(
         alloc: std.mem.Allocator,
@@ -95,14 +96,17 @@ pub const Channel = struct {
             };
         }
     }
+
     pub fn debug(c: *Channel) void {
         std.debug.print("{s}\n   source_num_frames: {d} \noutput_num_frames: {d}\n   frozen: {}\n", .{ c.name, c.num_frames, c.num_output_frames, c.interpolation });
     }
 
+    //LLM cleaned up, fixed a leak by returning the volume grid from these methods:
+
     pub fn extractFrame(
         c: *Channel,
         frame_num: ?usize, //frame num can be an i frame!
-    ) !vdb543.Grid {
+    ) !volume.Grid {
         return switch (c.interpolation) {
             .direct => try direct(c, frame_num, false),
             .frozen => try direct(c, null, true),
@@ -110,16 +114,16 @@ pub const Channel = struct {
         };
     }
 
-    //extraction function
     pub fn direct(
         c: *Channel,
         frame_num: ?usize,
         frozen: bool,
-    ) !vdb543.Grid {
-        var frame_grid: volume.Grid = undefined;
+    ) !volume.Grid {
+        //LLM rewrite to stash the frozen frames
         if (frozen) {
-            //TODO: option to freeze a specific frame from a 4D seq
-            frame_grid = try volume.Grid.init(
+            if (c.frozen_grid) |cached| return cached; // ← cache hit, skip the work
+
+            var frame_grid = try volume.Grid.init(
                 c.alloc,
                 c.name,
                 [3]usize{ 0, 1, 2 },
@@ -130,30 +134,35 @@ pub const Channel = struct {
                 c.prune,
             );
             try frame_grid.populate(c.data, null);
-        } else {
-            frame_grid = try volume.Grid.init(
-                c.alloc,
-                c.name,
-                [3]usize{ 0, 1, 2 },
-                .ndarray,
-                c.affine_transform,
-                false,
-                c.spatial_dims,
-                c.prune,
-            );
-
-            const frame_size = c.spatial_dims[0] * c.spatial_dims[1] * c.spatial_dims[2];
-            const start_end: [2]usize = .{ frame_num.? * frame_size, ((frame_num.? + 1) * frame_size) };
-            try frame_grid.populate(c.data, start_end);
+            c.frozen_grid = frame_grid; // ← stash it
+            return frame_grid;
         }
-        return frame_grid.grid.?;
+
+        // non-frozen path: build a fresh grid for this frame
+        var frame_grid = try volume.Grid.init(
+            c.alloc,
+            c.name,
+            [3]usize{ 0, 1, 2 },
+            .ndarray,
+            c.affine_transform,
+            false,
+            c.spatial_dims,
+            c.prune,
+        );
+        const frame_size = c.spatial_dims[0] * c.spatial_dims[1] * c.spatial_dims[2];
+        const start_end: [2]usize = .{
+            frame_num.? * frame_size,
+            (frame_num.? + 1) * frame_size,
+        };
+        try frame_grid.populate(c.data, start_end);
+        return frame_grid;
     }
 
     //extraction function
     pub fn fade(
         c: *Channel,
         output_frame: usize, //can be an i frame!
-    ) !vdb543.Grid {
+    ) !volume.Grid {
         const a_frame = output_frame / c.hold_duration;
         const sub = output_frame % c.hold_duration;
 
@@ -220,7 +229,7 @@ pub const Channel = struct {
         try vdb_grid.addMetadata(frame_grid.alloc, frame_grid.name);
         frame_grid.grid = vdb_grid;
 
-        return frame_grid.grid.?;
+        return frame_grid;
     }
 };
 
@@ -230,24 +239,24 @@ pub const Sequence = struct {
     channels: []const *Channel,
     save_config: SaveConfiguration,
 
-    //probably call in with an arena allocator if you are saving lots of frames!
     pub fn saveFrame(s: *Sequence, frame_num: usize, alloc: std.mem.Allocator) !void {
+        //LLM rewrite
+        const wrappers = try alloc.alloc(volume.Grid, s.channels.len);
         const grids = try alloc.alloc(vdb543.Grid, s.channels.len);
 
-        //this more or less builds a volume with all the grids in the channels
-        // at the appropriate frame
-
         for (s.channels, 0..) |channel, i| {
-            grids[i] = try channel.extractFrame(frame_num);
+            wrappers[i] = try channel.extractFrame(frame_num);
+            grids[i] = wrappers[i].grid.?;
         }
-
-        var frame_vol: volume.Vol = .{
-            .grids = grids,
-            .save_config = s.save_config,
+        // Frozen wrappers are owned by the Channel cache and freed in deinitChannel.
+        // Only deinit the transient ones.
+        defer for (s.channels, 0..) |channel, i| {
+            if (channel.interpolation != .frozen) wrappers[i].deinit();
         };
+
+        var frame_vol: volume.Vol = .{ .grids = grids, .save_config = s.save_config };
         try frame_vol.save(frame_num);
     }
-
     pub fn save(s: *Sequence) !void {
         std.fs.cwd().access(s.save_config.folder, .{}) catch {
             try std.fs.cwd().makeDir(s.save_config.folder);

@@ -308,9 +308,9 @@ pub export fn initChannel(
 
 pub export fn deinitChannel(ptr: ?*anyopaque) void {
     const allocator = std.heap.c_allocator;
-    if (ptr) |p| { //LLM: unwrapping pattern
-        const channel_ptr: *sequence.Channel = @ptrCast(@alignCast(p)); //LLM: casting pattern
-        // No internal frees — Channel borrows everything. Just drop the box.
+    if (ptr) |p| {
+        const channel_ptr: *sequence.Channel = @ptrCast(@alignCast(p));
+        if (channel_ptr.frozen_grid) |*g| g.deinit(); // ← NEW
         allocator.destroy(channel_ptr);
     }
 }
