@@ -5,7 +5,7 @@ const vdb543 = @import("vdb543.zig");
 
 //make sure even unused stuff from volume is testsed:
 test {
-    // std.testing.refAllDecls(volume);
+    std.testing.refAllDecls(volume);
     std.testing.refAllDecls(sequence);
 }
 
@@ -51,6 +51,7 @@ test "hello" {
 // returns a ptr to the Grid (or null on failure)
 pub export fn initGrid(
     name: [*:0]const u8,
+    attribute: [*:0]const u8,
     source_format: volume.SourceFormat,
     cartesian_order: *const [3]usize,
     transform_flat: *const [16]f64,
@@ -70,17 +71,23 @@ pub export fn initGrid(
         }
     }
 
-    // Dupe the name so the struct owns it past the Python call lifetime
+    // Dupe the name and attribute so the struct owns them past the Python call lifetime
     const name_owned = allocator.dupe(u8, std.mem.span(name)) catch return null;
+    const attribute_owned = allocator.dupe(u8, std.mem.span(attribute)) catch {
+        allocator.free(name_owned);
+        return null;
+    };
 
     const grid_ptr = allocator.create(volume.Grid) catch {
         allocator.free(name_owned);
+        allocator.free(attribute_owned);
         return null;
     };
 
     grid_ptr.* = volume.Grid.init(
         allocator,
         name_owned,
+        attribute_owned,
         cartesian_order.*,
         source_format,
         transform,
@@ -89,6 +96,7 @@ pub export fn initGrid(
         prune_val,
     ) catch {
         allocator.free(name_owned);
+        allocator.free(attribute_owned);
         allocator.destroy(grid_ptr);
         return null;
     };
@@ -118,6 +126,7 @@ pub export fn deinitGrid(ptr: ?*anyopaque) void {
         const grid_ptr: *volume.Grid = @ptrCast(@alignCast(p)); //LLM: casting pattern
         grid_ptr.deinit();
         allocator.free(grid_ptr.name);
+        allocator.free(grid_ptr.attribute);
         allocator.destroy(grid_ptr);
     }
 }
@@ -130,8 +139,7 @@ pub export fn deinitGrid(ptr: ?*anyopaque) void {
 // each one already populated via populateGrid).
 // grid_ptrs: pointer to an array of ?*anyopaque, each pointing to a volume.Grid
 // grid_count: number of grids in grid_ptrs
-// returns a ptr to the Vol (or null on failure)
-
+//
 // NOTE: the referenced volume.Grid objects must outlive the Vol — do NOT call
 // deinitGrid on any of them until after saveVol + deinitVol are done.
 pub export fn initVol(
@@ -143,14 +151,12 @@ pub export fn initVol(
 ) ?*anyopaque {
     const allocator = std.heap.c_allocator;
 
-    // Dupe strings so the struct owns them past the Python call lifetime
     const basename_owned = allocator.dupe(u8, std.mem.span(basename)) catch return null;
     const folder_owned = allocator.dupe(u8, std.mem.span(save_folder)) catch {
         allocator.free(basename_owned);
         return null;
     };
 
-    // Build an owned slice of vdb543.Grid values pulled off each volume.Grid
     const grids = allocator.alloc(vdb543.Grid, grid_count) catch {
         allocator.free(basename_owned);
         allocator.free(folder_owned);
@@ -164,8 +170,7 @@ pub export fn initVol(
             allocator.free(folder_owned);
             return null;
         };
-        const grid_ptr: *volume.Grid = @ptrCast(@alignCast(gp)); //LLM: casting pattern
-        // populateGrid must have been called already, so .grid is non-null
+        const grid_ptr: *volume.Grid = @ptrCast(@alignCast(gp));
         const inner = grid_ptr.grid orelse {
             allocator.free(grids);
             allocator.free(basename_owned);
@@ -182,9 +187,9 @@ pub export fn initVol(
         return null;
     };
 
-    vol_ptr.* = volume.Vol{
+    vol_ptr.* = .{
         .grids = grids,
-        .save_config = volume.SaveConfiguration{
+        .save_config = .{
             .basename = basename_owned,
             .folder = folder_owned,
             .overwrite = overwrite,
@@ -196,8 +201,8 @@ pub export fn initVol(
 
 pub export fn deinitVol(ptr: ?*anyopaque) void {
     const allocator = std.heap.c_allocator;
-    if (ptr) |p| { //LLM: unwrapping pattern
-        const vol_ptr: *volume.Vol = @ptrCast(@alignCast(p)); //LLM: casting pattern
+    if (ptr) |p| {
+        const vol_ptr: *volume.Vol = @ptrCast(@alignCast(p));
         allocator.free(vol_ptr.grids);
         allocator.free(vol_ptr.save_config.basename);
         allocator.free(vol_ptr.save_config.folder);
@@ -206,12 +211,12 @@ pub export fn deinitVol(ptr: ?*anyopaque) void {
 }
 
 pub export fn saveVol(ptr: ?*anyopaque) usize {
-    if (ptr) |p| { //LLM: unwrapping pattern
-        const vol_ptr: *volume.Vol = @ptrCast(@alignCast(p)); //LLM: casting pattern
+    if (ptr) |p| {
+        const vol_ptr: *volume.Vol = @ptrCast(@alignCast(p));
         vol_ptr.save(null) catch |e| {
             return cErr(e).code;
         };
-    } //else would be a null ptr
+    }
     return 0;
 }
 
@@ -220,9 +225,9 @@ pub export fn saveVol(ptr: ?*anyopaque) usize {
 // ============================================================================
 
 // Initializes a sequence.Channel as a BORROWING view over caller-owned memory.
-// The caller (Python wrapper) MUST keep `name` and `data` alive for the
-// lifetime of the Channel — typically by holding references to the original
-// numpy array and encoded bytes object on the Python Channel instance.
+// The caller (Python wrapper) MUST keep `name`, `attribute`, and `data` alive
+// for the lifetime of the Channel — typically by holding references to the
+// original numpy array and encoded bytes objects on the Python Channel instance.
 //
 // data: all voxels flattened across all frames, length must equal
 //       num_frames * dims[0] * dims[1] * dims[2]  (T * X * Y * Z)
@@ -240,6 +245,7 @@ pub export fn saveVol(ptr: ?*anyopaque) usize {
 // returns a ptr to the Channel (or null on failure)
 pub export fn initChannel(
     name: [*:0]const u8,
+    attribute: [*:0]const u8,
     data: [*]const f32,
     frame_cartesian_order: *const [3]usize,
     source_format: volume.SourceFormat,
@@ -269,8 +275,9 @@ pub export fn initChannel(
         }
     }
 
-    // Borrow name and data — no dupes. Python holds the lifetime.
+    // Borrow name, attribute, and data — no dupes. Python holds the lifetime.
     const name_borrowed = std.mem.span(name);
+    const attribute_borrowed = std.mem.span(attribute);
 
     // Frozen channels carry exactly one 3D frame in the buffer, regardless of how
     // many output frames they span in the sequence. Slicing by num_frames here
@@ -287,6 +294,7 @@ pub export fn initChannel(
     channel_ptr.* = sequence.Channel.init(
         allocator,
         name_borrowed,
+        attribute_borrowed,
         data_borrowed,
         frame_cartesian_order.*,
         source_format,
@@ -310,7 +318,7 @@ pub export fn deinitChannel(ptr: ?*anyopaque) void {
     const allocator = std.heap.c_allocator;
     if (ptr) |p| {
         const channel_ptr: *sequence.Channel = @ptrCast(@alignCast(p));
-        if (channel_ptr.frozen_grid) |*g| g.deinit(); // ← NEW
+        if (channel_ptr.frozen_grid) |*g| g.deinit();
         allocator.destroy(channel_ptr);
     }
 }
@@ -349,7 +357,7 @@ pub export fn initSequence(
             allocator.free(channels);
             return null;
         };
-        const channel_ptr: *sequence.Channel = @ptrCast(@alignCast(cp)); //LLM: casting pattern
+        const channel_ptr: *sequence.Channel = @ptrCast(@alignCast(cp));
         channels[i] = channel_ptr;
     }
 
@@ -372,8 +380,8 @@ pub export fn initSequence(
 
 pub export fn deinitSequence(ptr: ?*anyopaque) void {
     const allocator = std.heap.c_allocator;
-    if (ptr) |p| { //LLM: unwrapping pattern
-        const seq_ptr: *sequence.Sequence = @ptrCast(@alignCast(p)); //LLM: casting pattern
+    if (ptr) |p| {
+        const seq_ptr: *sequence.Sequence = @ptrCast(@alignCast(p));
         // Only free what the C layer allocated: the channels pointer slice.
         // Strings are borrowed from Python, channel objects are borrowed too.
         allocator.free(seq_ptr.channels);
@@ -382,11 +390,11 @@ pub export fn deinitSequence(ptr: ?*anyopaque) void {
 }
 
 pub export fn saveSequence(ptr: ?*anyopaque) usize {
-    if (ptr) |p| { //LLM: unwrapping pattern
-        const seq_ptr: *sequence.Sequence = @ptrCast(@alignCast(p)); //LLM: casting pattern
+    if (ptr) |p| {
+        const seq_ptr: *sequence.Sequence = @ptrCast(@alignCast(p));
         seq_ptr.save() catch |e| {
             return cErr(e).code;
         };
-    } //else would be a null ptr
+    }
     return 0;
 }
