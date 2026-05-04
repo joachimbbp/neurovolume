@@ -21,6 +21,7 @@ pub const Interpolation = enum {
 pub const Channel = struct {
     alloc: std.mem.Allocator,
     name: []const u8,
+    attriute: []const u8,
     data: []const f32,
     //grids stuff
     frame_cartesian_order: [3]usize, //WARN: 4D specific prep_ndarray probably needed!
@@ -41,6 +42,7 @@ pub const Channel = struct {
     pub fn init(
         alloc: std.mem.Allocator,
         name: []const u8,
+        attribute: []const u8,
         data: []const f32,
         //grids stuff
         frame_cartesian_order: [3]usize, //WARN: 4D specific prep_ndarray probably needed?!
@@ -61,6 +63,7 @@ pub const Channel = struct {
             return .{
                 .alloc = alloc,
                 .name = name,
+                .attriute = attribute,
                 .data = data,
                 .frame_cartesian_order = frame_cartesian_order,
                 .source_format = source_format,
@@ -80,6 +83,7 @@ pub const Channel = struct {
             return .{
                 .alloc = alloc,
                 .name = name,
+                .attribute = attribute,
                 .data = data,
                 .frame_cartesian_order = frame_cartesian_order,
                 .source_format = source_format,
@@ -126,6 +130,7 @@ pub const Channel = struct {
             var frame_grid = try volume.Grid.init(
                 c.alloc,
                 c.name,
+                c.attriute,
                 [3]usize{ 0, 1, 2 },
                 .ndarray,
                 c.affine_transform,
@@ -142,6 +147,7 @@ pub const Channel = struct {
         var frame_grid = try volume.Grid.init(
             c.alloc,
             c.name,
+            c.attribute,
             [3]usize{ 0, 1, 2 },
             .ndarray,
             c.affine_transform,
@@ -178,6 +184,7 @@ pub const Channel = struct {
         var frame_grid = try volume.Grid.init(
             c.alloc,
             c.name,
+            c.attribute,
             [3]usize{ 0, 1, 2 },
             .ndarray,
             c.affine_transform,
@@ -226,7 +233,11 @@ pub const Channel = struct {
             frame_grid.affine_transform,
             .empty,
         );
-        try vdb_grid.addMetadata(frame_grid.alloc, frame_grid.name);
+        try vdb_grid.addMetadata(
+            frame_grid.alloc,
+            frame_grid.attribute,
+            frame_grid.name,
+        );
         frame_grid.grid = vdb_grid;
 
         return frame_grid;
@@ -321,6 +332,7 @@ test "sequence tests" {
     var cube_channel = try Channel.init(
         arena.allocator(),
         "cube",
+        "density",
         cube_prepped,
         [3]usize{ 0, 1, 2 },
         .ndarray,
@@ -347,6 +359,7 @@ test "sequence tests" {
     var pyramid_channel = try Channel.init(
         arena.allocator(),
         "pyramid",
+        "density",
         pyramid_prepped,
         [3]usize{ 0, 1, 2 },
         .ndarray,
@@ -376,6 +389,7 @@ test "sequence tests" {
     var sphere_channel = try Channel.init(
         arena.allocator(),
         "sphere",
+        "density",
         sphere_prepped,
         [3]usize{ 0, 1, 2 },
         .ndarray,
@@ -405,6 +419,7 @@ test "sequence tests" {
     var jcube_channel = try Channel.init(
         arena.allocator(),
         "jcube",
+        "density",
         jcube_prepped,
         [3]usize{ 0, 1, 2 },
         .ndarray,

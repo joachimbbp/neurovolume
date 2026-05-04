@@ -885,7 +885,12 @@ pub fn GridType(comptime vdb_type: type) type {
         pub const kind = vdb_type.kind;
         const Self = @This();
 
-        pub fn init(tree: *vdb_type, name: []const u8, transform: [4][4]f64, metadata: MetaMap) Self {
+        pub fn init(
+            tree: *vdb_type,
+            name: []const u8,
+            transform: [4][4]f64,
+            metadata: MetaMap,
+        ) Self {
             return .{
                 .tree = tree,
                 .name = name,
@@ -897,17 +902,23 @@ pub fn GridType(comptime vdb_type: type) type {
             };
         }
 
-        pub fn addMetadata(grid: *Self, gpa: std.mem.Allocator, name: []const u8) !void {
+        pub fn addMetadata(
+            grid: *Self,
+            gpa: std.mem.Allocator,
+            attribute: []const u8,
+        ) !void {
             //WARN: these are hard coded as defaults
             try grid.metadata.put(gpa, "class", .{ .string = try gpa.dupe(u8, "unknown") });
             try grid.metadata.put(gpa, "file_compression", .{ .string = try gpa.dupe(u8, "none") });
             try grid.metadata.put(gpa, "is_saved_as_half_float", .{ .boolean = false });
 
             //TODO: add prune level here (if possible)
-            try grid.metadata.put(gpa, "name", .{ .string = try gpa.dupe(u8, name) });
+
+            //Grid attribute (confusingly named "name"):
+            try grid.metadata.put(gpa, "name", .{ .string = try gpa.dupe(u8, attribute) });
         }
 
-        /// Grids do not own their tree or name,
+        /// Grids do not own their tree or attribute ("name"),
         /// so you must call grid.tree.deinit() separately to prevent leaks.
         pub fn deinit(g: *Self, allocator: std.mem.Allocator) void {
             for (g.metadata.values()) |*val| val.deinit(allocator);
@@ -932,7 +943,13 @@ pub fn GridType(comptime vdb_type: type) type {
             }
         }
 
-        pub fn writeHeader(_: Self, writer: *std.Io.Writer, name: []const u8, other_name: []const u8) Writer.Error!void {
+        pub fn writeHeader(
+            _: Self,
+            writer: *std.Io.Writer,
+            name: []const u8, //The grid's "name", to the attribute "name"
+            other_name: []const u8,
+        ) Writer.Error!void {
+            //write name:
             try writer.print("{f}", .{alt(name)});
             try writer.print("{f}", .{alt(Self.kind)});
             try writer.print("{f}", .{alt(other_name)});

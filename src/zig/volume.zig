@@ -24,6 +24,7 @@ pub const SaveConfiguration = struct {
 pub const Grid = struct {
     alloc: std.mem.Allocator,
     name: []const u8,
+    attribute: []const u8,
     cartesian_order: [3]usize,
     source_format: SourceFormat,
     affine_transform: [4][4]f64,
@@ -35,6 +36,7 @@ pub const Grid = struct {
     pub fn init(
         alloc: std.mem.Allocator,
         name: []const u8,
+        attribute: []const u8,
         cartesian_order: [3]usize,
         source_format: SourceFormat,
         affine_transform: [4][4]f64,
@@ -48,6 +50,7 @@ pub const Grid = struct {
         return .{
             .alloc = alloc,
             .name = name,
+            .attribute = attribute,
             .cartesian_order = cartesian_order,
             .source_format = source_format,
             .affine_transform = affine_transform,
@@ -64,6 +67,7 @@ pub const Grid = struct {
         g: *Grid,
         data: []const f32,
         start_end: ?[2]usize, // for sequences
+
     ) !void {
         //setup based on data source type (just numpy for now)
         //switch prongs just open for possible future native fileparsing
@@ -118,13 +122,15 @@ pub const Grid = struct {
             g.affine_transform,
             .empty,
         );
-        try grid.addMetadata(g.alloc, g.name);
+        try grid.addMetadata(g.alloc, g.attribute);
         g.grid = grid; // store into the optional field that's already on Grid
 
-        // //TODO: see if you can add prune level to metadata
+        //TODO: see if you can add prune level to metadata
     }
 
     pub fn deinit(g: *Grid) void {
+        //LLM suggested this to fix a memory leak:
+        if (g.grid) |*inner| inner.deinit(g.alloc);
         g.vdb.deinit(g.alloc);
         g.alloc.destroy(g.vdb);
     }
@@ -137,6 +143,8 @@ pub const Vol = struct {
         v: *Vol,
         frame_num: ?usize,
     ) !void {
+        //BUG:flagged by LLM
+        // saving the same volume twice might result in errors!
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const alloc = gpa.allocator();
         defer _ = gpa.deinit();
@@ -158,9 +166,6 @@ pub const Vol = struct {
         const file = try std.fs.cwd().createFile(w.written(), .{});
         defer file.close();
         var writer = file.writer(&buffer);
-
-        var vdb: vdb543.VDB = .init(0);
-        defer vdb.deinit(arena.allocator());
 
         try vdb543.writeVDBFile(
             &writer,
@@ -205,6 +210,7 @@ test "volume grid tests" {
     var sphere_grid = try Grid.init(
         arena.allocator(),
         "sphere",
+        "density",
         [3]usize{ 0, 1, 2 },
         .ndarray,
         identity,
@@ -225,6 +231,7 @@ test "volume grid tests" {
     var cube_grid = try Grid.init(
         arena.allocator(),
         "cube",
+        "density",
         [3]usize{ 0, 1, 2 },
         .ndarray,
         identity,

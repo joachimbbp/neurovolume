@@ -42,9 +42,11 @@
 
 - [ ] Dry all errors in some unified spot
 
+
 - [ ] Write documentation
 
 # Release Candidate
+- [ ] Add `__repr__` to Sequence, Channel, Grid, Volume, and SaveConfig
 - [ ] Contributors code of conduct 
 	- [ ] Find a balanced AI policy
 
