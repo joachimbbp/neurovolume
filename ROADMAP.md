@@ -11,10 +11,13 @@
 	- The whole save config thing is somewhat clunky, we should probably replace it. Most importantly: Move the logic currently in `SaveConfig` (name, output folder, overwrite) out of channel/volume `init` and into channel/volume `write` function
 	- Establish some sane defaults here
 
-- [ ] Improve Attribute Writing System
-	-  Presently, the name of the grid is also the name of the attribute. This is probably not good. It has tripped me up in Blender and will probably trip up the user. Find what is a good balance of idiomatic and powerful.
+- [ ] Imporve naming on `Channel`
+	- `num_frames` and `num_output_frames` are confusingly named
 
-- [ ] Asynchronously write sequence frames
+- [ ] Improve Attribute Writing System
+	-  Presently, the name of the grid is also the name of the attribute. It is unclear if this is good or bad. It has tripped me up in Blender and will probably trip up the user. Attempts to solve has lead to weird bugs when loading the VDB. Find what is a good balance of idiomatic and powerful.
+
+- [ ] Asynchronously write sequence frames (Zig level)
 
 - [ ] Automate the Zig-Python interface with a heuristic
 	- This is presently AI generated (which is not good). Third party tools, such as Ziggy Pydust, lack documentation and are lagging behind language releases.
@@ -51,7 +54,13 @@
 # Future
 - [ ] Standalone zig library
 	- Both zig and Python libraries should look like each other
-	- Zig library is probably going to be focused on simulations, so not sure if we will need native file parsing (numpy, NIfTI, etc) or not. Trying to cover every possible file is probably unwise.
+	- Zig library is probably going to be useful for simulations and other things that need to go fast, so not sure if we will need native file parsing (numpy, NIfTI, etc) or not. Trying to cover every possible file is probably unwise. Perhaps a little module to read numpy arrays from disk?
 - [ ] Add source RGB values to the output VDB
 - [ ] Directly delete points (and otherwise edit) an existing VDB file
 	- Useful for data cleanup in blender, etc
+
+# Far Future
+- [ ] VDB viewer to test experimental features that might not be supported by current software such as:
+	- [ ] Expand VDB to use arbitrarily high dimensions
+	related:
+	- [ ] Temporal sparsity (Right now we write a T1 image for every frame)
