@@ -43,7 +43,7 @@ fmri = nv.Sequence([bold_diff, t1], save_config)
 fmri.write()
 ````
 
-See `tests/test_integration.py` for 
+See `tests/test_integration.py` for more examples.
 
 Higher sparsity amounts will result in better performance and lower disk space usage. However, after a certain point, they begin to degrade the VDB quality.
 
