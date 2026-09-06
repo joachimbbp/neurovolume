@@ -5,13 +5,13 @@
 	- Implemented [here](https://github.com/joachimbbp/neurovolume/commit/cf7001b342d0439f8eda0ace781f4b3c05b80422)
 
 # Beta Release
-- [ ] Upgrade to Zig 0.16.0
+- [ ] Upgrade to latest Zig (if prudent)
 
-- [ ] Fix `SaveConfig`
+- [S] Fix `SaveConfig`
 	- The whole save config thing is somewhat clunky, we should probably replace it. Most importantly: Move the logic currently in `SaveConfig` (name, output folder, overwrite) out of channel/volume `init` and into channel/volume `write` function
 	- Establish some sane defaults here
 
-- [ ] Imporve naming on `Channel`
+- [S] Imporve naming on `Channel`
 	- `num_frames` and `num_output_frames` are confusingly named
 
 - [ ] Improve Attribute Writing System
@@ -23,7 +23,7 @@
 	- This is presently AI generated (which is not good). Third party tools, such as Ziggy Pydust, lack documentation and are lagging behind language releases.
 	- Doing so will speed up the iteration and allow you to test directly on the Python layer.
 
-- [ ] Expand supported Operating Systems
+- [S] Expand supported Operating Systems
 	- All Mac, linux, windows, etc
 
 - [ ] Benchmarks And Testing:
