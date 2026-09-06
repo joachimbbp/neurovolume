@@ -16,10 +16,10 @@ pub fn build(b: *std.Build) void {
         .macos => "dylib",
         .linux => "so", // per claude
         .windows => "dll", // per claude
-        else => @panic("Unsupported target OS for build, target.os.tag={tag}", .{tag}),
+        else => @panic(b.fmt("Unsupported target OS for build, target.os.tag={s}", .{@tagName(tag)})),
     };
 
-    print("target.os.tag={s}, lib_ext={s}", .{ tag, lib_ext });
+    print("target.os.tag={s}, lib_ext={s}", .{ @tagName(tag), lib_ext });
 
     const libneurovolume = b.addLibrary(.{
         .name = "neurovolume",
