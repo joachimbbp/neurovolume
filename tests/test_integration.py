@@ -1,6 +1,5 @@
 # INSTRUCTIONS: must be run from project root, NOT ./tests
 import numpy as np
-from numpy._typing import _BoolLike_co
 import neurovolume as nv
 from neurovolume import transform as t
 

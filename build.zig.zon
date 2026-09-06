@@ -12,7 +12,6 @@
     .paths = .{
         "build.zig",
         "build.zig.zon",
-        // FIXME: presumably "src/neurovolume"
         "src/zig",
         "LICENSE",
         "README.md",

@@ -1,4 +1,3 @@
-from shutil import Error
 from . import _internal
 from . import modes
 import ctypes as c

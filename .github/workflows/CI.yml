@@ -6,8 +6,13 @@ on:
 
 jobs:
   build:
-    name: build
-    runs-on: macos-15 #ARM64
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # please submit PRs for any operating system YOU might want to use!
+        os: [macos-15, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -27,7 +32,8 @@ jobs:
       
       - name: Build Binary Folder 
         run: mkdir -p src/neurovolume/_native
-
+        shell: bash
+        
       - name: Build Python Library
         run: uv build
 
