@@ -1,53 +1,86 @@
+# entire file is LLM copypasta from claude
 # SOURCE: based on:
 # https://docs.astral.sh/uv/guides/integration/github/#publishing-to-pypi
-
 name: "Publish"
-
 on:
   push:
     tags:
       # publish any tag starting with 'v' (version convention)
       - v*
 jobs:
-  run:
-    runs-on: macos-15 # ARM64, using mac for now
-    environment:
-      name: pypi # (set environment name in PyPi project and github Environments)
-    permissions:
-      id-token: write
-      contents: read
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15      # Apple Silicon (ARM64)
+            target: macos-arm64
+          - os: macos-13      # Intel (x86_64)
+            target: macos-x86_64
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: windows-latest
+            target: windows-x86_64
+    runs-on: ${{ matrix.os }}
     steps:
-      # Copypasta from my cy.yml
       - name: Checkout
         uses: actions/checkout@v5
-      
+
       - name: Install UV
         uses: astral-sh/setup-uv@v6
-
       - name: Setup Python
         run: uv python install
-
-      - name: Install uv project 
+      - name: Install uv project
         run: uv sync --locked --all-extras --dev
 
       - name: Build Zig Binaries
-        run: uv run python -m ziglang build #TODO: maybe test the zig library later?
-      
-      - name: Build Binary Folder 
+        run: uv run python -m ziglang build
+
+      - name: Build Binary Folder
         run: mkdir -p src/neurovolume/_native
+        shell: bash
 
       - name: Build Python Library
         run: uv build
 
       - name: Test Python Library
         run: uv run pytest -s tests
-        # end copypasta
-     
-      # modified from the uv docs:
-      # Check that basic features work and we didn't miss to include crucial files
-      # - name: Smoke test (wheel)
-      #   run: uv run --isolated --no-project --with dist/*.whl tests/smoke_test.py
-      # - name: Smoke test (source distribution)
-      #   run: uv run --isolated --no-project --with dist/*.tar.gz tests/smoke_test.py
+
+      # NOTE: check this output - if the wheel filename doesn't include your
+      # OS/arch (e.g. "-macosx_", "-linux_", "-win_"), your build backend is
+      # tagging it as pure Python (py3-none-any), which will cause wheels
+      # from different platforms to collide/overwrite in the publish job.
+      - name: List built distributions
+        run: ls -la dist/
+        shell: bash
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+
+      - name: List downloaded distributions
+        run: ls -la dist/
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v6
+
       - name: Publish
         run: uv publish

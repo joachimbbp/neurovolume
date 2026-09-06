@@ -55,9 +55,8 @@ pub fn build(b: *std.Build) void {
 
     //_: copy binaries:
     //LLM: heavy LLM inspo here
-    //WARN: just mac for now!
     const install_lib = b.addInstallArtifact(libneurovolume, .{});
-    const dest_path = b.fmt("../src/neurvolume/_native/libneurovolume.{s}", .{lib_ext});
+    const dest_path = b.fmt("../src/neurovolume/_native/libneurovolume.{s}", .{lib_ext});
     const copy_lib = b.addInstallFile(libneurovolume.getEmittedBin(), dest_path);
     copy_lib.step.dependOn(&install_lib.step);
     b.getInstallStep().dependOn(&copy_lib.step);
