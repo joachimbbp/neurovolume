@@ -9,6 +9,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("./src/zig/c_root.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = true,
     });
 
     const tag = target.result.os.tag;
@@ -34,6 +35,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("./src/zig/demo_temp.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         }),
     });
 
