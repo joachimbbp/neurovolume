@@ -6,7 +6,7 @@
 
 # Beta Release
 (N is for Next, W is for Work in Progress)
-- [ ] Upgrade to latest Zig (if prudent)
+- [N] Upgrade to latest Zig
 
 - [N] Fix `SaveConfig`
 	- The whole save config thing is somewhat clunky, we should probably replace it. Most importantly: Move the logic currently in `SaveConfig` (name, output folder, overwrite) out of channel/volume `init` and into channel/volume `write` function
@@ -26,7 +26,10 @@
 
 - [W] Expand supported Operating Systems
 	- All Mac, linux, windows, etc
-
+	- Builds are failing for `macos-26` when trying to build the zig binaries.
+		- This should be patched in zig `0.16.0` (see first bullet point)
+		-
+		
 - [ ] Benchmarks, Testing, Publishing:
 	- [ ] Improve Testing, CI/CD, and Publishing pipelines
 	- [ ] Write benchmarks
