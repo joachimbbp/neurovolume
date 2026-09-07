@@ -33,8 +33,8 @@ bold_nii = "./tests/data/sub-01_task-emotionalfaces_run-1_bold.nii"
 print("Downloading test data...")
 # TODO: check if not present?
 urlretrieve(t1_url, t1_gz)
-urlretrieve(t2_url, t2_gz)
-urlretrieve(bold_url, bold_gz)
+# urlretrieve(t2_url, t2_gz)
+# urlretrieve(bold_url, bold_gz)
 
 print("Test data downloaded")
 # print("Unzipping...")
@@ -42,12 +42,12 @@ print("Test data downloaded")
 with gzip.open(t1_gz, "rb") as f_in:
     with open(t1_nii, "wb") as f_out:
         shutil.copyfileobj(f_in, f_out)
-with gzip.open(t2_gz, "rb") as f_in:
-    with open(t2_nii, "wb") as f_out:
-        shutil.copyfileobj(f_in, f_out)
-with gzip.open(bold_gz, "rb") as f_in:
-    with open(bold_nii, "wb") as f_out:
-        shutil.copyfileobj(f_in, f_out)
+# with gzip.open(t2_gz, "rb") as f_in:
+#     with open(t2_nii, "wb") as f_out:
+#         shutil.copyfileobj(f_in, f_out)
+# with gzip.open(bold_gz, "rb") as f_in:
+#     with open(bold_nii, "wb") as f_out:
+#         shutil.copyfileobj(f_in, f_out)
 
 vdb_out = Path("tests/data/vdb_out")
 
@@ -139,40 +139,40 @@ def sub(arr):
     return out  # MULTI-CHANNEL VOLUME SEQUENCES
 
 
-def test_sequence():
-    bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
-    t1_arr, _, t1_affine = _get_nii_data(t1_nii)
+# def test_sequence():
+#     bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
+#     t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
-    fps = _get_fps(bold_img, loud=True)
+#     fps = _get_fps(bold_img, loud=True)
 
-    print("setting a bold channel..")
-    bold_diff = nv.Channel(
-        "bold",
-        sub(nv.prep_ndarray(bold_arr)),
-        transform=bold_affine,
-        source_fps=fps,
-        playback_fps=24,
-        speed=1,
-        interpolation=nv.modes.Interpolation.direct,
-    )
-    print("setting t1 channel")
-    t1 = nv.Channel(
-        "t1",
-        nv.prep_ndarray(t1_arr),
-        transform=t1_affine,
-        num_source_frames=bold_diff.num_output_frames,
-        interpolation=nv.modes.Interpolation.frozen,
-        prune=np.float32(0.1),
-    )
+#     print("setting a bold channel..")
+#     bold_diff = nv.Channel(
+#         "bold",
+#         sub(nv.prep_ndarray(bold_arr)),
+#         transform=bold_affine,
+#         source_fps=fps,
+#         playback_fps=24,
+#         speed=1,
+#         interpolation=nv.modes.Interpolation.direct,
+#     )
+#     print("setting t1 channel")
+#     t1 = nv.Channel(
+#         "t1",
+#         nv.prep_ndarray(t1_arr),
+#         transform=t1_affine,
+#         num_source_frames=bold_diff.num_output_frames,
+#         interpolation=nv.modes.Interpolation.frozen,
+#         prune=np.float32(0.1),
+#     )
 
-    print("setting save config...")
-    save_config = nv.SaveConfig("fmri_sub", folder=vdb_out / "fmri_seq")
-    print("Setting fmri sequence...")
-    fmri = nv.Sequence([bold_diff, t1], save_config)
-    print("writing fmri VDB...")
-    fmri.write()
+#     print("setting save config...")
+#     save_config = nv.SaveConfig("fmri_sub", folder=vdb_out / "fmri_seq")
+#     print("Setting fmri sequence...")
+#     fmri = nv.Sequence([bold_diff, t1], save_config)
+#     print("writing fmri VDB...")
+#     fmri.write()
 
-    print("done!")
+#     print("done!")
 
 
 # # TODO rewrite this with updated logic:

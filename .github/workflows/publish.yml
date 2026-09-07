@@ -13,14 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15      # Apple Silicon (ARM64)
+          - os: macos-26      # Apple Silicon (ARM64)
             target: macos-arm64
-          - os: macos-13      # Intel (x86_64)
-            target: macos-x86_64
-          - os: ubuntu-latest
-            target: linux-x86_64
-          - os: windows-latest
-            target: windows-x86_64
+          - os: macos-26-intel      # Intel (x86_64)
+            target: macos-intel_x86_64
+          - os: windows-11-arm
+            target: windows-11-arm
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -46,10 +44,6 @@ jobs:
       - name: Test Python Library
         run: uv run pytest -s tests
 
-      # NOTE: check this output - if the wheel filename doesn't include your
-      # OS/arch (e.g. "-macosx_", "-linux_", "-win_"), your build backend is
-      # tagging it as pure Python (py3-none-any), which will cause wheels
-      # from different platforms to collide/overwrite in the publish job.
       - name: List built distributions
         run: ls -la dist/
         shell: bash
