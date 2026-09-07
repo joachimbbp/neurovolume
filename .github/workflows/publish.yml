@@ -13,12 +13,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-26      # Apple Silicon (ARM64)
-            target: macos-arm64
+          - os: macos-15      # Apple Silicon (ARM64)
+            target: macos-15
           - os: macos-26-intel      # Intel (x86_64)
-            target: macos-intel_x86_64
-          - os: windows-11-arm
-            target: windows-11-arm
+            target: macos-26-intel
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout

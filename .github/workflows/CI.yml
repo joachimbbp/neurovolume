@@ -12,7 +12,7 @@ jobs:
       matrix:
         # please submit PRs for any operating system YOU might want to use!
         # see: https://docs.github.com/en/actions/reference/runners/github-hosted-runners
-        os: [macos-15, macos-26-intel]
+        os: [macos-15, macos-26,  macos-26-intel, macos-15-intel, windows-2025, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
 
     steps:
