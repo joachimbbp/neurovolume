@@ -10,8 +10,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # NOTE:
+        # as we upgrade CI, testing, and publication we should be more
+        # intentional about the operating systems and begin to pin
+        # specific versions (not just "latest")
         # please submit PRs for any operating system YOU might want to use!
-        os: [macos-15, ubuntu-latest, windows-latest]
+        # see: https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+        os: [macos-26, windows-latest, macos-26-intel]
     runs-on: ${{ matrix.os }}
 
     steps:
