@@ -12,13 +12,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-26      # Apple Silicon (ARM64)
-            target: macos-arm64
-          - os: macos-26-intel      # Intel (x86_64)
-            target: macos-intel_x86_64
-          - os: windows-11-arm
-            target: windows-11-arm
+        os: [
+        # TODO: after Zig is updated, add macos-26
+        # WARN: this should mirror what was tested and confirmed as working
+        # in CI.yml
+        # there isn't a non terrible way to DRY this in yml, so as long
+        # as we're on github actions this is probably the way it has
+        # to be! (submit PRs and email me if you know a better way)
+            "macos-15",
+            "macos-26-intel",
+            "macos-15-intel",
+            "windows-2025",
+            # "ubuntu-24.04" # breaks sometimes (but not all the time)
+            ]
+
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -51,7 +58,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.target }}
+          name: dist-${{ matrix.os}}
           path: dist/
 
   publish:

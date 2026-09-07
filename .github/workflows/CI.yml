@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main"] 
+    branches: ["CI"] 
 
 jobs:
   build:
@@ -12,9 +12,15 @@ jobs:
       matrix:
         # please submit PRs for any operating system YOU might want to use!
         # see: https://docs.github.com/en/actions/reference/runners/github-hosted-runners
-        os: [macos-26, windows-11-arm, macos-26-intel]
+        os: [
+        # TODO: after Zig is updated, add macos-26
+            "macos-15",
+            "macos-26-intel",
+            "macos-15-intel",
+            "windows-2025",
+            # "ubuntu-24.04" # breaks sometimes (but not all the time)
+            ]
     runs-on: ${{ matrix.os }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
