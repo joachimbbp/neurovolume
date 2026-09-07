@@ -25,10 +25,10 @@
 	- Doing so will speed up the iteration and allow you to test directly on the Python layer.
 
 - [W] Expand supported Operating Systems
-	- All Mac, linux, windows, etc
+	- All Mac, linux, windows, etc.
 	- Builds are failing for `macos-26` when trying to build the zig binaries.
 		- This should be patched in zig `0.16.0` (see first bullet point)
-		-
+  - Ubuntu builds regularly time out
 		
 - [ ] Benchmarks, Testing, Publishing:
 	- [ ] Improve Testing, CI/CD, and Publishing pipelines
