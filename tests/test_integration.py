@@ -96,18 +96,18 @@ def _get_nii_data(nii_path: str):
 
 
 def test_static():
-    bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
+    # bold_arr, bold_img, bold_affine = _get_nii_data(bold_nii)
     t1_arr, _, t1_affine = _get_nii_data(t1_nii)
 
     # print("setting a bold channel..")
     # TODO: try with fade (but that is very heavy!!!!)
-    bold = nv.Grid(
-        "bold",
-        nv.prep_ndarray(bold_arr)[1],
-        # obvs will mis-align but Im just trying to dial in the prune
-        # transform=bold_affine,
-        prune=np.float32(0.1),
-    )
+    # bold = nv.Grid(
+    #     "bold",
+    #     nv.prep_ndarray(bold_arr)[1],
+    #     # obvs will mis-align but Im just trying to dial in the prune
+    #     # transform=bold_affine,
+    #     prune=np.float32(0.1),
+    # )
     print("setting t1 channel")
     t1 = nv.Grid(
         "t1",
@@ -118,8 +118,8 @@ def test_static():
     # 0.1 is more or less good
     save_config = nv.SaveConfig("combined_0p1", folder=vdb_out)
 
-    vol = nv.Volume([t1, bold], save_config)
-
+    # vol = nv.Volume([t1, bold], save_config)
+    vol = nv.Volume([t1], save_config)
     vol.write()
 
 
