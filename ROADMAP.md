@@ -5,14 +5,15 @@
 	- Implemented [here](https://github.com/joachimbbp/neurovolume/commit/cf7001b342d0439f8eda0ace781f4b3c05b80422)
 
 # Beta Release
-(N is for Next, W is for Work in Progress)
-- [N] Upgrade to latest Zig
+N is for Next, B is being addressed on this branch, W is for general Work in Progress (including work being indirectly addressed on this branch)
+
+- [B] Upgrade to latest Zig
 
 - [N] Fix `SaveConfig`
 	- The whole save config thing is somewhat clunky, we should probably replace it. Most importantly: Move the logic currently in `SaveConfig` (name, output folder, overwrite) out of channel/volume `init` and into channel/volume `write` function
 	- Establish some sane defaults here
 
-- [N] Imporve naming on `Channel`
+- [N] Improve naming on `Channel`
 	- `num_frames` and `num_output_frames` are confusingly named
 
 - [ ] Improve Attribute Writing System
@@ -25,7 +26,7 @@
 	- Doing so will speed up the iteration and allow you to test directly on the Python layer.
 
 - [W] Expand supported Operating Systems
-	- All Mac, linux, windows, etc.
+	- All Mac, Linux, Windows, etc.
 	- Builds are failing for `macos-26` when trying to build the zig binaries.
 		- This should be patched in zig `0.16.0` (see first bullet point)
   - Ubuntu builds regularly time out
@@ -56,12 +57,12 @@
 	- [ ] Find a balanced AI policy
 
 # Future
-- [ ] Standalone zig library
+- [ ] Standalone Zig library
 	- Both zig and Python libraries should look like each other
 	- Zig library is probably going to be useful for simulations and other things that need to go fast, so not sure if we will need native file parsing (numpy, NIfTI, etc) or not. Trying to cover every possible file is probably unwise. Perhaps a little module to read numpy arrays from disk?
 - [ ] Add source RGB values to the output VDB
 - [ ] Directly delete points (and otherwise edit) an existing VDB file
-	- Useful for data cleanup in blender, etc
+	- Useful for data clean up in blender, etc.
 
 # Far Future
 - [ ] VDB viewer to test experimental features that might not be supported by current software such as:

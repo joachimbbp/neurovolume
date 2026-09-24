@@ -6,10 +6,10 @@ While this project focuses on neuroscience, it includes `ndarray` to `VDB` to su
 
 This project is under active development and might not have everything you need. Please reference reference our [roadmap](ROADMAP.md) to see what is in the works!
 
-This project is available as a pre-release alpha on [pypi](https://pypi.org/project/neurovolume/). Presently it is only available for arm64. More operating systems coming soon!
+This project is available as a prerelease alpha on [pypi](https://pypi.org/project/neurovolume/).
 
 # 🏗️ Building
-If you are building locally, we use uv to build and test the project:
+If you are building locally, we use `uv` to build and test the project:
 ```bash
 uv run python -m ziglang build && uv run pytest tests -s
 ```

@@ -10,6 +10,7 @@ language-servers = [
     {name = "pyright"}, # type chekcer
     {name = "ruff"}, # linter and formatter
 ]
+soft-wrap.enable = true
 
 [language-server.pyright]
 command = "pyright-langserver"
@@ -25,6 +26,7 @@ config = {}
 [[language]]
 name = "zig"
 auto-format = true
+soft-wrap.enable = true
 
 [language-server.zls.config]
 enable_build_on_save = true
