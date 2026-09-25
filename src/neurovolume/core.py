@@ -312,7 +312,7 @@ class Sequence:
         _channels = []
 
         for channel in self.channels:
-            if channel.num_frames == None:
+            if channel.num_frames is None:
                 # which is REALLY shouldn't
                 raise ValueError("undefined number of frames!")
             _channels.append(

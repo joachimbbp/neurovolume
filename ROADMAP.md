@@ -9,6 +9,9 @@ N is for Next, B is being addressed on this branch, W is for general Work in Pro
 
 - [B] Upgrade to latest Zig
 
+- [N] Quickstart Guide
+		- complete after pushing this branch to main
+
 - [N] Fix `SaveConfig`
 	- The whole save config thing is somewhat clunky, we should probably replace it. Most importantly: Move the logic currently in `SaveConfig` (name, output folder, overwrite) out of channel/volume `init` and into channel/volume `write` function
 	- Establish some sane defaults here

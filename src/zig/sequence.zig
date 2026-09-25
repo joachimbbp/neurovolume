@@ -37,7 +37,7 @@ pub const Channel = struct {
     speed: ?f32,
     num_output_frames: usize, //TODO PERHAPS: set this for all num_framse just for clean
     hold_duration: usize,
-    frozen_grid: ?volume.Grid = null, // <- LLM cache for frozen interpolation
+    frozen_grid: ?volume.PreGrid = null, // <- LLM cache for frozen interpolation
 
     pub fn init(
         alloc: std.mem.Allocator,
@@ -107,7 +107,7 @@ pub const Channel = struct {
     pub fn extractFrame(
         c: *Channel,
         frame_num: ?usize, //frame num can be an i frame!
-    ) !volume.Grid {
+    ) !volume.PreGrid {
         return switch (c.interpolation) {
             .direct => try direct(c, frame_num, false),
             .frozen => try direct(c, null, true),
@@ -119,12 +119,12 @@ pub const Channel = struct {
         c: *Channel,
         frame_num: ?usize,
         frozen: bool,
-    ) !volume.Grid {
+    ) !volume.PreGrid {
         //LLM rewrite to stash the frozen frames
         if (frozen) {
             if (c.frozen_grid) |cached| return cached; // ← cache hit, skip the work
 
-            var frame_grid = try volume.Grid.init(
+            var frame_grid = try volume.PreGrid.init(
                 c.alloc,
                 c.name,
                 [3]usize{ 0, 1, 2 },
@@ -140,7 +140,7 @@ pub const Channel = struct {
         }
 
         // non-frozen path: build a fresh grid for this frame
-        var frame_grid = try volume.Grid.init(
+        var frame_grid = try volume.PreGrid.init(
             c.alloc,
             c.name,
             [3]usize{ 0, 1, 2 },
@@ -163,7 +163,7 @@ pub const Channel = struct {
     pub fn fade(
         c: *Channel,
         output_frame: usize, //can be an i frame!
-    ) !volume.Grid {
+    ) !volume.PreGrid {
         const a_frame = output_frame / c.hold_duration;
         const sub = output_frame % c.hold_duration;
 
@@ -176,7 +176,7 @@ pub const Channel = struct {
         const b_scalar: f32 = @as(f32, @floatFromInt(sub)) / @as(f32, @floatFromInt(c.hold_duration));
         const a_scalar: f32 = 1.0 - b_scalar;
 
-        var frame_grid = try volume.Grid.init(
+        var frame_grid = try volume.PreGrid.init(
             c.alloc,
             c.name,
             [3]usize{ 0, 1, 2 },
@@ -241,7 +241,7 @@ pub const Sequence = struct {
     save_config: SaveConfiguration,
     io: Io, // I am assuming this is the right pattern!
     pub fn saveFrame(s: *Sequence, frame_num: usize, alloc: std.mem.Allocator) !void {
-        const wrappers = try alloc.alloc(volume.Grid, s.channels.len);
+        const wrappers = try alloc.alloc(volume.PreGrid, s.channels.len);
         const grids = try alloc.alloc(vdb543.Grid, s.channels.len);
 
         for (s.channels, 0..) |channel, i| {
@@ -257,7 +257,10 @@ pub const Sequence = struct {
         var frame_vol: volume.Vol = .{ .grids = grids, .save_config = s.save_config };
         try frame_vol.save(frame_num);
     }
-    pub fn save(s: *Sequence) !void {
+    pub fn save(
+        s: *Sequence,
+        allocator: std.mem.Allocator,
+    ) !void {
         Io.Dir.cwd().access(
             s.io,
             s.save_config.folder,
@@ -266,17 +269,11 @@ pub const Sequence = struct {
             try Io.Dir.createDirAbsolute(
                 s.io,
                 s.save_config.folder,
-                // CHECKPOINT: permissions!
-                ,
+                .default_file,
             );
         };
         // TODO: async!
-
-        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        const gpa_alloc = gpa.allocator();
-        defer _ = gpa.deinit();
-
-        var arena = std.heap.ArenaAllocator.init(gpa_alloc);
+        var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
         const seq_len = s.channels[0].num_output_frames;

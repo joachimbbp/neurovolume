@@ -18,10 +18,7 @@ pub const SaveConfiguration = struct {
     overwrite: bool, // if false, saves version number
 };
 
-//FIX: the naming conventions here are not great
-// try to rename these structs so we don't have
-// multiple things named "grid" across the codebase
-pub const Grid = struct {
+pub const PreGrid = struct {
     alloc: std.mem.Allocator,
     name: []const u8,
     cartesian_order: [3]usize,
@@ -41,7 +38,7 @@ pub const Grid = struct {
         normalize: bool,
         dims: [3]usize,
         prune: ?f32,
-    ) !Grid {
+    ) !PreGrid {
         const vdb_ptr = try alloc.create(vdb543.VDB);
         vdb_ptr.* = .init(0);
 
@@ -61,15 +58,15 @@ pub const Grid = struct {
 
     //populates the vdb543.Grid with VDB data
     pub fn populate(
-        g: *Grid,
+        pre_grid: *PreGrid,
         data: []const f32,
         start_end: ?[2]usize, // for sequences
     ) !void {
         //setup based on data source type (just numpy for now)
         //switch prongs just open for possible future native fileparsing
-        switch (g.source_format) {
+        switch (pre_grid.source_format) {
             .ndarray => {
-                if (g.normalize) {
+                if (pre_grid.normalize) {
                     std.debug.print(
                         ndarray_fyi,
                         .{},
@@ -91,9 +88,9 @@ pub const Grid = struct {
             if (start_end != null) {
                 value = data[start_end.?[0]..start_end.?[1]][i];
             }
-            try g.vdb.putVoxel(
-                g.alloc,
-                .from(.{ cart[g.cartesian_order[0]], cart[g.cartesian_order[1]], cart[g.cartesian_order[2]] }),
+            try pre_grid.vdb.putVoxel(
+                pre_grid.alloc,
+                .from(.{ cart[pre_grid.cartesian_order[0]], cart[pre_grid.cartesian_order[1]], cart[pre_grid.cartesian_order[2]] }),
                 value,
             );
             i += 1;
@@ -101,7 +98,7 @@ pub const Grid = struct {
                 i32,
                 3,
                 &cart,
-                .{ g.dims[0], g.dims[1], g.dims[2] },
+                .{ pre_grid.dims[0], pre_grid.dims[1], pre_grid.dims[2] },
             )) break;
         }
 
@@ -109,46 +106,44 @@ pub const Grid = struct {
         // the tol is the tolerance amount
         // higher means more things are pruned
         //default is quite strict
-        if (g.prune) |tol| g.vdb.prune(tol);
+        if (pre_grid.prune) |tol| pre_grid.vdb.prune(tol);
 
         //LLM suggesting a fix to its own code lol:
         var grid = vdb543.Grid.init(
-            g.vdb,
-            g.name,
-            g.affine_transform,
+            pre_grid.vdb,
+            pre_grid.name,
+            pre_grid.affine_transform,
             .empty,
         );
-        try grid.addMetadata(g.alloc, g.name);
-        g.grid = grid; // store into the optional field that's already on Grid
+        try grid.addMetadata(pre_grid.alloc, pre_grid.name);
+        pre_grid.grid = grid; // store into the optional field that's already on Grid
 
         // //TODO: see if you can add prune level to metadata
     }
 
-    pub fn deinit(g: *Grid) void {
+    pub fn deinit(g: *PreGrid) void {
         g.vdb.deinit(g.alloc);
         g.alloc.destroy(g.vdb);
     }
 };
 pub const Vol = struct {
     grids: []vdb543.Grid,
-    save_config: SaveConfiguration,
 
     pub fn save(
         v: *Vol,
         frame_num: ?usize,
+        allocator: std.mem.Allocator,
+        save_config: SaveConfiguration,
     ) !void {
-        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        const alloc = gpa.allocator();
-        defer _ = gpa.deinit();
-        var arena = std.heap.ArenaAllocator.init(alloc);
+        var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
-        var w: std.Io.Writer.Allocating = .init(alloc);
+        var w: std.Io.Writer.Allocating = .init(allocator);
         defer w.deinit();
         if (frame_num != null) {
             try w.writer.print("{s}/{s}_{d:0>4}.vdb", .{
-                v.save_config.folder,
-                v.save_config.basename,
+                save_config.folder,
+                save_config.basename,
                 frame_num.?,
             });
         } else {
@@ -202,7 +197,7 @@ test "volume grid tests" {
         sphere_arr,
         &[_]usize{ 0, 2, 1 },
     );
-    var sphere_grid = try Grid.init(
+    var sphere_grid = try PreGrid.init(
         arena.allocator(),
         "sphere",
         [3]usize{ 0, 1, 2 },
@@ -222,7 +217,7 @@ test "volume grid tests" {
         cube_arr,
         &[_]usize{ 0, 2, 1 },
     );
-    var cube_grid = try Grid.init(
+    var cube_grid = try PreGrid.init(
         arena.allocator(),
         "cube",
         [3]usize{ 0, 1, 2 },
