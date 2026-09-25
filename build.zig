@@ -55,6 +55,11 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
 
+    //_: ZLS check step (type-check without installing)
+    const check = b.step("check", "Check compilation");
+    check.dependOn(&libneurovolume.step);
+    check.dependOn(&exe.step);
+
     //_: copy binaries:
     //LLM: heavy LLM inspo here
     const install_lib = b.addInstallArtifact(libneurovolume, .{});
