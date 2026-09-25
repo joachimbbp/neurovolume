@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const volume = @import("volume.zig");
 const util = @import("util.zig");
 const vdb543 = @import("vdb543.zig");
@@ -238,9 +239,8 @@ pub const Channel = struct {
 pub const Sequence = struct {
     channels: []const *Channel,
     save_config: SaveConfiguration,
-
+    io: Io, // I am assuming this is the right pattern!
     pub fn saveFrame(s: *Sequence, frame_num: usize, alloc: std.mem.Allocator) !void {
-        //LLM rewrite
         const wrappers = try alloc.alloc(volume.Grid, s.channels.len);
         const grids = try alloc.alloc(vdb543.Grid, s.channels.len);
 
@@ -258,9 +258,20 @@ pub const Sequence = struct {
         try frame_vol.save(frame_num);
     }
     pub fn save(s: *Sequence) !void {
-        std.fs.cwd().access(s.save_config.folder, .{}) catch {
-            try std.fs.cwd().makeDir(s.save_config.folder);
+        Io.Dir.cwd().access(
+            s.io,
+            s.save_config.folder,
+            .{},
+        ) catch {
+            try Io.Dir.createDirAbsolute(
+                s.io,
+                s.save_config.folder,
+                // CHECKPOINT: permissions!
+                ,
+            );
         };
+        // TODO: async!
+
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const gpa_alloc = gpa.allocator();
         defer _ = gpa.deinit();

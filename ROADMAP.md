@@ -30,7 +30,8 @@ N is for Next, B is being addressed on this branch, W is for general Work in Pro
 	- Builds are failing for `macos-26` when trying to build the zig binaries.
 		- This should be patched in zig `0.16.0` (see first bullet point)
   - Ubuntu builds regularly time out
-		
+	- WARN: some Zig paths must be encoded differently depending on the operating system (see `Io.Dir.createDir()`). There are other possible issues here as well! You will need a better test suite to catch and patch these problems!
+	
 - [ ] Benchmarks, Testing, Publishing:
 	- [ ] Improve Testing, CI/CD, and Publishing pipelines
 	- [ ] Write benchmarks
